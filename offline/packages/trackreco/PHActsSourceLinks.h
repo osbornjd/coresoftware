@@ -148,6 +148,10 @@ class PHActsSourceLinks : public SubsysReco
                             const TrkrCluster *cluster,
                             const TrkrDefs::cluskey clusKey);
 
+Surface getTpcLocalCoordsCylinders(Acts::Vector2D &local2D,
+                                             Acts::BoundMatrix &localErr,
+                                             const TrkrCluster *cluster,
+				   const TrkrDefs::cluskey clusKey);
   /**
    * Member variables
    */

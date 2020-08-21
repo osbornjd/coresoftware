@@ -28,6 +28,7 @@
 /// Acts includes
 #include <Acts/Surfaces/PerigeeSurface.hpp>
 #include <Acts/Surfaces/PlaneSurface.hpp>
+#include <Acts/Surfaces/CylinderSurface.hpp>
 #include <Acts/Surfaces/Surface.hpp>
 #include <Acts/Utilities/Units.hpp>
 
@@ -67,26 +68,27 @@ int PHActsSourceLinks::Init(PHCompositeNode *topNode)
 
 int PHActsSourceLinks::InitRun(PHCompositeNode *topNode)
 {
-  if (Verbosity() > 10)
+  //if (Verbosity() > 10)
   {
     std::cout << "Starting PHActsSourceLinks::InitRun" << std::endl;
   }
 
   /// Check and create nodes that this module will build
   createNodes(topNode);
-
+  std::cout << " 1" << std::endl;
   /// Check if Acts geometry has been built and is on the node tree
   m_actsGeometry = new MakeActsGeometry();
-  
+  std::cout << " 2" << std::endl;
   m_actsGeometry->setVerbosity(0);
   m_actsGeometry->buildAllGeometry(topNode);
-
+  std::cout << " 3" << std::endl;
   /// Set the tGeometry struct to be put on the node tree
   m_tGeometry->tGeometry = m_actsGeometry->getTGeometry();
   m_tGeometry->magField = m_actsGeometry->getMagField();
   m_tGeometry->calibContext = m_actsGeometry->getCalibContext();
   m_tGeometry->magFieldContext = m_actsGeometry->getMagFieldContext();
   m_tGeometry->geoContext = m_actsGeometry->getGeoContext();
+  std::cout << " 4" << std::endl;
 
   if (Verbosity() > 10)
   {
@@ -155,8 +157,11 @@ int PHActsSourceLinks::process_event(PHCompositeNode *topNode)
     }
     else if (trkrId == TrkrDefs::tpcId)
     {
-      surface = getTpcLocalCoords(local2D, cov, cluster, clusKey);
-
+      if(m_actsGeometry->using_cylinders())
+	surface = getTpcLocalCoordsCylinders(local2D, cov, cluster, clusKey);
+      else
+	surface = getTpcLocalCoords(local2D, cov, cluster, clusKey);
+      
       if (!surface)
       {
         /// if we couldn't find the surface (shouldn't happen) just skip this hit
@@ -292,18 +297,29 @@ Surface PHActsSourceLinks::getTpcLocalCoords(Acts::Vector2D &local2D,
   std::vector<double> worldVec = {world[0], world[1], world[2]};
   /// MakeActsGeometry has a helper function since many surfaces can exist on
   /// a given readout module
-  Surface surface = m_actsGeometry->getTpcSurfaceFromCoords(tpcHitSetKey,
-							    worldVec);
+
+  Surface surface = 0;
+  if(m_actsGeometry->use_cylinders)    
+    {
+     surface = m_actsGeometry->getTpcSurfaceFromCoordsCylinders(tpcHitSetKey,
+							       worldVec);
+    }
+ else
+   {
+     surface = m_actsGeometry->getTpcSurfaceFromCoords(tpcHitSetKey,
+							       worldVec);
+   }
 
   /// If surface can't be found (shouldn't happen) return nullptr and skip this cluster
   if(!surface)
     {
       std::cout << PHWHERE
-		<< "Failed to find associated surface element - should be impossible! Skipping measurement."
-		<< std::endl;
+		<< "Failed to find associated surface element for hitsetkey " << tpcHitSetKey << " - should be impossible! Skipping measurement."  << std::endl;
+      std::cout << "    radius " << radius << "  layer " << layer << " sector " << sectorId << " side " << side << std::endl;
+
       return nullptr;
     }
-  if(Verbosity() > 0)
+  if(Verbosity() > 10)
     {
       std::cout << "Stream of found TPC surface: " << std::endl;
       surface->toStream(m_tGeometry->geoContext, std::cout);
@@ -358,6 +374,132 @@ Surface PHActsSourceLinks::getTpcLocalCoords(Acts::Vector2D &local2D,
     std::cout << " sPHENIX global : " << x * 10 << "  " << y * 10 << "  " 
 	      << z * 10 << "  " << std::endl;
     std::cout << " acts global : " << actsGlobal(0) << "  " << actsGlobal(1) 
+	      << "  " << actsGlobal(2) << std::endl;
+  }
+
+  TMatrixD sPhenixLocalErr = transformCovarToLocal(clusPhi, worldErr);
+
+  /// Get the 2D location covariance uncertainty for the cluster (y and z)
+  localErr(Acts::eLOC_0, Acts::eLOC_0) = 
+    sPhenixLocalErr[1][1] * Acts::UnitConstants::cm2;
+  localErr(Acts::eLOC_1, Acts::eLOC_0) = 
+    sPhenixLocalErr[2][1] * Acts::UnitConstants::cm2;
+  localErr(Acts::eLOC_0, Acts::eLOC_1) = 
+    sPhenixLocalErr[1][2] * Acts::UnitConstants::cm2;
+  localErr(Acts::eLOC_1, Acts::eLOC_1) = 
+    sPhenixLocalErr[2][2] * Acts::UnitConstants::cm2;
+
+
+  if(Verbosity() > 10)
+    {
+      for (int i = 0; i < 3; ++i)
+	{
+	  for (int j = 0; j < 3; j++)
+	    {
+	      std::cout << "  " << i << " "  << j << " worldErr " << worldErr[i][j]  << " localErr " << sPhenixLocalErr[i][j] << std::endl;
+	    }
+	}
+    }
+
+  return surface;
+}
+
+Surface PHActsSourceLinks::getTpcLocalCoordsCylinders(Acts::Vector2D &local2D,
+                                             Acts::BoundMatrix &localErr,
+                                             const TrkrCluster *cluster,
+                                             const TrkrDefs::cluskey clusKey)
+{
+  // cm
+  const float x = cluster->getPosition(0);
+  const float y = cluster->getPosition(1);
+  const float z = cluster->getPosition(2);
+
+  // In local coords the covariances are in the  r*phi vs z frame
+  // They have been rotated into global coordinates in TrkrCluster
+  TMatrixD worldErr(3, 3);
+  for (int i = 0; i < 3; ++i)
+  {
+    for (int j = 0; j < 3; j++)
+    {
+      worldErr[i][j] = cluster->getError(i, j);  // this is the cov error squared
+    }
+  }
+
+  /// Extract detector element IDs to access the correct Surface
+  TVector3 world(x, y, z);
+
+  /// Get some geometry values (lengths in mm)
+  const double clusPhi = atan2(world[1], world[0]);
+  const double radius = sqrt(x * x + y * y) * Acts::UnitConstants::cm;
+  const double rClusPhi = radius * clusPhi;
+  const double zTpc = world[2] * Acts::UnitConstants::cm;
+
+  const unsigned int layer = TrkrDefs::getLayer(clusKey);
+  const unsigned int sectorId = TpcDefs::getSectorId(clusKey);
+  const unsigned int side = TpcDefs::getSide(clusKey);
+ 
+  /// Get the surface key to find the surface from the map
+  TrkrDefs::hitsetkey tpcHitSetKey = TpcDefs::genHitSetKey(layer, sectorId, side);
+  std::vector<double> worldVec = {world[0], world[1], world[2]};
+  /// MakeActsGeometry has a helper function since many surfaces can exist on
+  /// a given readout module
+  Surface surface = m_actsGeometry->getTpcSurfaceFromCoordsCylinders(tpcHitSetKey,
+							    worldVec);
+
+  /// If surface can't be found (shouldn't happen) return nullptr and skip this cluster
+  if(!surface)
+    {
+      std::cout << PHWHERE
+		<< "Failed to find associated surface element for hitsetkey " << tpcHitSetKey << " - should be impossible! Skipping measurement."  << std::endl;
+      std::cout << "    radius " << radius << "  layer " << layer << " sector " << sectorId << " side " << side << std::endl;
+
+      return nullptr;
+    }
+  if(Verbosity() > 0)
+    {
+      std::cout << "Stream of found TPC surface: " << std::endl;
+      surface->toStream(m_tGeometry->geoContext, std::cout);
+      std::cout << std::endl;
+    }
+
+  /// Transformation of cluster to local surface coords
+  /// Coords are r*phi relative to surface r-phi center, and z
+  /// relative to surface z center
+  // lengths in mm
+
+  Acts::Vector3D globalPos(x * Acts::UnitConstants::cm,
+			   y * Acts::UnitConstants::cm,
+			   z * Acts::UnitConstants::cm);
+  
+  surface->globalToLocal(m_actsGeometry->getGeoContext(), globalPos,
+			 surface->normal(m_actsGeometry->getGeoContext()),
+			 local2D);
+  
+  if (Verbosity() > 0)
+  {
+    /// Test that Acts surface transforms correctly back
+    Acts::Vector3D actsGlobal(0,0,0);
+    surface->localToGlobal(m_actsGeometry->getGeoContext(), local2D, 
+			   Acts::Vector3D(1,1,1), actsGlobal);
+
+    // estimate local position on surface (assumes 30 degree azimuthal surfaces)
+    double surf_center_phi = (-180.0 + 15.0 + (double) sectorId*30.0) * M_PI / 180.0; 
+    double surf_center_rphi = radius * surf_center_phi;
+    double surf_center_z = 10 * 105.5 / 2.0;
+    if(side == 0) surf_center_z = - surf_center_z;
+
+    std::cout << "cluster readback (mm):  x " << x*Acts::UnitConstants::cm <<  " y " << y*Acts::UnitConstants::cm << " z " << z*Acts::UnitConstants::cm 
+	      << " radius " << radius << std::endl;
+    std::cout << " cluster readback: phi " << clusPhi << " cluster z " << zTpc << " r*clusphi " << rClusPhi << std::endl;
+    std::cout << " radius " << radius << " sector " << sectorId << " side " << side << std::endl;
+    std::cout << " surf_center_phi " << surf_center_phi << " surf_center_rphi " << surf_center_rphi << " surf_center_z " << surf_center_z << std::endl;
+    std::cout << " est: local phi " << clusPhi - surf_center_phi
+	      << " local rphi " << rClusPhi-surf_center_rphi 
+    	      << " local z " << zTpc - surf_center_z  << std::endl;
+    std::cout << " acts local : " <<local2D(0) <<"  "<<local2D(1) << std::endl;
+    std::cout << " sPHENIX global : " << x * 10 << "  " << y * 10 << "  " 
+	      << z * 10 << "  " << std::endl;
+    std::cout << " Check: acts global from local: " << actsGlobal(0) << "  " << actsGlobal(1) 
 	      << "  " << actsGlobal(2) << std::endl;
   }
 

@@ -71,6 +71,7 @@ class MakeActsGeometry
   /// Functions to edit TGeoManager to include TPC boxes
   void editTPCGeometry(PHCompositeNode *topNode);
   void addActsTpcSurfaces(TGeoVolume *tpc_gas_vol, TGeoManager *geoManager);
+  void addActsTpcSurfacesCylinders(TGeoVolume *tpc_gas_vol, TGeoManager *geoManager);
 
   void setVerbosity(int verbosity)
   { m_verbosity = verbosity; }
@@ -98,6 +99,11 @@ class MakeActsGeometry
   /// since there are many tpc surfaces per read out module
   Surface getTpcSurfaceFromCoords(TrkrDefs::hitsetkey hitsetkey, 
     std::vector<double> &world);
+  Surface getTpcSurfaceFromCoordsCylinders(TrkrDefs::hitsetkey hitsetkey, 
+    std::vector<double> &world);
+
+  bool using_cylinders() {return use_cylinders;}
+  bool use_cylinders;
 
  private:
   
@@ -123,6 +129,7 @@ class MakeActsGeometry
   void makeMvtxMapPairs(TrackingVolumePtr &mvtxVolume);
   void makeInttMapPairs(TrackingVolumePtr &inttVolume);
   void makeTpcMapPairs(TrackingVolumePtr &tpcVolume);
+  void makeTpcMapPairsCylinder(TrackingVolumePtr &tpcVolume);
   
   /// Get subdetector hitsetkey from the local sensor unit coordinates
   TrkrDefs::hitsetkey getMvtxHitSetKeyFromCoords(unsigned int layer, 
@@ -167,6 +174,7 @@ class MakeActsGeometry
   double m_surfStepZ;
   double m_moduleStepPhi;
   double m_modulePhiStart;
+  unsigned int m_numCylinderSectionsPhi;
 
   /// Debugger for printing out tpc active volumes
   int nprint_tpc;
@@ -183,6 +191,7 @@ class MakeActsGeometry
   const double half_width_clearance_thick = 0.4999;
   const double half_width_clearance_phi = 0.4999;
   const double half_width_clearance_z = 0.4999;
+  const double radial_clearance = 1.0e-4;  // cm
 
   /// The acts geometry object
   TGeoDetector m_detector;
