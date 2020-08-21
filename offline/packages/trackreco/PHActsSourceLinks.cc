@@ -485,15 +485,16 @@ Surface PHActsSourceLinks::getTpcLocalCoordsCylinders(Acts::Vector2D &local2D,
     // estimate local position on surface (assumes 30 degree azimuthal surfaces)
     double surf_center_phi = (-180.0 + 15.0 + (double) sectorId*30.0) * M_PI / 180.0; 
     double surf_center_rphi = radius * surf_center_phi;
-    double surf_center_z = 10 * 105.5 / 2.0;
+    double surf_center_z = 528.9;  // center of the north gas volume
     if(side == 0) surf_center_z = - surf_center_z;
 
+    double rad_to_deg = 180.0 / M_PI;
     std::cout << "cluster readback (mm):  x " << x*Acts::UnitConstants::cm <<  " y " << y*Acts::UnitConstants::cm << " z " << z*Acts::UnitConstants::cm 
 	      << " radius " << radius << std::endl;
-    std::cout << " cluster readback: phi " << clusPhi << " cluster z " << zTpc << " r*clusphi " << rClusPhi << std::endl;
+    std::cout << " cluster readback: phi(deg) " << clusPhi *rad_to_deg << " cluster z " << zTpc << " r*clusphi " << rClusPhi << std::endl;
     std::cout << " radius " << radius << " sector " << sectorId << " side " << side << std::endl;
-    std::cout << " surf_center_phi " << surf_center_phi << " surf_center_rphi " << surf_center_rphi << " surf_center_z " << surf_center_z << std::endl;
-    std::cout << " est: local phi " << clusPhi - surf_center_phi
+    std::cout << " surf_center_phi(deg) " << surf_center_phi * rad_to_deg << " surf_center_rphi " << surf_center_rphi << " surf_center_z " << surf_center_z << std::endl;
+    std::cout << " est: local phi(deg) " << (clusPhi - surf_center_phi) * rad_to_deg
 	      << " local rphi " << rClusPhi-surf_center_rphi 
     	      << " local z " << zTpc - surf_center_z  << std::endl;
     std::cout << " acts local : " <<local2D(0) <<"  "<<local2D(1) << std::endl;

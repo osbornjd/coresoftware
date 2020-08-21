@@ -302,10 +302,12 @@ void MakeActsGeometry::addActsTpcSurfacesCylinders(TGeoVolume *tpc_gas_vol, TGeo
 
   TGeoVolume *tpc_gas_measurement_vol[m_nTpcLayers];
 
-  // The (half) tpc gas volume is 105.5 cm long and is symmetric around (x,y,z) = (0,0,0) in its frame
+  // The active (half) tpc gas volume is 105.5 cm long and is symmetric around (x,y,z) = (0,0,0) in its frame
+  // note that the active volume does not include the membrane or end wall, 
+  // so the center of the active volume is at the center of the north gas volume, which is at z = 52.89 cm
   double tpc_half_length_z = 105.5/ 2.0;
   double phi_start = 0.0;   // degrees
-  double phi_end =  30.0 * 12.0 / (double ) m_numCylinderSectionsPhi;  // degrees, m_numCylinderSectionsPhi should be 1, 4 or 12
+  double phi_end =  30.0 * 12.0 / (double ) m_numCylinderSectionsPhi;  // degrees, m_numCylinderSectionsPhi should eventually be 1, 2, 4, 6 or 12 - assumes 12 for now!
 
   for(unsigned int ilayer = 0; ilayer < m_nTpcLayers; ++ilayer)
     {
@@ -321,22 +323,22 @@ void MakeActsGeometry::addActsTpcSurfacesCylinders(TGeoVolume *tpc_gas_vol, TGeo
 							     phi_start, phi_end
 							     ) ;
 
-      //int copy = 0;
       for(unsigned int iphi = 0; iphi < m_numCylinderSectionsPhi; ++iphi)
 	{
-	  double phi_rot_degrees = -180.0 + (phi_end - phi_start) * (double) iphi;
+	  double phi_rot_degrees = -180.0 + 15.0 + (phi_end - phi_start) * (double) iphi;
 
 	  char rot_name[500];
 	  sprintf(rot_name,"tpc_gas_rotation_%i", iphi);
 
+	  // the center of the north gas volume is at 528.9 mm relative to the membrane, corresponding to 0.0 here 
 	  TGeoCombiTrans *tpc_gas_measurement_location = new TGeoCombiTrans(0.0, 0.0, 0.0,
 									    new TGeoRotation(rot_name,phi_rot_degrees, 0, 0));
 	  	  
 	  tpc_gas_vol->AddNode(tpc_gas_measurement_vol[ilayer], iphi, tpc_gas_measurement_location);
 	  
-	  cout << PHWHERE << " Made iphi " << iphi << " in ilayer " << ilayer << " with phi rot " << phi_rot_degrees << endl;
+	  cout << PHWHERE << " Made iphi " << iphi << " in ilayer " << ilayer << " with phi rot " << phi_rot_degrees 
+	       << " phi_start " << phi_start << " phi_end " << phi_end << endl;
 	  
-	  //copy++;
 	}
 
     }
