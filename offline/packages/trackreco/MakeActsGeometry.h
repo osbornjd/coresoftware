@@ -102,8 +102,8 @@ class MakeActsGeometry
   Surface getTpcSurfaceFromCoordsCylinders(TrkrDefs::hitsetkey hitsetkey, 
     std::vector<double> &world);
 
-  bool using_cylinders() {return use_cylinders;}
-  bool use_cylinders;
+  bool usingCylinders() {return m_useCylinders;}
+  void useCylinders(bool useCylinders){m_useCylinders = useCylinders;}
 
  private:
   
@@ -160,6 +160,8 @@ class MakeActsGeometry
   std::map<TrkrDefs::hitsetkey, std::vector<Surface>> m_clusterSurfaceMapTpcEdit;
   std::map<TrkrDefs::cluskey, Surface> m_clusterSurfaceMapTpc;
   
+   bool m_useCylinders;
+
   /// These don't change, we are building the tpc this way!
   const static unsigned int m_nTpcLayers = 48;
   const unsigned int m_nTpcModulesPerLayer = 12;

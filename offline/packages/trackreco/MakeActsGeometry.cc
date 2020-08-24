@@ -68,11 +68,11 @@
 using namespace std;
 
 MakeActsGeometry::MakeActsGeometry(const string &name)
-  : use_cylinders(true)
-  , m_geomContainerMvtx(nullptr)
+  : m_geomContainerMvtx(nullptr)
   , m_geomContainerIntt(nullptr)
   , m_geomContainerTpc(nullptr)
   , m_geoManager(nullptr)
+  , m_useCylinders(true)
   , m_minSurfZ(0.0)
   , m_maxSurfZ(105.5)
   , m_nSurfZ(1)
@@ -160,9 +160,6 @@ void MakeActsGeometry::editTPCGeometry(PHCompositeNode *topNode)
   {
     TString node_name = World_vol->GetNode(i)->GetName();
 
-    //if (m_verbosity)
-    //cout << "EditTPCGeometry - searching node " << node_name << endl;
-
     if (node_name.BeginsWith("tpc_envelope"))
     {
       if (m_verbosity)
@@ -206,7 +203,7 @@ void MakeActsGeometry::editTPCGeometry(PHCompositeNode *topNode)
   }
 
   // adds surfaces to the underlying volume, so both north and south placements get them
-  if(use_cylinders)
+  if(m_useCylinders)
     addActsTpcSurfacesCylinders(tpc_gas_north_vol, geoManager);
   else
     addActsTpcSurfaces(tpc_gas_north_vol, geoManager);
@@ -487,7 +484,7 @@ void MakeActsGeometry::makeGeometry(int argc, char *argv[],
   /// Same for the TPC - only one volume
   auto tpcVolume = volumeVector.at(1);
 
-  if(use_cylinders)
+  if(m_useCylinders)
     makeTpcMapPairsCylinder(tpcVolume);
   else
     makeTpcMapPairs(tpcVolume);
@@ -566,7 +563,7 @@ void MakeActsGeometry::makeTpcMapPairsCylinder(TrackingVolumePtr &tpcVolume)
       auto surfaceVector = surfaceArray->surfaces();
       for( unsigned int j = 0; j < surfaceVector.size(); j++)
 	{
-	  auto  surf = surfaceVector.at(j)->getSharedPtr();
+	  auto surf = surfaceVector.at(j)->getSharedPtr();
 
 	  //std::cout << " surface type " << surf->type() << " surf name " << surf->name() << std::endl;
 	  //surf->toStream(m_geoCtxt, std::cout);

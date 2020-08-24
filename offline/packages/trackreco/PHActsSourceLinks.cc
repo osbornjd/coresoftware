@@ -75,20 +75,18 @@ int PHActsSourceLinks::InitRun(PHCompositeNode *topNode)
 
   /// Check and create nodes that this module will build
   createNodes(topNode);
-  std::cout << " 1" << std::endl;
   /// Check if Acts geometry has been built and is on the node tree
   m_actsGeometry = new MakeActsGeometry();
-  std::cout << " 2" << std::endl;
-  m_actsGeometry->setVerbosity(0);
+  m_actsGeometry->setVerbosity(Verbosity());
+  m_actsGeometry->useCylinders(true);
   m_actsGeometry->buildAllGeometry(topNode);
-  std::cout << " 3" << std::endl;
+
   /// Set the tGeometry struct to be put on the node tree
   m_tGeometry->tGeometry = m_actsGeometry->getTGeometry();
   m_tGeometry->magField = m_actsGeometry->getMagField();
   m_tGeometry->calibContext = m_actsGeometry->getCalibContext();
   m_tGeometry->magFieldContext = m_actsGeometry->getMagFieldContext();
   m_tGeometry->geoContext = m_actsGeometry->getGeoContext();
-  std::cout << " 4" << std::endl;
 
   if (Verbosity() > 10)
   {
@@ -157,7 +155,7 @@ int PHActsSourceLinks::process_event(PHCompositeNode *topNode)
     }
     else if (trkrId == TrkrDefs::tpcId)
     {
-      if(m_actsGeometry->using_cylinders())
+      if(m_actsGeometry->usingCylinders())
 	surface = getTpcLocalCoordsCylinders(local2D, cov, cluster, clusKey);
       else
 	surface = getTpcLocalCoords(local2D, cov, cluster, clusKey);
@@ -223,7 +221,6 @@ int PHActsSourceLinks::process_event(PHCompositeNode *topNode)
 
   if (Verbosity() > 10)
   {
-    //m_hitIdClusKey
     std::map<TrkrDefs::cluskey, unsigned int>::iterator it = m_hitIdClusKey->begin();
     while (it != m_hitIdClusKey->end())
     {
@@ -232,7 +229,6 @@ int PHActsSourceLinks::process_event(PHCompositeNode *topNode)
       ++it;
     }
   }
-
 
   return Fun4AllReturnCodes::EVENT_OK;
 }
@@ -299,7 +295,7 @@ Surface PHActsSourceLinks::getTpcLocalCoords(Acts::Vector2D &local2D,
   /// a given readout module
 
   Surface surface = 0;
-  if(m_actsGeometry->use_cylinders)    
+  if(m_actsGeometry->usingCylinders())    
     {
      surface = m_actsGeometry->getTpcSurfaceFromCoordsCylinders(tpcHitSetKey,
 							       worldVec);
