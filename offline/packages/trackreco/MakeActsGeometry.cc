@@ -37,6 +37,7 @@
 #include <Acts/MagneticField/MagneticFieldContext.hpp>
 #include <Acts/Surfaces/PerigeeSurface.hpp>
 #include <Acts/Surfaces/PlaneSurface.hpp>
+#include <Acts/Surfaces/CylinderSurface.hpp>
 #include <Acts/Surfaces/Surface.hpp>
 #include <Acts/Utilities/CalibrationContext.hpp>
 
@@ -67,7 +68,8 @@
 using namespace std;
 
 MakeActsGeometry::MakeActsGeometry(const string &name)
-  : m_geomContainerMvtx(nullptr)
+  : use_cylinders(true)
+  , m_geomContainerMvtx(nullptr)
   , m_geomContainerIntt(nullptr)
   , m_geomContainerTpc(nullptr)
   , m_geoManager(nullptr)
@@ -75,6 +77,7 @@ MakeActsGeometry::MakeActsGeometry(const string &name)
   , m_maxSurfZ(105.5)
   , m_nSurfZ(1)
   , m_nSurfPhi(12)
+  , m_numCylinderSectionsPhi(12)
   , m_verbosity(0)
 {
   /// These are arbitrary tpc subdivisions, and may change
@@ -104,7 +107,6 @@ MakeActsGeometry::~MakeActsGeometry()
 
 int MakeActsGeometry::buildAllGeometry(PHCompositeNode *topNode)
 {
-
   /// Add the TPC surfaces to the copy of the TGeoManager. Do this before
   /// anything else so that the geometry is finalized
   editTPCGeometry(topNode);
@@ -128,7 +130,6 @@ int MakeActsGeometry::buildAllGeometry(PHCompositeNode *topNode)
 
 void MakeActsGeometry::editTPCGeometry(PHCompositeNode *topNode)
 {
-  
   PHGeomTGeo *geomNode = PHGeomUtility::GetGeomTGeoNode(topNode, true);
   assert(geomNode);
   
@@ -205,7 +206,10 @@ void MakeActsGeometry::editTPCGeometry(PHCompositeNode *topNode)
   }
 
   // adds surfaces to the underlying volume, so both north and south placements get them
-  addActsTpcSurfaces(tpc_gas_north_vol, geoManager);
+  if(use_cylinders)
+    addActsTpcSurfacesCylinders(tpc_gas_north_vol, geoManager);
+  else
+    addActsTpcSurfaces(tpc_gas_north_vol, geoManager);
 
   geoManager->CloseGeometry();
 
@@ -291,6 +295,56 @@ void MakeActsGeometry::addActsTpcSurfaces(TGeoVolume *tpc_gas_vol, TGeoManager *
     }
 }
 
+void MakeActsGeometry::addActsTpcSurfacesCylinders(TGeoVolume *tpc_gas_vol, TGeoManager *geoManager)
+{
+  TGeoMedium *tpc_gas_medium = tpc_gas_vol->GetMedium();
+  assert(tpc_gas_medium);
+
+  TGeoVolume *tpc_gas_measurement_vol[m_nTpcLayers];
+
+  // The active (half) tpc gas volume is 105.5 cm long and is symmetric around (x,y,z) = (0,0,0) in its frame
+  // note that the active volume does not include the membrane or end wall, 
+  // so the center of the active volume is at the center of the north gas volume, which is at z = 52.89 cm
+  double tpc_half_length_z = 105.5/ 2.0;
+  double phi_start = 0.0;   // degrees
+  double phi_end =  30.0 * 12.0 / (double ) m_numCylinderSectionsPhi;  // degrees, m_numCylinderSectionsPhi should eventually be 1, 2, 4, 6 or 12 - assumes 12 for now!
+
+  for(unsigned int ilayer = 0; ilayer < m_nTpcLayers; ++ilayer)
+    {
+      // make a tube section for this layer
+      char tube_name[500];
+      sprintf(tube_name,"tpc_gas_measurement_%i",ilayer);
+
+
+      tpc_gas_measurement_vol[ilayer] = geoManager->MakeTubs(tube_name, tpc_gas_medium, 
+							    m_layerRadius[ilayer] - m_layerThickness[ilayer] / 2.0 + radial_clearance, 
+							    m_layerRadius[ilayer] + m_layerThickness[ilayer] / 2.0 - radial_clearance, 
+							     tpc_half_length_z,
+							     phi_start, phi_end
+							     ) ;
+
+      for(unsigned int iphi = 0; iphi < m_numCylinderSectionsPhi; ++iphi)
+	{
+	  double phi_rot_degrees = -180.0 + 15.0 + (phi_end - phi_start) * (double) iphi;
+
+	  char rot_name[500];
+	  sprintf(rot_name,"tpc_gas_rotation_%i", iphi);
+
+	  // the center of the north gas volume is at 528.9 mm relative to the membrane, corresponding to 0.0 here 
+	  TGeoCombiTrans *tpc_gas_measurement_location = new TGeoCombiTrans(0.0, 0.0, 0.0,
+									    new TGeoRotation(rot_name,phi_rot_degrees, 0, 0));
+	  	  
+	  tpc_gas_vol->AddNode(tpc_gas_measurement_vol[ilayer], iphi, tpc_gas_measurement_location);
+	  
+	  cout << PHWHERE << " Made iphi " << iphi << " in ilayer " << ilayer << " with phi rot " << phi_rot_degrees 
+	       << " phi_start " << phi_start << " phi_end " << phi_end << endl;
+	  
+	}
+
+    }
+
+}
+
 /**
  * Builds silicon layers and TPC geometry in the ACTS surface world
  */
@@ -319,11 +373,13 @@ void MakeActsGeometry::buildActsSurfaces()
   // so we get access to the results. The layer builder magically gets the TGeoManager
 
   makeGeometry(argc, arg, m_detector);
+
 }
 
 void MakeActsGeometry::makeGeometry(int argc, char *argv[], 
 				    FW::IBaseDetector &detector)
 {
+
   /// setup and parse options
   auto desc = FW::Options::makeDefaultOptions();
   FW::Options::addSequencerOptions(desc);
@@ -342,6 +398,7 @@ void MakeActsGeometry::makeGeometry(int argc, char *argv[],
 
   /// The geometry, material and decoration
   auto geometry = FW::Geometry::build(vm, detector);
+
   /// Geometry is a pair of (tgeoTrackingGeometry, tgeoContextDecorators)
   m_tGeometry = geometry.first;
   m_contextDecorators = geometry.second;
@@ -429,9 +486,12 @@ void MakeActsGeometry::makeGeometry(int argc, char *argv[],
 
   /// Same for the TPC - only one volume
   auto tpcVolume = volumeVector.at(1);
-  
-  makeTpcMapPairs(tpcVolume);
 
+  if(use_cylinders)
+    makeTpcMapPairsCylinder(tpcVolume);
+  else
+    makeTpcMapPairs(tpcVolume);
+    
   return;
 }
 
@@ -486,6 +546,84 @@ void MakeActsGeometry::makeTpcMapPairs(TrackingVolumePtr &tpcVolume)
 	}
     }
 
+}
+
+void MakeActsGeometry::makeTpcMapPairsCylinder(TrackingVolumePtr &tpcVolume)
+{
+
+  auto tpcLayerArray = tpcVolume->confinedLayers();
+  auto tpcLayerVector = tpcLayerArray->arrayObjects();
+
+  /// Need to unfold each layer that Acts builds
+  for(unsigned int i = 0; i < tpcLayerVector.size(); i++)
+    {
+      auto surfaceArray = tpcLayerVector.at(i)->surfaceArray();
+      if(surfaceArray == NULL){
+	continue;
+      }
+      /// surfaceVector is a vector of surfaces corresponding to the tpc layer
+      /// that acts builds
+      auto surfaceVector = surfaceArray->surfaces();
+      for( unsigned int j = 0; j < surfaceVector.size(); j++)
+	{
+	  auto  surf = surfaceVector.at(j)->getSharedPtr();
+
+	  //std::cout << " surface type " << surf->type() << " surf name " << surf->name() << std::endl;
+	  //surf->toStream(m_geoCtxt, std::cout);
+
+	  auto vec3d = surf->center(m_geoCtxt);
+ 	  double surf_z = vec3d[2];
+	  unsigned int surf_tpc_layer = (i - 1) / 2; // want TPC layer for looking up radius
+	  unsigned int surf_layer = surf_tpc_layer+7;  // sPHENIX layer
+	  unsigned int iphi = j;
+	  if(j > 11) iphi = j - 12;
+	  unsigned int side = 1;
+	  if(surf_z < 0) side = 0;
+	  TrkrDefs::hitsetkey hitsetkey = TpcDefs::genHitSetKey(surf_layer, iphi, side);
+
+	  /*
+	  // sanity check 
+	  double phi_start = 0.0;   // degrees
+	  double phi_end =  30.0 * 12.0 / (double ) m_numCylinderSectionsPhi;  // degrees, m_numCylinderSectionsPhi should be 1, 2, 4, 6 or 12
+	  double surf_phi_degrees = -180.0 + (phi_end - phi_start) * (double) iphi + (phi_end - phi_start) / 2.0;
+	  double surf_phi = surf_phi_degrees * M_PI / 180.0;
+	  double surf_radius = m_layerRadius[surf_tpc_layer];
+	  std::vector<double> surf_center = {surf_radius * cos(surf_phi), surf_radius*sin(surf_phi), surf_z}; 
+	  TrkrDefs::hitsetkey check_hitsetkey = getTpcHitSetKeyFromCoords(surf_center);
+
+
+	  int check_sector = TpcDefs::getSectorId(check_hitsetkey);
+	  std::cout << std::endl << " TPC surface index " << i << " surface " << j << " layer " << surf_layer 
+		    << " (radius, phi(deg), z) = " << surf_radius << "  " << surf_phi_degrees << "  " << surf_z << endl; 
+	  std::cout << "     layer, iphi, side " << surf_layer << " " << iphi << " " << side << " hitsetkey " << hitsetkey 
+		    << " check_hitsetkey " << check_hitsetkey << " check_sector " << check_sector << std::endl;
+	  */
+
+	  /// If there is already an entry for this hitsetkey, add the surface
+	  /// to its corresponding vector
+	  std::map<TrkrDefs::hitsetkey, std::vector<Surface>>::iterator mapIter;
+	  mapIter = m_clusterSurfaceMapTpcEdit.find(hitsetkey);
+	  
+	  if(mapIter != m_clusterSurfaceMapTpcEdit.end())
+	    {
+	      std::cout << " Found existing entry for hitsetkey " << hitsetkey << std::endl;
+	      mapIter->second.push_back(surf);
+	    }
+	  else
+	    {
+	      /// Otherwise make a new map entry
+	      std::vector<Surface> dumvec;
+	      dumvec.push_back(surf);
+	      std::pair<TrkrDefs::hitsetkey, std::vector<Surface>> tmp = 
+		std::make_pair(hitsetkey, dumvec);
+	      m_clusterSurfaceMapTpcEdit.insert(tmp);
+	      //std::cout << "Adding new map entry for hitsetkey " << hitsetkey << " and surface " <<  std::endl;
+	      //surf->toStream(m_geoCtxt, std::cout);
+	    }
+	  
+	}
+    }
+  //std::cout <<  std::endl << "Final size of clusterr surface map = " <<  m_clusterSurfaceMapTpcEdit.size() << std::endl;
 }
 
 void MakeActsGeometry::makeInttMapPairs(TrackingVolumePtr &inttVolume)
@@ -691,6 +829,33 @@ Surface MakeActsGeometry::getTpcSurfaceFromCoords(TrkrDefs::hitsetkey hitsetkey,
 
 }
 
+Surface MakeActsGeometry::getTpcSurfaceFromCoordsCylinders(TrkrDefs::hitsetkey hitsetkey, std::vector<double> &world)
+{
+  std::map<TrkrDefs::hitsetkey, std::vector<Surface>>::iterator mapIter;
+  mapIter = m_clusterSurfaceMapTpcEdit.find(hitsetkey);
+  
+  if(mapIter == m_clusterSurfaceMapTpcEdit.end())
+    {
+      cout << PHWHERE << "Error: hitsetkey not found in clusterSurfaceMap, hitsetkey = " << hitsetkey << endl;
+      return nullptr;
+    }
+
+  //double world_phi = atan2(world[1], world[0]);
+  //double world_z = world[2];
+  
+  std::vector<Surface> surf_vec = mapIter->second;
+  //unsigned int surf_index = 999;
+  Surface this_surf = surf_vec[0];
+
+  if(!this_surf)
+    {
+      cout << PHWHERE << "Error: TPC surface index not defined, skipping cluster!" << endl;
+      return nullptr;
+    }
+ 
+  return this_surf;
+
+}
 
 TrkrDefs::hitsetkey MakeActsGeometry::getTpcHitSetKeyFromCoords(std::vector<double> &world)
 {
