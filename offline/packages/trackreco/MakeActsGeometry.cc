@@ -352,11 +352,14 @@ void MakeActsGeometry::buildActsSurfaces()
   char *arg[argc];
 
   // Response file contains arguments necessary for geometry building
-  const std::string argstr[argc]{
+  std::string argstr[argc]{
     "-n1", "-l0", 
       "--response-file=tgeo-sphenix.response",
       "--bf-values", "0", "0", "1.4"
       };
+
+  if(m_useCylinders)
+    argstr[2] = "--repsonse-file=tgeo-sphenix-tpcCylinders.response";
 
   // Set vector of chars to arguments needed
   for (int i = 0; i < argc; ++i)
