@@ -47,6 +47,7 @@
 #include <TMatrixDSym.h>
 #include <cmath>
 #include <iostream>
+#include <algorithm>
 #include <vector>
 #include <utility>
 #include <chrono>
@@ -61,6 +62,7 @@ PHActsTrkProp::PHActsTrkProp(const std::string& name)
   , h_eventTime(nullptr)
   , m_nBadFits(0)
   , m_tGeometry(nullptr)
+  , m_resetCovariance(false)
   , m_trackMap(nullptr)
   , m_actsProtoTracks(nullptr)
   , m_actsFitResults(nullptr)
@@ -70,6 +72,7 @@ PHActsTrkProp::PHActsTrkProp(const std::string& name)
   , m_topNode(nullptr)
 {
   Verbosity(0);
+  initializeLayerSelector();
 }
 
  PHActsTrkProp::~PHActsTrkProp()
@@ -90,26 +93,39 @@ int PHActsTrkProp::Setup(PHCompositeNode* topNode)
   /// {makeId(volId, layerId), {maxChi2, numSourceLinks}}
   /// We'll just put the max chi2 to 10 
 
-  m_sourceLinkSelectorConfig = {
-    /// global default values
-    {makeId(), {100., 55}},
+  std::vector<std::pair<Acts::GeometryID,
+			Acts::SourceLinkSelectorCuts>> sourceLinkSelectors;
+  
+  /// Global detector criteria
+  sourceLinkSelectors.push_back({makeId(), {100.,53}});
 
-    /// MVTX volume should have max 3 SLs
-    {makeId(7), {m_volMaxChi2.find(7)->second, 3}},
-    
-    /// INTT volume should have max 2 SLs
-    {makeId(9), {m_volMaxChi2.find(9)->second, 2}},
-    
-    /// TPC volume should have max 50 (?) SLs
-    {makeId(11), {m_volMaxChi2.find(11)->second,50}}
-  };
+  /// Volume criteria
+  /// Volume IDs - MVTX = 7, INTT = 9, TPC = 11
+  sourceLinkSelectors.push_back({makeId(7), {m_volMaxChi2.find(7)->second, 3}});
+  sourceLinkSelectors.push_back({makeId(9), {m_volMaxChi2.find(9)->second, 2}});
+  sourceLinkSelectors.push_back({makeId(11), {m_volMaxChi2.find(11)->second, 48}});
+  
+  /// Set individual layer criteria (e.g. for first layer of TPC)
+  /// Individual layers should only have one SL per layer
+  for(int vol = 0; vol < m_volLayerMaxChi2.size(); ++vol)
+    for(std::pair<const int, const float> element : m_volLayerMaxChi2.at(vol))
+      sourceLinkSelectors.push_back({makeId(vol*2.+7, element.first),
+	                            {element.second, 1}});
+	      
+  m_sourceLinkSelectorConfig = SourceLinkSelectorConfig(sourceLinkSelectors);
 
-  if(Verbosity() > 2)
-    std::cout << "Set measurement max chi 2 to :" << std::endl
-	      << "MVTX : " << m_volMaxChi2.find(7)->second << std::endl
-	      << "INTT : " << m_volMaxChi2.find(9)->second << std::endl
-	      << "TPC  : " << m_volMaxChi2.find(11)->second << std::endl;
-
+  if(Verbosity() > 1)
+    {
+      std::cout << "The source link selection criteria were set to: " << std::endl;
+      for(int i = 0; i < sourceLinkSelectors.size(); i++)
+	{
+	  std::cout << "GeoID : " << sourceLinkSelectors.at(i).first
+		    << " has chi sq selection " 
+		    << sourceLinkSelectors.at(i).second.chi2CutOff
+		    << std::endl;
+	}
+    }
+	     
   auto logger = Acts::Logging::INFO;
   if(Verbosity() > 5)
     logger = Acts::Logging::VERBOSE;
@@ -171,6 +187,8 @@ int PHActsTrkProp::Process()
   /// Collect all source links for the CKF
   std::vector<SourceLink> sourceLinks = getEventSourceLinks();
 
+  int nTrackSeeds = 0;
+  
   std::map<unsigned int, ActsTrack>::iterator trackIter;
   for(trackIter = m_actsProtoTracks->begin();
       trackIter != m_actsProtoTracks->end();
@@ -181,19 +199,31 @@ int PHActsTrkProp::Process()
 
     FW::TrackParameters trackSeed = track.getTrackParams();
 
-    Acts::BoundSymMatrix covariance;
-    covariance << 1000 * Acts::UnitConstants::um, 0., 0., 0., 0., 0.,
-                  0., 1000 * Acts::UnitConstants::um, 0., 0., 0., 0.,
-                  0., 0., 0.05, 0., 0., 0.,
-                  0., 0., 0., 0.05, 0., 0.,
-                  0., 0., 0., 0., 0.001, 0.,
-                  0., 0., 0., 0., 0., 1.;
-    
-    FW::TrackParameters trackSeedNewCov(covariance,
-					trackSeed.position(),
-					trackSeed.momentum(),
-					trackSeed.charge(),
-					trackSeed.time());
+    if(m_resetCovariance)
+      {
+	if(Verbosity() > 0)
+	  std::cout << "PHActsTrkProp : resetting covariance"<<std::endl;
+	Acts::BoundSymMatrix covariance;
+
+	/// If we are resetting the covariance and the space point
+	/// to the vertex, the POCA should have the covariance of the
+	/// vertex
+	covariance << 1000 * Acts::UnitConstants::um, 0., 0., 0., 0., 0.,
+	              0., 1000 * Acts::UnitConstants::um, 0., 0., 0., 0.,
+	              0., 0., 0.01, 0., 0., 0.,
+	              0., 0., 0., 0.01, 0., 0.,
+	              0., 0., 0., 0., 0.0001, 0.,
+	              0., 0., 0., 0., 0., 1.;
+
+	Acts::Vector3D newPos(track.getVertex());
+
+	FW::TrackParameters trackSeedNewCov(covariance,
+					    newPos,
+					    trackSeed.momentum(),
+					    trackSeed.charge(),
+					    trackSeed.time());
+	trackSeed = trackSeedNewCov;
+      }
 
     /// Construct a perigee surface as the target surface
     /// This surface is what Acts fits with respect to, so we set it to
@@ -212,7 +242,7 @@ int PHActsTrkProp::Process()
 		  << " corresponding to SvtxTrack key " << trackKey
 		  << std::endl
 		  << "with initial covariance " << std::endl
-		  << covariance << std::endl;
+		  << trackSeed.covariance().value() << std::endl;
       }
 
 
@@ -227,7 +257,7 @@ int PHActsTrkProp::Process()
 
     /// Run the CKF for all source links and the constructed track seed
     /// CKF runs both track finder and KF track fitter
-    auto result = findCfg.finder(sourceLinks, trackSeedNewCov, ckfOptions);
+    auto result = findCfg.finder(sourceLinks, trackSeed, ckfOptions);
     
     if(result.ok())
       {
@@ -249,12 +279,18 @@ int PHActsTrkProp::Process()
 		
 	m_nBadFits++;
       }
-    
+
+    nTrackSeeds++;
   }
   
 
   if(Verbosity() > 0)
-    std::cout << "Finished process_event for PHActsTrkProp" << std::endl;
+    {
+      std::cout << "Finished process_event for PHActsTrkProp" 
+		<< std::endl;
+      std::cout << "Processed " << nTrackSeeds << " track seeds "
+		<< std::endl;
+    }
 
   auto stopTime = high_resolution_clock::now();
   auto eventTime = duration_cast<microseconds>(stopTime - startTime);
@@ -310,9 +346,14 @@ void PHActsTrkProp::updateSvtxTrack(Trajectory traj,
   
   /// All these tracks should have the same vertexId if they came from
   /// the same track seed
-  const unsigned int vertexId = origTrack->get_vertex_id();
+  unsigned int vertexId = origTrack->get_vertex_id();
   
+  /// hack for now to just set the vertex id to 0 if it is needed
+  if(vertexId == UINT_MAX)
+    vertexId = 0;
+
   origTrack->Reset();
+
 
   /// Create a state at 0.0 to propagate out from
   float pathLength = 0.0;
@@ -340,6 +381,13 @@ void PHActsTrkProp::updateSvtxTrack(Trajectory traj,
     {
       auto trajState = Acts::MultiTrajectoryHelpers::trajectoryState(mj, trackTip);
       
+      size_t nStates = trajState.nStates;
+      size_t nMeasurements = trajState.nMeasurements;
+      size_t nOutliers = trajState.nOutliers;
+      size_t nHoles = trajState.nHoles;
+      double chi2sum = trajState.chi2Sum;
+      size_t NDF = trajState.NDF;
+
       /// No trackParameters for this trackTip, so fit failed for this tip
       if( !traj.hasTrackParameters(trackTip) )
 	continue;
@@ -361,6 +409,10 @@ void PHActsTrkProp::updateSvtxTrack(Trajectory traj,
 		    << "position : " << fittedParameters.position().transpose()
 		    << std::endl
 		    << "charge : " << fittedParameters.charge() << std::endl;
+	  std::cout << "Track has " << nStates << " states and " 
+		    << nMeasurements << " measurements and " 
+		    << nHoles << " holes and " << nOutliers << " outliers "
+		    << std::endl;
 	}
       
       float qOp = fittedParameters.parameters()[Acts::ParDef::eQOP];
@@ -371,12 +423,6 @@ void PHActsTrkProp::updateSvtxTrack(Trajectory traj,
 	  rotater->setVerbosity(0);
 	  rotatedCov = rotater->rotateActsCovToSvtxTrack(fittedParameters);
 	}
-      
-      
-      //size_t nStates = trajState.nStates;
-      //size_t nMeasurements = trajState.nMeasurements;
-      double chi2sum = trajState.chi2Sum;
-      size_t NDF = trajState.NDF;
       
       float DCA3Dxy = -9999;
       float DCA3Dz = -9999;
@@ -505,6 +551,25 @@ Acts::GeometryID PHActsTrkProp::makeId(int volume,
                            .setSensitive(sensitive);
 }
 
+void PHActsTrkProp::setVolumeLayerMaxChi2(const int vol, const int layer,
+					  const float maxChi2)
+{
+  int volume;
+  if(vol == 7)
+    volume = 0;
+  else if(vol == 9)
+    volume = 1;
+  else if(vol == 11)
+    volume = 2;
+  else
+    {
+      std::cout << "Invalid volume number supplied. Not including" << std::endl;
+      return;
+    }
+
+  m_volLayerMaxChi2.at(volume).insert(std::make_pair(layer, maxChi2));
+
+}
 void PHActsTrkProp::setVolumeMaxChi2(const int vol, const float maxChi2)
 {
   m_volMaxChi2.insert(std::make_pair(vol, maxChi2));
@@ -618,3 +683,10 @@ int PHActsTrkProp::getNodes(PHCompositeNode* topNode)
   return Fun4AllReturnCodes::EVENT_OK;
 }
 
+void PHActsTrkProp::initializeLayerSelector()
+{
+  std::map<const int, const float> dumMap;
+  m_volLayerMaxChi2.push_back(dumMap);
+  m_volLayerMaxChi2.push_back(dumMap);
+  m_volLayerMaxChi2.push_back(dumMap);
+}

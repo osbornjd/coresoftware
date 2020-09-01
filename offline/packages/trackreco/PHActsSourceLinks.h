@@ -95,7 +95,9 @@ class PHActsSourceLinks : public SubsysReco
   int InitRun(PHCompositeNode *topNode);
   int process_event(PHCompositeNode *topNode);
   int ResetEvent(PHCompositeNode *topNode);
-  
+  void useVertexAsMeasurement(bool useVertexMeasurement)
+    {m_useVertexMeasurement = useVertexMeasurement;}
+
  private:
   /**
    * Functions
@@ -148,13 +150,20 @@ class PHActsSourceLinks : public SubsysReco
                             const TrkrCluster *cluster,
                             const TrkrDefs::cluskey clusKey);
 
-Surface getTpcLocalCoordsCylinders(Acts::Vector2D &local2D,
-                                             Acts::BoundMatrix &localErr,
-                                             const TrkrCluster *cluster,
-				   const TrkrDefs::cluskey clusKey);
+
+  Surface getTpcLocalCoordsCylinders(Acts::Vector2D &local2D,
+				     Acts::BoundMatrix &localErr,
+				     const TrkrCluster *cluster,
+				     const TrkrDefs::cluskey clusKey);
+
+  void addVerticesAsSourceLinks(PHCompositeNode *topNode,
+				unsigned int &hitId);
+
   /**
    * Member variables
    */
+
+  bool m_useVertexMeasurement;
 
   /// SvtxCluster node
   TrkrClusterContainer *m_clusterMap;
