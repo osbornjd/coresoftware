@@ -140,6 +140,9 @@ class MakeActsGeometry : public SubsysReco
   
   void unpackVolumes();
 
+  void setMaterialResponseFiles(std::string& responseFile,
+				std::string& materialFile);
+
   /// Subdetector geometry containers for getting layer information
   PHG4CylinderGeomContainer* m_geomContainerMvtx = nullptr;
   PHG4CylinderGeomContainer* m_geomContainerIntt = nullptr;
