@@ -543,7 +543,6 @@ void MakeActsGeometry::buildActsSurfaces()
     "-n1", "-l0", 
       "--response-file", responseFile,
       "--mat-input-file", materialFile,
-      
       "--bf-values","0","0",m_magField,
       "--bf-bscalor", rescaleStr.str()
       };
@@ -552,14 +551,16 @@ void MakeActsGeometry::buildActsSurfaces()
   /// If 2d fieldmap, replace b field args
   if(m_magField.find(".root") != std::string::npos)
     {
-      argstr[8] = "--bf-map";
-      argstr[9] = m_magField;
-      argstr[10]= "--bf-name";
-      argstr[11] = "fieldmap";
-      argstr[12] = "--bf-lscalor";
-      argstr[13] = "10";
-      argstr[14] = "--bf-rz";
-      argstr[15] = "true";
+      argstr[6] = "--bf-map";
+      argstr[7] = m_magField;
+      argstr[8]= "--bf-name";
+      argstr[9] = "fieldmap";
+      argstr[10] = "--bf-lscalor";
+      argstr[11] = "10";
+      argstr[12] = "--bf-rz";
+      argstr[13] = "true";
+      argstr[14] = "--bf-bscalor";
+      argstr[15] = rescaleStr.str();
     }
 
   // Set vector of chars to arguments needed
