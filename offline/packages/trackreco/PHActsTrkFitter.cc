@@ -231,7 +231,7 @@ void PHActsTrkFitter::loopTracks(Acts::Logging::Level logLevel)
 
       }
 
-    Acts::BoundSymMatrix cov = setDefaultCovariance();
+    Acts::BoundSymMatrix cov = setDefaultCovariance(trackSeed.momentum().norm());
 
     ActsExamples::TrackParameters newTrackSeed(
                   trackSeed.fourPosition(m_tGeometry->geoContext),
@@ -243,8 +243,8 @@ void PHActsTrkFitter::loopTracks(Acts::Logging::Level logLevel)
     /// Construct a perigee surface as the target surface
     /// This surface is what Acts fits with respect to, so we set it to
     /// the initial vertex estimation
-    auto pSurface = Acts::Surface::makeShared<Acts::PerigeeSurface>(
-		          track.getVertex());
+    auto pSurface = 
+      Acts::Surface::makeShared<Acts::PerigeeSurface>(track.getVertex());
    
     if(Verbosity() > 2)
       {
@@ -650,8 +650,9 @@ void PHActsTrkFitter::updateSvtxTrack(Trajectory traj,
   
 }
 
-Acts::BoundSymMatrix PHActsTrkFitter::setDefaultCovariance()
+Acts::BoundSymMatrix PHActsTrkFitter::setDefaultCovariance(double p)
 {
+
   Acts::BoundSymMatrix cov;
    
   /// Acts cares about the track covariance as it helps the KF
@@ -661,7 +662,9 @@ Acts::BoundSymMatrix PHActsTrkFitter::setDefaultCovariance()
   /// If the covariance is too loose, it won't be able to propagate,
   /// but if it is too tight, it will just "believe" the track seed over
   /// the hit data
- 
+  /// From Acts: var(q/p) = (-1/p^2)^2 * var(p)
+  /// Seed resolution is ~15%, so set the var(q/p) accordingly
+
   /// If we are using distortions, then we need to blow up the covariance
   /// a bit since the seed was created with distorted TPC clusters
   if(m_fitSiliconMMs)
@@ -676,7 +679,7 @@ Acts::BoundSymMatrix PHActsTrkFitter::setDefaultCovariance()
            0., 1000 * Acts::UnitConstants::um, 0., 0., 0., 0.,
            0., 0., 0.05, 0., 0., 0.,
            0., 0., 0., 0.05, 0., 0.,
-           0., 0., 0., 0., 0.00005 , 0.,
+           0., 0., 0., 0., 0.03 / (pow(p,4)) , 0.,
            0., 0., 0., 0., 0., 1.;
 
   return cov;

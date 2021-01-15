@@ -122,7 +122,7 @@ class PHActsTrkFitter : public PHTrackFitting
   void updateActsProtoTrack(const FitResult& fitOutput,
 		       std::map<unsigned int, ActsTrack>::iterator iter);
 
-  Acts::BoundSymMatrix setDefaultCovariance();
+  Acts::BoundSymMatrix setDefaultCovariance(double p);
 
   /// Map of Acts fit results and track key to be placed on node tree
   std::map<const unsigned int, Trajectory> 

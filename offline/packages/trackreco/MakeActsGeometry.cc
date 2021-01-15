@@ -510,7 +510,7 @@ void MakeActsGeometry::buildActsSurfaces()
   if(Verbosity() > 0)
     std::cout << PHWHERE << "Magnetic field " << m_magField 
 	      << " with rescale " << m_magFieldRescale << std::endl;
-  
+
   /// If the 2d fieldmap is provided, for now we just assume a 1.4T
   /// field (which will be properly scaled by 1.4/1.5) from magFieldRescale
   if(m_magField.find(".root") != std::string::npos)
@@ -557,10 +557,11 @@ void MakeActsGeometry::buildActsSurfaces()
       argstr[9] = "fieldmap";
       argstr[10] = "--bf-lscalor";
       argstr[11] = "10";
-      argstr[12] = "--bf-rz";
-      argstr[13] = "true";
-      argstr[14] = "--bf-bscalor";
-      argstr[15] = rescaleStr.str();
+      argstr[12] = "--bf-bscalor";
+      argstr[13] = rescaleStr.str();
+      argstr[14] = "--bf-rz";
+      argstr[15] = "true";
+    
     }
 
   // Set vector of chars to arguments needed
