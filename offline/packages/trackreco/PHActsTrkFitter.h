@@ -81,7 +81,8 @@ class PHActsTrkFitter : public PHTrackFitting
   /// Run the direct navigator to fit only tracks with silicon+MM hits
   void fitSiliconMMs(bool fitSiliconMMs)
        {m_fitSiliconMMs = fitSiliconMMs;}
-
+  void fitSilicon(bool fitSilicon)
+       {m_fitSilicon = fitSilicon;}
   void setUpdateSvtxTrackStates(bool fillSvtxTrackStates)
        { m_fillSvtxTrackStates = fillSvtxTrackStates; }   
 
@@ -149,6 +150,10 @@ class PHActsTrkFitter : public PHTrackFitting
   /// Boolean to use normal tracking geometry navigator or the
   /// Acts::DirectedNavigator with a list of sorted silicon+MM surfaces
   bool m_fitSiliconMMs;
+
+  /// Boolean to use the Acts::DirectedNavigator with a list 
+  /// of sorted silicon surfaces
+  bool m_fitSilicon = true;
 
   /// A bool to update the SvtxTrackState information (or not)
   bool m_fillSvtxTrackStates;

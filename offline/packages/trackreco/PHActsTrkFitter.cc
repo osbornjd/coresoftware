@@ -209,26 +209,28 @@ void PHActsTrkFitter::loopTracks(Acts::Logging::Level logLevel)
 
     /// If using directed navigation, collect surface list to navigate
     SurfacePtrVec surfaces;
-    if(m_fitSiliconMMs)
+    if(m_fitSiliconMMs or m_fitSilicon)
       {	
 	sourceLinks = getSurfaceVector(sourceLinks, surfaces);
 	/// Check to see if there is a track to fit, if not skip it
 	if(surfaces.size() == 0)
 	  continue;
-	bool MMsurface = false;
-	for(auto surf : surfaces)
-	  {
-	    if(surf->geometryId().volume() == 16)
-	      {
-		MMsurface = true;
-		break;
-	      }
-	  }
-	/// If there's not a MM surface, we don't want to fit only
-	/// the silicon
-	if(!MMsurface)
-	  continue;
 
+	/// If we are fitting si+MM, check that there is a MM surf
+	if(m_fitSiliconMMs)
+	  {
+	    bool MMsurface = false;
+	    for(auto surf : surfaces)
+	      {
+		if(surf->geometryId().volume() == 16)
+		  {
+		    MMsurface = true;
+		    break;
+		  }
+	      }
+	    if(!MMsurface)
+	      continue;
+	  }
       }
 
     Acts::BoundSymMatrix cov = setDefaultCovariance();
@@ -438,7 +440,7 @@ ActsExamples::TrkrClusterFittingAlgorithm::FitterResult PHActsTrkFitter::fitTrac
 	         kfOptions, 
 	  const SurfacePtrVec& surfSequence)
 {
-  if(m_fitSiliconMMs) 
+  if(m_fitSiliconMMs or m_fitSilicon) 
     return m_fitCfg.dFit(sourceLinks, seed, kfOptions, surfSequence);  
   else
     return m_fitCfg.fit(sourceLinks, seed, kfOptions);
@@ -456,15 +458,22 @@ SourceLinkVec PHActsTrkFitter::getSurfaceVector(SourceLinkVec sourceLinks,
     {
       auto volume = sl.referenceSurface().geometryId().volume();
 
+      /// Skip the TPC
+      if(volume == 14 or volume == 11)
+	continue;
+
+      /// Skip the MM if we are only doing the silicon
+      if(m_fitSilicon && volume == 16)
+	continue;
+      
       if(Verbosity() > 1)
-	std::cout<<"SL available on : " << sl.referenceSurface().geometryId()<<std::endl;
-    
-      /// If volume is not the TPC add the SL to the list
-      if(volume != 14)
-	{
-	  siliconMMSls.push_back(sl);	
-	  surfaces.push_back(&sl.referenceSurface());
-	}
+	std::cout<<"SL available on : " 
+		 << sl.referenceSurface().geometryId()<<std::endl;
+
+
+      siliconMMSls.push_back(sl);	
+      surfaces.push_back(&sl.referenceSurface());
+	
     }
 
   /// Surfaces need to be sorted in order, i.e. from smallest to
