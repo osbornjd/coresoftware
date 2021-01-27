@@ -55,8 +55,11 @@ PHActsVertexFinder::PHActsVertexFinder(const std::string &name)
   , m_actsVertexMap(nullptr)
 {
 }
-
 int PHActsVertexFinder::Setup(PHCompositeNode *topNode)
+{
+  return Fun4AllReturnCodes::EVENT_OK;
+}
+int PHActsVertexFinder::InitRun(PHCompositeNode *topNode)
 {
   int ret = createNodes(topNode);
   if(ret != Fun4AllReturnCodes::EVENT_OK)
@@ -77,6 +80,9 @@ int PHActsVertexFinder::Process(PHCompositeNode *topNode)
   if(ret != Fun4AllReturnCodes::EVENT_OK)
     return ret;
 
+  /// Reset the vertex map as it will be overwritten with brand new vertices
+  m_svtxVertexMap->clear();
+
   /// Create a map that correlates the track momentum to the track key
   KeyMap keyMap;
 
@@ -86,7 +92,7 @@ int PHActsVertexFinder::Process(PHCompositeNode *topNode)
   auto vertices = findVertices(trackPointers);
 
   fillVertexMap(vertices, keyMap);
-  
+
   /// Clean up the track pointer vector memory
   for(auto track : trackPointers)
     {
@@ -302,25 +308,27 @@ void PHActsVertexFinder::fillVertexMap(VertexVector& vertices,
 	       vertex.covariance()(i,j) / Acts::UnitConstants::cm2); 
 	    }
 	}
-
+  
       for(const auto track : vertex.tracks())
 	{
 	  const auto originalParams = track.originalParams;
 	  const auto trackKey = keyMap.find(originalParams)->second;
+
 	  svtxVertex->insert_track(trackKey);
 
 	  updateTrackDCA(trackKey, Acts::Vector3D(vertexX,
 						  vertexY,
 						  vertexZ));
+        
 	}
 
       svtxVertex->set_chisq(chi2);
       svtxVertex->set_ndof(ndf);
       svtxVertex->set_t0(vertex.time());
       svtxVertex->set_id(key);
-
+   
       m_svtxVertexMap->insert(svtxVertex.release());
-
+   
       ++key;
     }
       
@@ -330,9 +338,8 @@ void PHActsVertexFinder::fillVertexMap(VertexVector& vertices,
 void PHActsVertexFinder::updateTrackDCA(const unsigned int trackKey,
 					const Acts::Vector3D vertex)
 {
-  
   auto svtxTrack = m_svtxTrackMap->find(trackKey)->second;
-  
+ 
   Acts::Vector3D pos(svtxTrack->get_x(),
 		     svtxTrack->get_y(),
 		     svtxTrack->get_z());
@@ -380,7 +387,7 @@ void PHActsVertexFinder::updateTrackDCA(const unsigned int trackKey,
   svtxTrack->set_dca3d_z(dca3Dz);
   svtxTrack->set_dca3d_xy_error(sqrt(dca3DxyCov));
   svtxTrack->set_dca3d_z_error(sqrt(dca3DzCov));
-
+ 
 }
 
 int PHActsVertexFinder::createNodes(PHCompositeNode *topNode)
@@ -418,13 +425,13 @@ int PHActsVertexFinder::createNodes(PHCompositeNode *topNode)
     }
 
   m_svtxVertexMap = 
-    findNode::getClass<SvtxVertexMap>(topNode, "SvtxVertexMapActs");
+    findNode::getClass<SvtxVertexMap>(topNode, "SvtxVertexMap");
   if(!m_svtxVertexMap)
     {
       m_svtxVertexMap = new SvtxVertexMap_v1;
       PHIODataNode<PHObject> *node = 
 	new PHIODataNode<PHObject>(m_svtxVertexMap,
-				   "SvtxVertexMapActs", "PHObject");
+				   "SvtxVertexMap", "PHObject");
       svtxNode->addNode(node);
     }
 
@@ -459,6 +466,7 @@ int PHActsVertexFinder::getNodes(PHCompositeNode *topNode)
     {
       std::cout << PHWHERE << "No SvtxTrackMap on node tree, exiting."
 		<< std::endl;
+      return Fun4AllReturnCodes::ABORTEVENT;
     }
 
   return Fun4AllReturnCodes::EVENT_OK;

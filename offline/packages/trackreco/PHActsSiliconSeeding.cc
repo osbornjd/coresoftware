@@ -1,5 +1,6 @@
 #include "PHActsSiliconSeeding.h"
 
+
 #include <fun4all/Fun4AllReturnCodes.h>
 #include <phool/PHCompositeNode.h>
 #include <phool/getClass.h>
@@ -57,12 +58,11 @@ int PHActsSiliconSeeding::Init(PHCompositeNode *topNode)
 
   if(m_seedAnalysis)
     {
-      
       m_file = new TFile("seedingOutfile.root","recreate");
     }
+
   createHistograms();
     
-  
   return Fun4AllReturnCodes::EVENT_OK;
 }
 int PHActsSiliconSeeding::InitRun(PHCompositeNode *topNode)
@@ -75,7 +75,12 @@ int PHActsSiliconSeeding::InitRun(PHCompositeNode *topNode)
   
   return Fun4AllReturnCodes::EVENT_OK;
 }
-
+int PHActsSiliconSeeding::ResetEvent(PHCompositeNode *topNode)
+{
+  m_trackMap->clear();
+  m_actsTrackMap->clear();
+  return Fun4AllReturnCodes::EVENT_OK;
+}
 int PHActsSiliconSeeding::process_event(PHCompositeNode *topNode)
 {
 
@@ -234,6 +239,11 @@ void PHActsSiliconSeeding::makeSvtxTracks(GridSeeds& seedVector)
 	  createSvtxTrack(x, y, seed.z() / Acts::UnitConstants::cm,
 			  px, py, pz, charge,
 			  clusters);
+
+	  createActsProtoTrack(x, y, seed.z() / Acts::UnitConstants::cm,
+			       px, py, pz, charge,
+			       clusters);
+	  
 	}
     }
 
@@ -251,7 +261,102 @@ void PHActsSiliconSeeding::makeSvtxTracks(GridSeeds& seedVector)
   
 }
  
- 
+void PHActsSiliconSeeding::createActsProtoTrack(const double x,
+						const double y,
+						const double z,
+						const double px,
+						const double py,
+						const double pz,
+						const int charge,
+						const std::vector<TrkrCluster*> clusters)
+{
+
+  auto stubs = makePossibleStubs(clusters);
+  
+  double trackX = x;
+  double trackY = y;
+  double trackZ = z;
+  double trackPx = px;
+  double trackPy = py;
+  double trackPz = pz;
+  double trackCharge = charge;
+  double trackPhi = atan2(py,px);
+  double trackEta = atanh(pz / sqrt(px * px + py * py + pz * pz));
+
+  int numSeedsPerActsSeed = 0;
+
+  /// Make a track for every stub that was constructed
+  /// We use the same xyz and pxpypz given by the mvtx circle
+  /// fit since that is the "anchor" for the stub
+  for(auto [stub, stubClusters] : stubs)
+    {
+      int nMvtx = 0;
+      int nIntt = 0;
+      numSeedsPerActsSeed++;
+      
+      /// Get a less rough estimate of R, and thus, p
+      double R, X0, Y0;
+      circleFitByTaubin(stubClusters, R, X0, Y0);
+      
+      /// 0.3 conversion factor, 1.4=B field, 
+      /// 100 convert R from cm to m
+      float pt = 0.3 * 1.4 * R / 100.;
+  
+      trackPx = pt * cos(trackPhi);
+      trackPy = pt * sin(trackPhi);
+      trackPz = pt * sinh(trackEta);
+      
+      Acts::Vector4D seed4Vec(trackX * Acts::UnitConstants::cm,
+			      trackY * Acts::UnitConstants::cm,
+			      trackZ * Acts::UnitConstants::cm,
+			      10 * Acts::UnitConstants::ns);
+
+      Acts::Vector3D seedMom(trackPx, trackPy, trackPz);
+      const double p = seedMom.norm();
+
+      Acts::BoundSymMatrix cov;
+      cov << 1000 * Acts::UnitConstants::um, 0., 0., 0., 0., 0.,
+	     0., 1000 * Acts::UnitConstants::um, 0., 0., 0., 0.,
+             0., 0., 0.1, 0., 0., 0.,
+             0., 0., 0., 0.1, 0., 0.,
+             0., 0., 0., 0., 0.005 , 0.,
+             0., 0., 0., 0., 0., 1.;
+
+      const ActsExamples::TrackParameters seed(seed4Vec,
+					       seedMom, p,
+					       trackCharge,
+					       cov);
+      std::vector<SourceLink> sourceLinks;
+      for(const auto clus : stubClusters) 
+	{
+	  const auto cluskey = clus->getClusKey();
+	  const auto hitId = m_hitIdCluskey->left.find(cluskey)->second;
+	  if(hitId > m_hitIdCluskey->size())
+	    continue;
+
+	  sourceLinks.push_back(m_sourceLinks->find(hitId)->second);
+
+	  if(TrkrDefs::getTrkrId(cluskey) == TrkrDefs::mvtxId)
+	    nMvtx++;
+	  else if(TrkrDefs::getTrkrId(cluskey) == TrkrDefs::inttId)
+	    nIntt++;	 
+	}
+
+      /// The acts KF just needs a space point to finish
+      /// the track fit at, which is nominally the vertex
+      /// So we just give it the track position here since
+      /// the vertex is TBD
+      Acts::Vector3D vertex(trackX * Acts::UnitConstants::cm,
+			    trackY * Acts::UnitConstants::cm,
+			    trackZ * Acts::UnitConstants::cm);
+
+      ActsTrack siliconStub(seed, sourceLinks, vertex);
+      const unsigned int trackKey = m_actsTrackMap->size();
+      m_actsTrackMap->insert(std::pair<unsigned int, ActsTrack>(trackKey, siliconStub));
+
+    }
+
+}
 void PHActsSiliconSeeding::createSvtxTrack(const double x,
 					   const double y,
 					   const double z,
@@ -1175,6 +1280,17 @@ int PHActsSiliconSeeding::createNodes(PHCompositeNode *topNode)
       PHIODataNode<PHObject> *trackNode = 
 	new PHIODataNode<PHObject>(m_trackMap,"SvtxSiliconTrackMap","PHObject");
       dstNode->addNode(trackNode);
+
+    }
+
+  m_actsTrackMap = findNode::getClass<std::map<unsigned int, ActsTrack>>(topNode, "ActsSiliconTrackMap");
+
+  if(!m_actsTrackMap)
+    {
+      m_actsTrackMap = new std::map<unsigned int, ActsTrack>;
+      PHDataNode<std::map<unsigned int, ActsTrack>> *actsNode =
+	new PHDataNode<std::map<unsigned int, ActsTrack>>(m_actsTrackMap, "ActsSiliconTrackMap");
+      svtxNode->addNode(actsNode);
 
     }
 

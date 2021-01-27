@@ -49,8 +49,11 @@
 PHActsInitialVertexFinder::PHActsInitialVertexFinder(const std::string& name)
   : PHInitVertexing(name)
 {}
-
 int PHActsInitialVertexFinder::Setup(PHCompositeNode *topNode)
+{
+  return Fun4AllReturnCodes::EVENT_OK;
+}
+int PHActsInitialVertexFinder::InitRun(PHCompositeNode *topNode)
 {
   if(getNodes(topNode) != Fun4AllReturnCodes::EVENT_OK)
     return Fun4AllReturnCodes::ABORTEVENT;

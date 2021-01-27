@@ -40,7 +40,7 @@
 #include <vector>
 
 PHActsTrkFitter::PHActsTrkFitter(const std::string& name)
-  : PHTrackFitting(name)
+  : SubsysReco(name)
   , m_event(0)
   , m_actsFitResults(nullptr)
   , m_actsProtoTracks(nullptr)
@@ -64,24 +64,27 @@ PHActsTrkFitter::PHActsTrkFitter(const std::string& name)
 PHActsTrkFitter::~PHActsTrkFitter()
 {
 }
-
-int PHActsTrkFitter::Setup(PHCompositeNode* topNode)
+int PHActsTrkFitter::Init(PHCompositeNode *topNode)
+{
+  return Fun4AllReturnCodes::EVENT_OK;
+}
+int PHActsTrkFitter::InitRun(PHCompositeNode* topNode)
 {
   if(Verbosity() > 1)
     std::cout << "Setup PHActsTrkFitter" << std::endl;
-  
-  if(createNodes(topNode) != Fun4AllReturnCodes::EVENT_OK)
+
+  if (getNodes(topNode) != Fun4AllReturnCodes::EVENT_OK)
     return Fun4AllReturnCodes::ABORTEVENT;
   
-  if (getNodes(topNode) != Fun4AllReturnCodes::EVENT_OK)
+  if(createNodes(topNode) != Fun4AllReturnCodes::EVENT_OK)
     return Fun4AllReturnCodes::ABORTEVENT;
   
   m_fitCfg.fit = ActsExamples::TrkrClusterFittingAlgorithm::makeFitterFunction(
                m_tGeometry->tGeometry,
 	       m_tGeometry->magField);
 
-  m_fitCfg.dFit = ActsExamples::TrkrClusterFittingAlgorithm::makeFitterFunction(
-	       m_tGeometry->magField);
+  m_fitCfg.dFit = 
+    ActsExamples::TrkrClusterFittingAlgorithm::makeFitterFunction(m_tGeometry->magField);
 
   if(m_timeAnalysis)
     {
@@ -106,14 +109,21 @@ int PHActsTrkFitter::Setup(PHCompositeNode* topNode)
   return Fun4AllReturnCodes::EVENT_OK;
 }
 
-int PHActsTrkFitter::Process()
+int PHActsTrkFitter::process_event(PHCompositeNode *topNode)
 {
   auto eventTimer = std::make_unique<PHTimer>("eventTimer");
   eventTimer->stop();
   eventTimer->restart();
-  
+
+  /// Clear the track fit results to start fresh for this event
+  m_actsFitResults->clear();
+
   m_event++;
 
+  if (getNodes(topNode) != Fun4AllReturnCodes::EVENT_OK)
+    return Fun4AllReturnCodes::ABORTEVENT;
+  
+  
   auto logLevel = Acts::Logging::FATAL;
 
   if (Verbosity() > 1)
@@ -151,7 +161,7 @@ int PHActsTrkFitter::Process()
 
 int PHActsTrkFitter::ResetEvent(PHCompositeNode *topNode)
 {
-
+  m_trackMap->clear();
   m_actsFitResults->clear();
 
   if(Verbosity() > 1)
@@ -159,6 +169,7 @@ int PHActsTrkFitter::ResetEvent(PHCompositeNode *topNode)
       std::cout << "Reset PHActsTrkFitter" << std::endl;
 
     }
+
   return Fun4AllReturnCodes::EVENT_OK;
 }
 
@@ -313,10 +324,11 @@ void PHActsTrkFitter::loopTracks(Acts::Logging::Level logLevel)
 	if(Verbosity() > 10)
 	  std::cout<<"Track fit failed"<<std::endl;
 	/// Insert an empty track fit output into the map since the fit failed
+	
        	m_actsFitResults->insert(
 			  std::pair<const unsigned int, Trajectory>
 			  (trackKey, ActsExamples::TrkrClusterMultiTrajectory()));
-
+	
 	// fit failed, delete the junk SvtxTrack from the node tree 
 	// so the evaluator does not waste time on it
 	m_trackMap->erase(trackKey);
@@ -331,6 +343,7 @@ void PHActsTrkFitter::loopTracks(Acts::Logging::Level logLevel)
       std::cout << "PHActsTrkFitter total single track time "
 		<< trackTime << std::endl;
   }
+
   return;
 }
 
@@ -740,11 +753,12 @@ int PHActsTrkFitter::createNodes(PHCompositeNode* topNode)
 int PHActsTrkFitter::getNodes(PHCompositeNode* topNode)
 {
   
-  m_actsProtoTracks = findNode::getClass<std::map<unsigned int, ActsTrack>>(topNode, "ActsTrackMap");
+  m_actsProtoTracks = findNode::getClass<std::map<unsigned int, ActsTrack>>(topNode, m_actsTrackMapName.c_str());
 
   if (!m_actsProtoTracks)
   {
-    std::cout << "Acts proto tracks not on node tree. Exiting."
+    std::cout << PHWHERE << m_actsTrackMapName.c_str() 
+	      << " map not on node tree. Exiting."
               << std::endl;
     return Fun4AllReturnCodes::ABORTEVENT;
   }
@@ -757,12 +771,16 @@ int PHActsTrkFitter::getNodes(PHCompositeNode* topNode)
       
       return Fun4AllReturnCodes::ABORTEVENT;
     }
-
-  m_trackMap = findNode::getClass<SvtxTrackMap>(topNode, "SvtxTrackMap");
+  
+  std::string mapName = "SvtxTrackMap";
+  if(m_actsTrackMapName.find("Silicon") != std::string::npos)
+    mapName = "SvtxSiliconTrackMap";
+  m_trackMap = findNode::getClass<SvtxTrackMap>(topNode, mapName.c_str());
   
   if(!m_trackMap)
     {
-      std::cout << PHWHERE << "SvtxTrackMap not found on node tree. Exiting."
+      std::cout << PHWHERE 
+		<< "SvtxTrackMap not found on node tree. Exiting."
 		<< std::endl;
       return Fun4AllReturnCodes::ABORTEVENT;
     }
@@ -774,9 +792,8 @@ int PHActsTrkFitter::getNodes(PHCompositeNode* topNode)
       std::cout << PHWHERE << "No HitID:ClusKey map on node tree. Bailing."
 		<< std::endl;
       
-      return Fun4AllReturnCodes::EVENT_OK;
+      return Fun4AllReturnCodes::ABORTEVENT;
     }
-
 
   return Fun4AllReturnCodes::EVENT_OK;
 }

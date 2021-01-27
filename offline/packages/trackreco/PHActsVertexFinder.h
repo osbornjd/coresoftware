@@ -47,6 +47,7 @@ class PHActsVertexFinder: public PHInitVertexing
 
  protected:
   int Setup(PHCompositeNode *topNode) override;
+  int InitRun(PHCompositeNode *topNode) override;
   int Process(PHCompositeNode *topNode) override;
   int ResetEvent(PHCompositeNode *topNode) override;
   int End(PHCompositeNode *topNode) override;

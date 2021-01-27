@@ -82,8 +82,7 @@ int PHActsTracks::process_event(PHCompositeNode *topNode)
 
   /// Vector to hold source links for a particular track
   std::vector<SourceLink> trackSourceLinks;
-  std::vector<ActsExamples::TrackParameters> trackSeeds;
-
+ 
   auto rotater = std::make_unique<ActsTransformations>();
   rotater->setVerbosity(Verbosity());
 

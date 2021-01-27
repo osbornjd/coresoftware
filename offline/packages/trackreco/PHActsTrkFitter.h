@@ -8,9 +8,10 @@
 #ifndef TRACKRECO_ACTSTRKFITTER_H
 #define TRACKRECO_ACTSTRKFITTER_H
 
-#include "PHTrackFitting.h"
 #include "ActsTrackingGeometry.h"
 #include <trackbase/TrkrDefs.h>
+
+#include <fun4all/SubsysReco.h>
 
 #include <Acts/Utilities/BinnedArray.hpp>
 #include <Acts/Utilities/Definitions.hpp>
@@ -55,7 +56,7 @@ using SourceLinkVec = std::vector<SourceLink>;
 typedef boost::bimap<TrkrDefs::cluskey, unsigned int> CluskeyBimap;
 
 
-class PHActsTrkFitter : public PHTrackFitting
+class PHActsTrkFitter : public SubsysReco
 {
  public:
   /// Default constructor
@@ -68,10 +69,12 @@ class PHActsTrkFitter : public PHTrackFitting
   int End(PHCompositeNode *topNode);
 
   /// Get and create nodes
-  int Setup(PHCompositeNode* topNode);
+  int Init(PHCompositeNode* topNode);
 
+  int InitRun(PHCompositeNode *topNode);
+  
   /// Process each event by calling the fitter
-  int Process();
+  int process_event(PHCompositeNode *topNode);
 
   int ResetEvent(PHCompositeNode *topNode);
 
@@ -85,7 +88,9 @@ class PHActsTrkFitter : public PHTrackFitting
        {m_fitSilicon = fitSilicon;}
   void setUpdateSvtxTrackStates(bool fillSvtxTrackStates)
        { m_fillSvtxTrackStates = fillSvtxTrackStates; }   
-
+  void setActsTrackMapName(std::string actsTrackMapName)
+       { m_actsTrackMapName = actsTrackMapName;}
+  
  private:
 
   /// Event counter
@@ -153,10 +158,12 @@ class PHActsTrkFitter : public PHTrackFitting
 
   /// Boolean to use the Acts::DirectedNavigator with a list 
   /// of sorted silicon surfaces
-  bool m_fitSilicon = true;
+  bool m_fitSilicon = false;
 
   /// A bool to update the SvtxTrackState information (or not)
   bool m_fillSvtxTrackStates;
+
+  std::string m_actsTrackMapName = "ActsTrackMap";
 
   /// Variables for doing event time execution analysis
   bool m_timeAnalysis;

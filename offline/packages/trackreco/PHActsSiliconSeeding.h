@@ -2,6 +2,7 @@
 #define TRACKRECO_PHACTSSILICONSEEDING_H
 
 #include "ActsTrackingGeometry.h"
+#include "ActsTrack.h"
 
 #include <fun4all/SubsysReco.h>
 #include <trackbase/TrkrDefs.h>
@@ -78,6 +79,7 @@ class PHActsSiliconSeeding : public SubsysReco
   int Init(PHCompositeNode *topNode);
   int InitRun(PHCompositeNode *topNode);
   int process_event(PHCompositeNode *topNode);
+  int ResetEvent(PHCompositeNode *topNode);
   int End(PHCompositeNode *topNode);
 
   /// Set seeding with truth clusters
@@ -145,6 +147,7 @@ class PHActsSiliconSeeding : public SubsysReco
 				double& yplus,
 				double& xminus,
 				double& yminus);
+  
   void createSvtxTrack(const double x,
 		       const double y,
 		       const double z,
@@ -153,6 +156,16 @@ class PHActsSiliconSeeding : public SubsysReco
 		       const double pz,
 		       const int charge,
 		       const std::vector<TrkrCluster*> clusters);
+
+  void createActsProtoTrack(const double x,
+			    const double y,
+			    const double z,
+			    const double px,
+			    const double py,
+			    const double pz,
+			    const int charge,
+			    const std::vector<TrkrCluster*> clusters);
+
   std::map<const unsigned int, std::vector<TrkrCluster*>>
     makePossibleStubs(std::vector<TrkrCluster*> allClusters);
   void createHistograms();
@@ -165,6 +178,7 @@ class PHActsSiliconSeeding : public SubsysReco
   CluskeyBimap *m_hitIdCluskey;
   TrkrClusterContainer *m_clusterMap = nullptr;
   PHG4CylinderGeomContainer *m_geomContainerIntt = nullptr;
+  std::map<unsigned int, ActsTrack> *m_actsTrackMap = nullptr;
   
   /// Configuration classes for Acts seeding
   Acts::SeedfinderConfig<SpacePoint> m_seedFinderCfg;
