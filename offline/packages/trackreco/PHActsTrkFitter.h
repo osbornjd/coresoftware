@@ -88,9 +88,7 @@ class PHActsTrkFitter : public SubsysReco
        {m_fitSilicon = fitSilicon;}
   void setUpdateSvtxTrackStates(bool fillSvtxTrackStates)
        { m_fillSvtxTrackStates = fillSvtxTrackStates; }   
-  void setActsTrackMapName(std::string actsTrackMapName)
-       { m_actsTrackMapName = actsTrackMapName;}
-  
+
  private:
 
   /// Event counter
@@ -128,6 +126,10 @@ class PHActsTrkFitter : public SubsysReco
   void updateActsProtoTrack(const FitResult& fitOutput,
 		       std::map<unsigned int, ActsTrack>::iterator iter);
 
+  void updateTrackPosition(Trajectory traj,
+			   SvtxTrack* track,
+			   Acts::Vector3D vertex);
+
   Acts::BoundSymMatrix setDefaultCovariance(const double p);
 
   /// Map of Acts fit results and track key to be placed on node tree
@@ -162,8 +164,6 @@ class PHActsTrkFitter : public SubsysReco
 
   /// A bool to update the SvtxTrackState information (or not)
   bool m_fillSvtxTrackStates;
-
-  std::string m_actsTrackMapName = "ActsTrackMap";
 
   /// Variables for doing event time execution analysis
   bool m_timeAnalysis;

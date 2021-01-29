@@ -552,6 +552,68 @@ void PHActsTrkFitter::checkSurfaceVec(SurfacePtrVec &surfaces)
 
 }
 
+void PHActsTrkFitter::updateTrackPosition(Trajectory traj,
+					  SvtxTrack* track,
+					  Acts::Vector3D vertex)
+{
+  const auto &[trackTips, mj] = traj.trajectory();
+  /// only one track tip in the track fit Trajectory
+  auto &trackTip = trackTips.front();
+  const auto& params = traj.trackParameters(trackTip);
+
+  /// Acts default unit is mm. So convert to cm
+  track->set_x(params.position(m_tGeometry->geoContext)(0)
+	       / Acts::UnitConstants::cm);
+  track->set_y(params.position(m_tGeometry->geoContext)(1)
+	       / Acts::UnitConstants::cm);
+  track->set_z(params.position(m_tGeometry->geoContext)(2)
+	       / Acts::UnitConstants::cm);
+
+  auto rotater = std::make_unique<ActsTransformations>();
+  rotater->setVerbosity(Verbosity());
+  
+  float dca3Dxy = NAN;
+  float dca3Dz = NAN;
+  float dca3DxyCov = NAN;
+  float dca3DzCov = NAN;
+      
+  if(params.covariance())
+    {
+      Acts::BoundSymMatrix rotatedCov = 
+	rotater->rotateActsCovToSvtxTrack(params,
+					  m_tGeometry->geoContext);
+      
+      int limit = 6;
+
+      /// Only update the position covariance
+      if(m_fitSilicon)
+	limit = 3;
+
+      for(int i = 0; i < limit; i++)
+	for(int j = 0; j < limit; j++)
+	  track->set_error(i,j, rotatedCov(i,j));
+      
+      rotater->calculateDCA(params, vertex, rotatedCov,
+			    m_tGeometry->geoContext, 
+			    dca3Dxy, dca3Dz, 
+			    dca3DxyCov, dca3DzCov);
+    }
+  
+  /// Set the DCA here. The DCA will be updated after the final
+  /// vertex fitting in PHActsVertexFinder
+  track->set_dca3d_xy(dca3Dxy / Acts::UnitConstants::cm);
+  track->set_dca3d_z(dca3Dz / Acts::UnitConstants::cm);
+  track->set_dca3d_xy_error(sqrt(dca3DxyCov) / Acts::UnitConstants::cm);
+  track->set_dca3d_z_error(sqrt(dca3DzCov) / Acts::UnitConstants::cm);
+  
+  if(Verbosity() > 2 and m_fitSilicon)
+    {
+      std::cout << "Identify track after updating with position " 
+		<< std::endl;
+      track->identify();
+    }
+}
+
 void PHActsTrkFitter::updateSvtxTrack(Trajectory traj, 
 				      const unsigned int trackKey,
 				      Acts::Vector3D vertex)
@@ -568,6 +630,13 @@ void PHActsTrkFitter::updateSvtxTrack(Trajectory traj,
       std::cout << "Identify (proto) track before updating with acts results " << std::endl;
       track->identify();
       std::cout << " proto cluster keys size " << track->size_cluster_keys() << std::endl;  
+    }
+
+  /// Only want to update the track position and DCA
+  if(m_fitSilicon)
+    {
+      updateTrackPosition(traj, track, vertex);
+      return;
     }
 
   // The number of associated clusters may have changed - start over
@@ -588,13 +657,6 @@ void PHActsTrkFitter::updateSvtxTrack(Trajectory traj,
  
   const auto& params = traj.trackParameters(trackTip);
 
-  /// Acts default unit is mm. So convert to cm
-  track->set_x(params.position(m_tGeometry->geoContext)(0)
-	       / Acts::UnitConstants::cm);
-  track->set_y(params.position(m_tGeometry->geoContext)(1)
-	       / Acts::UnitConstants::cm);
-  track->set_z(params.position(m_tGeometry->geoContext)(2)
-	       / Acts::UnitConstants::cm);
 
   track->set_px(params.momentum()(0));
   track->set_py(params.momentum()(1));
@@ -607,40 +669,7 @@ void PHActsTrkFitter::updateSvtxTrack(Trajectory traj,
   auto rotater = std::make_unique<ActsTransformations>();
   rotater->setVerbosity(Verbosity());
   
-  float dca3Dxy = NAN;
-  float dca3Dz = NAN;
-  float dca3DxyCov = NAN;
-  float dca3DzCov = NAN;
-      
-  if(params.covariance())
-    {
-   
-      Acts::BoundSymMatrix rotatedCov = 
-	rotater->rotateActsCovToSvtxTrack(params,
-					  m_tGeometry->geoContext);
-      
-      for(int i = 0; i < 6; i++)
-	{
-	  for(int j = 0; j < 6; j++)
-	    {
-	      track->set_error(i,j, rotatedCov(i,j));
-	    }
-	}
-    
- 
-
-      rotater->calculateDCA(params, vertex, rotatedCov,
-			    m_tGeometry->geoContext, 
-			    dca3Dxy, dca3Dz, 
-			    dca3DxyCov, dca3DzCov);
-    }
- 
-  /// Set the DCA here. The DCA will be updated after the final
-  /// vertex fitting in PHActsVertexFinder
-  track->set_dca3d_xy(dca3Dxy / Acts::UnitConstants::cm);
-  track->set_dca3d_z(dca3Dz / Acts::UnitConstants::cm);
-  track->set_dca3d_xy_error(sqrt(dca3DxyCov) / Acts::UnitConstants::cm);
-  track->set_dca3d_z_error(sqrt(dca3DzCov) / Acts::UnitConstants::cm);
+  updateTrackPosition(traj, track, vertex);
   
   // Also need to update the state list and cluster ID list for all measurements associated with the acts track  
   // loop over acts track states, copy over to SvtxTrackStates, and add to SvtxTrack
@@ -691,12 +720,12 @@ Acts::BoundSymMatrix PHActsTrkFitter::setDefaultCovariance(const double p)
  
   /// If we are using distortions, then we need to blow up the covariance
   /// a bit since the seed was created with distorted TPC clusters
-  if(m_fitSiliconMMs or m_fitSilicon)
-    cov << 100 * Acts::UnitConstants::um, 0., 0., 0., 0., 0.,
-           0., 100 * Acts::UnitConstants::um, 0., 0., 0., 0.,
-           0., 0., 0.02, 0., 0., 0.,
-           0., 0., 0., 0.02, 0., 0.,
-           0., 0., 0., 0., 0.00005 , 0.,
+  if(m_fitSiliconMMs)
+    cov << 1000 * Acts::UnitConstants::um, 0., 0., 0., 0., 0.,
+           0., 1000 * Acts::UnitConstants::um, 0., 0., 0., 0.,
+           0., 0., 0.1, 0., 0., 0.,
+           0., 0., 0., 0.1, 0., 0.,
+           0., 0., 0., 0., 0.005 , 0.,
            0., 0., 0., 0., 0., 1.;
   else
     cov << 1000 * Acts::UnitConstants::um, 0., 0., 0., 0., 0.,
@@ -753,7 +782,7 @@ int PHActsTrkFitter::createNodes(PHCompositeNode* topNode)
 int PHActsTrkFitter::getNodes(PHCompositeNode* topNode)
 {
   
-  m_actsProtoTracks = findNode::getClass<std::map<unsigned int, ActsTrack>>(topNode, m_actsTrackMapName.c_str());
+  m_actsProtoTracks = findNode::getClass<std::map<unsigned int, ActsTrack>>(topNode, "ActsTrackMap");
 
   if (!m_actsProtoTracks)
   {
@@ -772,10 +801,7 @@ int PHActsTrkFitter::getNodes(PHCompositeNode* topNode)
       return Fun4AllReturnCodes::ABORTEVENT;
     }
   
-  std::string mapName = "SvtxTrackMap";
-  //if(m_actsTrackMapName.find("Silicon") != std::string::npos)
-  //mapName = "SvtxSiliconTrackMap";
-  m_trackMap = findNode::getClass<SvtxTrackMap>(topNode, mapName.c_str());
+  m_trackMap = findNode::getClass<SvtxTrackMap>(topNode, "SvtxTrackMap");
   
   if(!m_trackMap)
     {

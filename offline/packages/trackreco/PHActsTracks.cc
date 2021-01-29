@@ -80,6 +80,9 @@ int PHActsTracks::process_event(PHCompositeNode *topNode)
   if (getNodes(topNode) != Fun4AllReturnCodes::EVENT_OK)
     return Fun4AllReturnCodes::ABORTEVENT;
 
+  /// Start fresh in this event in this module
+  m_actsTrackMap->clear();
+
   /// Vector to hold source links for a particular track
   std::vector<SourceLink> trackSourceLinks;
  
