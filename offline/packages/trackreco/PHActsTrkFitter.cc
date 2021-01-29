@@ -244,7 +244,7 @@ void PHActsTrkFitter::loopTracks(Acts::Logging::Level logLevel)
 	  }
       }
 
-    Acts::BoundSymMatrix cov = setDefaultCovariance();
+    Acts::BoundSymMatrix cov = setDefaultCovariance(trackSeed.absoluteMomentum());
 
     ActsExamples::TrackParameters newTrackSeed(
                   trackSeed.fourPosition(m_tGeometry->geoContext),
@@ -567,7 +567,7 @@ void PHActsTrkFitter::updateSvtxTrack(Trajectory traj,
     {
       std::cout << "Identify (proto) track before updating with acts results " << std::endl;
       track->identify();
-      std::cout << " cluster keys size " << track->size_cluster_keys() << std::endl;  
+      std::cout << " proto cluster keys size " << track->size_cluster_keys() << std::endl;  
     }
 
   // The number of associated clusters may have changed - start over
@@ -669,7 +669,7 @@ void PHActsTrkFitter::updateSvtxTrack(Trajectory traj,
       std::cout << " Identify fitted track after updating track states:" 
 		<< std::endl;
       track->identify();
-      std::cout << " cluster keys size " << track->size_cluster_keys() 
+      std::cout << " fit cluster keys size " << track->size_cluster_keys() 
 		<< std::endl;  
     }
  
@@ -677,7 +677,7 @@ void PHActsTrkFitter::updateSvtxTrack(Trajectory traj,
   
 }
 
-Acts::BoundSymMatrix PHActsTrkFitter::setDefaultCovariance()
+Acts::BoundSymMatrix PHActsTrkFitter::setDefaultCovariance(const double p)
 {
   Acts::BoundSymMatrix cov;
    
@@ -691,12 +691,12 @@ Acts::BoundSymMatrix PHActsTrkFitter::setDefaultCovariance()
  
   /// If we are using distortions, then we need to blow up the covariance
   /// a bit since the seed was created with distorted TPC clusters
-  if(m_fitSiliconMMs)
-    cov << 1000 * Acts::UnitConstants::um, 0., 0., 0., 0., 0.,
-           0., 1000 * Acts::UnitConstants::um, 0., 0., 0., 0.,
-           0., 0., 0.1, 0., 0., 0.,
-           0., 0., 0., 0.1, 0., 0.,
-           0., 0., 0., 0., 0.005 , 0.,
+  if(m_fitSiliconMMs or m_fitSilicon)
+    cov << 100 * Acts::UnitConstants::um, 0., 0., 0., 0., 0.,
+           0., 100 * Acts::UnitConstants::um, 0., 0., 0., 0.,
+           0., 0., 0.02, 0., 0., 0.,
+           0., 0., 0., 0.02, 0., 0.,
+           0., 0., 0., 0., 0.00005 , 0.,
            0., 0., 0., 0., 0., 1.;
   else
     cov << 1000 * Acts::UnitConstants::um, 0., 0., 0., 0., 0.,
@@ -773,14 +773,14 @@ int PHActsTrkFitter::getNodes(PHCompositeNode* topNode)
     }
   
   std::string mapName = "SvtxTrackMap";
-  if(m_actsTrackMapName.find("Silicon") != std::string::npos)
-    mapName = "SvtxSiliconTrackMap";
+  //if(m_actsTrackMapName.find("Silicon") != std::string::npos)
+  //mapName = "SvtxSiliconTrackMap";
   m_trackMap = findNode::getClass<SvtxTrackMap>(topNode, mapName.c_str());
   
   if(!m_trackMap)
     {
       std::cout << PHWHERE 
-		<< "SvtxTrackMap not found on node tree. Exiting."
+		<< "SvtxTrackMap not efound on node tree. Exiting."
 		<< std::endl;
       return Fun4AllReturnCodes::ABORTEVENT;
     }

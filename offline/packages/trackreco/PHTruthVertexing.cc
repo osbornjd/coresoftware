@@ -188,7 +188,10 @@ void PHTruthVertexing::assignStubsVertices(PHCompositeNode *topNode)
 	    }
 
 	}
-
+      if(Verbosity() > 3)
+	std::cout << "Track vert dx dy dz " << dx << ", " << dy
+		  << ", " << dz << " and setting vertex id " 
+		  << trackVertexId << std::endl;
       track->set_vertex_id(trackVertexId);
       auto vertex = _vertex_map->find(trackVertexId)->second;
       vertex->insert_track(trackKey);
