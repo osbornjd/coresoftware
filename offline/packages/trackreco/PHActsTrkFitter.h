@@ -130,7 +130,7 @@ class PHActsTrkFitter : public SubsysReco
 			   SvtxTrack* track,
 			   Acts::Vector3D vertex);
 
-  Acts::BoundSymMatrix setDefaultCovariance(const double p);
+  Acts::BoundSymMatrix setDefaultCovariance();
 
   /// Map of Acts fit results and track key to be placed on node tree
   std::map<const unsigned int, Trajectory> 

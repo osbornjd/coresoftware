@@ -73,7 +73,7 @@ int PHActsTrkFitter::InitRun(PHCompositeNode* topNode)
   if(Verbosity() > 1)
     std::cout << "Setup PHActsTrkFitter" << std::endl;
 
-  if (getNodes(topNode) != Fun4AllReturnCodes::EVENT_OK)
+  if(getNodes(topNode) != Fun4AllReturnCodes::EVENT_OK)
     return Fun4AllReturnCodes::ABORTEVENT;
   
   if(createNodes(topNode) != Fun4AllReturnCodes::EVENT_OK)
@@ -120,10 +120,6 @@ int PHActsTrkFitter::process_event(PHCompositeNode *topNode)
 
   m_event++;
 
-  if (getNodes(topNode) != Fun4AllReturnCodes::EVENT_OK)
-    return Fun4AllReturnCodes::ABORTEVENT;
-  
-  
   auto logLevel = Acts::Logging::FATAL;
 
   if (Verbosity() > 1)
@@ -161,7 +157,6 @@ int PHActsTrkFitter::process_event(PHCompositeNode *topNode)
 
 int PHActsTrkFitter::ResetEvent(PHCompositeNode *topNode)
 {
-  m_trackMap->clear();
   m_actsFitResults->clear();
 
   if(Verbosity() > 1)
@@ -244,7 +239,7 @@ void PHActsTrkFitter::loopTracks(Acts::Logging::Level logLevel)
 	  }
       }
 
-    Acts::BoundSymMatrix cov = setDefaultCovariance(trackSeed.absoluteMomentum());
+    Acts::BoundSymMatrix cov = setDefaultCovariance();
 
     ActsExamples::TrackParameters newTrackSeed(
                   trackSeed.fourPosition(m_tGeometry->geoContext),
@@ -706,7 +701,7 @@ void PHActsTrkFitter::updateSvtxTrack(Trajectory traj,
   
 }
 
-Acts::BoundSymMatrix PHActsTrkFitter::setDefaultCovariance(const double p)
+Acts::BoundSymMatrix PHActsTrkFitter::setDefaultCovariance()
 {
   Acts::BoundSymMatrix cov;
    
@@ -786,8 +781,7 @@ int PHActsTrkFitter::getNodes(PHCompositeNode* topNode)
 
   if (!m_actsProtoTracks)
   {
-    std::cout << PHWHERE << m_actsTrackMapName.c_str() 
-	      << " map not on node tree. Exiting."
+    std::cout << PHWHERE << "SvtxTrackMap not on node tree. Exiting."
               << std::endl;
     return Fun4AllReturnCodes::ABORTEVENT;
   }

@@ -80,9 +80,6 @@ int PHActsVertexFinder::Process(PHCompositeNode *topNode)
   if(ret != Fun4AllReturnCodes::EVENT_OK)
     return ret;
 
-  /// Reset the vertex map as it will be overwritten with brand new vertices
-  m_svtxVertexMap->clear();
-
   /// Create a map that correlates the track momentum to the track key
   KeyMap keyMap;
 
@@ -243,9 +240,9 @@ VertexVector PHActsVertexFinder::findVertices(TrackPtrVector& tracks)
 	}
       else
 	{
-	  if(Verbosity() > 1)
+	  if(Verbosity() > -1)
 	    {
-	      std::cout << "Acts vertex finder returned error: " 
+	      std::cout << PHWHERE << "Acts vertex finder returned error: " 
 			<< result.error().message() << std::endl;
 	    }	  
 	}
@@ -264,6 +261,10 @@ void PHActsVertexFinder::fillVertexMap(VertexVector& vertices,
 				       KeyMap& keyMap)
 {
   unsigned int key = 0;
+
+  if(vertices.size() > 0)
+    m_svtxVertexMap->clear();
+
   for(auto vertex : vertices)
     {
       const auto &[chi2, ndf] = vertex.fitQuality();

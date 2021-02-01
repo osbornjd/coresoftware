@@ -110,9 +110,19 @@ int PHActsTracks::process_event(PHCompositeNode *topNode)
       vertexId = 0;
 
     const SvtxVertex *svtxVertex = m_vertexMap->get(vertexId);
-    Acts::Vector3D vertex = {svtxVertex->get_x() * Acts::UnitConstants::cm, 
-			     svtxVertex->get_y() * Acts::UnitConstants::cm, 
-			     svtxVertex->get_z() * Acts::UnitConstants::cm};
+    double vertX = track->get_x() * Acts::UnitConstants::cm;
+    double vertY = track->get_y() * Acts::UnitConstants::cm;
+    double vertZ = track->get_z() * Acts::UnitConstants::cm;
+
+    /// If the vertex is available, use it. Otherwise use track position
+    if(svtxVertex)
+      {
+	vertX = svtxVertex->get_x() * Acts::UnitConstants::cm;
+	vertY = svtxVertex->get_y() * Acts::UnitConstants::cm;
+	vertZ = svtxVertex->get_z() * Acts::UnitConstants::cm;
+      }
+
+    Acts::Vector3D vertex = {vertX, vertY, vertZ};
     
     if(Verbosity() > 4)
       {

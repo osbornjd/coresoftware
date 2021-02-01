@@ -313,17 +313,11 @@ VertexVector PHActsInitialVertexFinder::findVertices(TrackParamVec& tracks)
 	}
       else
 	{
-	  if(Verbosity() > 0)
+	  if(Verbosity() > -1)
 	    {
-	      std::cout << "Acts initial vertex finder returned error: " 
+	      std::cout << PHWHERE << "Acts initial vertex finder returned error: " 
 			<< result.error().message() << std::endl;
-	      std::cout << "Track positions IVF used are : " << std::endl;
-	      for(const auto track : tracks)
-		{
-		  const auto position = track->position(m_tGeometry->geoContext);
-		  std::cout << "(" << position(0) << ", " << position(1)
-			    << ", " << position(2) << std::endl;
-		}
+	     
 	    }
 	}
     
