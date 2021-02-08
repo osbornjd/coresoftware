@@ -8,9 +8,10 @@
 #ifndef TRACKRECO_ACTSTRKFITTER_H
 #define TRACKRECO_ACTSTRKFITTER_H
 
-#include "PHTrackFitting.h"
 #include "ActsTrackingGeometry.h"
 #include <trackbase/TrkrDefs.h>
+
+#include <fun4all/SubsysReco.h>
 
 #include <Acts/Utilities/BinnedArray.hpp>
 #include <Acts/Utilities/Definitions.hpp>
@@ -55,7 +56,7 @@ using SourceLinkVec = std::vector<SourceLink>;
 typedef boost::bimap<TrkrDefs::cluskey, unsigned int> CluskeyBimap;
 
 
-class PHActsTrkFitter : public PHTrackFitting
+class PHActsTrkFitter : public SubsysReco
 {
  public:
   /// Default constructor
@@ -68,15 +69,18 @@ class PHActsTrkFitter : public PHTrackFitting
   int End(PHCompositeNode *topNode);
 
   /// Get and create nodes
-  int Setup(PHCompositeNode* topNode);
+  int Init(PHCompositeNode* topNode);
+  int InitRun(PHCompositeNode *topNode);
 
-  /// Process each event by calling the fitter
-  int Process();
+  int process_event(PHCompositeNode *topNode);
 
   int ResetEvent(PHCompositeNode *topNode);
 
   /// Do some internal time benchmarking analysis
   void doTimeAnalysis(bool timeAnalysis){m_timeAnalysis = timeAnalysis;}
+
+  void secondFit(bool secondFit)
+  { m_secondFit = secondFit;}
 
   /// Run the direct navigator to fit only tracks with silicon+MM hits
   void fitSiliconMMs(bool fitSiliconMMs)
@@ -96,7 +100,8 @@ class PHActsTrkFitter : public PHTrackFitting
   /// Create new nodes
   int createNodes(PHCompositeNode *topNode);
 
-  void loopTracks(Acts::Logging::Level logLevel);
+  void loopTracks(PHCompositeNode *topNode, 
+		  Acts::Logging::Level logLevel);
 
   /// Convert the acts track fit result to an svtx track
   void updateSvtxTrack(Trajectory traj, const unsigned int trackKey,
@@ -153,6 +158,8 @@ class PHActsTrkFitter : public PHTrackFitting
   /// A bool to update the SvtxTrackState information (or not)
   bool m_fillSvtxTrackStates;
 
+  bool m_secondFit = false;
+
   /// Variables for doing event time execution analysis
   bool m_timeAnalysis;
   TFile *m_timeFile;
@@ -161,6 +168,23 @@ class PHActsTrkFitter : public PHTrackFitting
   TH1 *h_updateTime;
   TH1 *h_stateTime;
   TH1 *h_rotTime;
+  TH2 *h_dcaxyDiff;
+  TH2 *h_dcazDiff;
+  TH2 *h_dcaxyComp;
+  TH2 *h_dcazComp;
+  TH2 *h_xEta;
+  TH2 *h_yEta;
+  TH2 *h_zEta;
+  TH2 *h_dcaxyFirstEta;
+  TH2 *h_dcaxyEta;
+  TH2 *h_dcaxysigComp;
+  TH2 *h_dcazsigComp;
+  TH2 *h_dcaxyerrComp;
+  TH2 *h_dcazerrComp;
+  TH2 *h_vertPosX;
+  TH2 *h_vertPosY;
+  TH2 *h_vertPosZ;
+
 };
 
 #endif

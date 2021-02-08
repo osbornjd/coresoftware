@@ -40,7 +40,7 @@
 #include <vector>
 
 PHActsTrkFitter::PHActsTrkFitter(const std::string& name)
-  : PHTrackFitting(name)
+  : SubsysReco(name)
   , m_event(0)
   , m_actsFitResults(nullptr)
   , m_actsProtoTracks(nullptr)
@@ -65,7 +65,11 @@ PHActsTrkFitter::~PHActsTrkFitter()
 {
 }
 
-int PHActsTrkFitter::Setup(PHCompositeNode* topNode)
+int PHActsTrkFitter::Init(PHCompositeNode *topNode)
+{
+  return Fun4AllReturnCodes::EVENT_OK;
+}
+int PHActsTrkFitter::InitRun(PHCompositeNode* topNode)
 {
   if(Verbosity() > 1)
     std::cout << "Setup PHActsTrkFitter" << std::endl;
@@ -93,11 +97,37 @@ int PHActsTrkFitter::Setup(PHCompositeNode* topNode)
 			   80, 0, 40, 100000, 0, 1000);
       h_updateTime = new TH1F("h_updateTime",";time [ms]",
 			      100000, 0, 1000);
-      
+
+      h_dcazsigComp = new TH2F("h_dcazsigComp",";DCA_{sig,z}^{first} [cm]; DCA_{sig,z}^{second} [cm]", 100,-5,5,1000,-15,15);
+      h_dcaxysigComp = new TH2F("h_dcaxysigComp",";DCA_{xy}^{first} [cm]; DCA_{sig,xy}^{second} [cm]", 100,-5,5,1000,-15,15);
+ 
+      h_dcaxyerrComp = new TH2F("h_dcaxyerrComp",";#sigmaDCA_{xy,first}[cm];#sigmaDCA_{xy,second} [cm]",1000,-0.05,0.05,1000,-0.05,0.05);
+      h_dcazerrComp = new TH2F("h_dcazerrComp",";#sigmaDCA_{z,first}[cm];#sigmaDCA_{z,second} [cm]",1000,-0.05,0.05,1000,-0.05,0.05);
+
+      h_dcazComp = new TH2F("h_dcazComp",";DCA_{z}^{first} [cm]; DCA_{z}^{second} [cm]", 1000,-0.05,0.05,1000,-0.05,0.05);
+      h_dcaxyComp = new TH2F("h_dcaxyComp",";DCA_{xy}^{first} [cm]; DCA_{xy}^{second} [cm]", 1000,-0.05,0.05,1000,-0.05,0.05);
+      h_dcazDiff = new TH2F("h_dcazDiff",";DCA_{z}^{first} [cm]; DCA_{z}^{first}-DCA_{z}^{second} [cm]", 1000,-0.05,0.05,1000,-0.05,0.05);
+      h_dcaxyDiff = new TH2F("h_dcaxyDiff",";DCA_{xy}^{first} [cm]; DCA_{xy}^{first}-DCA_{xy}^{second} [cm]", 1000,-0.05,0.05,1000,-0.05,0.05);
       h_rotTime = new TH1F("h_rotTime", ";time [ms]",
 			   100000, 0, 1000);
+
+      h_vertPosX = new TH2F("h_vertPosX",";x_{track}^{first}-x_{vert} [cm];x_{track}^{second}-x_{vert} [cm]", 10000,-0.05,0.05,10000,-0.05,0.05);
+      h_vertPosY = new TH2F("h_vertPosY",";y_{track}^{first}-y_{vert} [cm];y_{track}^{second}-y_{vert} [cm]", 10000,-0.05,0.05,10000,-0.05,0.05);
+      h_vertPosZ = new TH2F("h_vertPosZ",";z_{track}^{first}-z_{vert} [cm];z_{track}^{second}-z_{vert} [cm]", 10000,-0.05,0.05,10000,-0.05,0.05);
+      
       h_stateTime = new TH1F("h_stateTime", ";time [ms]",
 			     100000, 0, 1000);			     
+      h_xEta = new TH2F("h_xEta",";#eta;x_{track} [cm]",
+			100,-1.1,1.1,1000,-0.05,0.05);
+      h_yEta = new TH2F("h_yEta",";#eta;y_{track} [cm]",
+			100,-1.1,1.1,1000,-0.05,0.05);
+      h_zEta = new TH2F("h_zEta",";#eta;z_{track} [cm]",
+			100,-1.1,1.1,1000,-0.05,0.05);
+      h_dcaxyEta = new TH2F("h_dcaxyEta",";#eta; DCA_{xy} [cm]",
+			    100,-1.1,1.1,1000,-0.05,0.05);
+      h_dcaxyFirstEta = new TH2F("h_dcaxyFirstEta",";#eta; DCA_{xy} [cm]",
+			    100,-1.1,1.1,1000,-0.05,0.05);
+
     }		 
   
   if(Verbosity() > 1)
@@ -106,14 +136,14 @@ int PHActsTrkFitter::Setup(PHCompositeNode* topNode)
   return Fun4AllReturnCodes::EVENT_OK;
 }
 
-int PHActsTrkFitter::Process()
+int PHActsTrkFitter::process_event(PHCompositeNode *topNode)
 {
   auto eventTimer = std::make_unique<PHTimer>("eventTimer");
   eventTimer->stop();
   eventTimer->restart();
   
   /// Start fresh for this event and for this execution of the module
-  m_actsFitResults->clear();
+  //m_actsFitResults->clear();
 
   m_event++;
 
@@ -127,7 +157,7 @@ int PHActsTrkFitter::Process()
       logLevel = Acts::Logging::VERBOSE;
   }
 
-  loopTracks(logLevel);
+  loopTracks(topNode, logLevel);
   
   eventTimer->stop();
   auto eventTime = eventTimer->get_accumulated_time();
@@ -170,6 +200,22 @@ int PHActsTrkFitter::End(PHCompositeNode *topNode)
   if(m_timeAnalysis)
     {
       m_timeFile->cd();
+      h_xEta->Write();
+      h_yEta->Write();
+      h_zEta->Write();
+      h_dcaxyFirstEta->Write();
+      h_dcaxyEta->Write();
+      h_dcaxyDiff->Write();
+      h_dcazDiff->Write();
+      h_dcazComp->Write();
+      h_dcaxyComp->Write();
+      h_dcazerrComp->Write();
+      h_dcaxyerrComp->Write();
+      h_dcazsigComp->Write();
+      h_dcaxysigComp->Write();
+      h_vertPosX->Write();
+      h_vertPosY->Write();
+      h_vertPosZ->Write();
       h_fitTime->Write();
       h_eventTime->Write();
       h_rotTime->Write();
@@ -189,7 +235,8 @@ int PHActsTrkFitter::End(PHCompositeNode *topNode)
   return Fun4AllReturnCodes::EVENT_OK;
 }
 
-void PHActsTrkFitter::loopTracks(Acts::Logging::Level logLevel)
+void PHActsTrkFitter::loopTracks(PHCompositeNode *topNode, 
+				 Acts::Logging::Level logLevel)
 {
   auto logger = Acts::getDefaultLogger("PHActsTrkFitter", logLevel);
 
@@ -541,9 +588,26 @@ void PHActsTrkFitter::updateSvtxTrack(Trajectory traj,
   /// only one track tip in the track fit Trajectory
   auto &trackTip = trackTips.front();
 
+  auto trajState =
+    Acts::MultiTrajectoryHelpers::trajectoryState(mj, trackTip);
+ 
+  const auto& params = traj.trackParameters(trackTip);
+
   SvtxTrackMap::Iter trackIter = m_trackMap->find(trackKey);
   SvtxTrack *track = trackIter->second;
   
+  if(m_timeAnalysis)
+    {      
+      h_vertPosX->Fill(track->get_x() - vertex(0)/10.,
+		       (params.position(m_tGeometry->geoContext)(0)-vertex(0))/10.);
+      h_vertPosY->Fill(track->get_y() - vertex(1)/10.,
+		       (params.position(m_tGeometry->geoContext)(1)-vertex(1))/10.);
+      h_vertPosZ->Fill(track->get_z() - vertex(2)/10.,
+		       (params.position(m_tGeometry->geoContext)(2)-vertex(2))/10.);
+
+    
+    }
+
   if(Verbosity() > 2)
     {
       std::cout << "Identify (proto) track before updating with acts results " << std::endl;
@@ -564,11 +628,6 @@ void PHActsTrkFitter::updateSvtxTrack(Trajectory traj,
   out.set_z(0.0);
   track->insert_state(&out);   
 
-  auto trajState =
-    Acts::MultiTrajectoryHelpers::trajectoryState(mj, trackTip);
- 
-  const auto& params = traj.trackParameters(trackTip);
-
   /// Acts default unit is mm. So convert to cm
   track->set_x(params.position(m_tGeometry->geoContext)(0)
 	       / Acts::UnitConstants::cm);
@@ -581,6 +640,17 @@ void PHActsTrkFitter::updateSvtxTrack(Trajectory traj,
   track->set_py(params.momentum()(1));
   track->set_pz(params.momentum()(2));
   
+  float eta = atanh(params.momentum()(2) / params.momentum().norm());
+      
+  if(m_timeAnalysis)
+    {
+   
+      h_xEta->Fill(eta, track->get_x());
+      h_yEta->Fill(eta, track->get_y());
+      h_zEta->Fill(eta, track->get_z());
+    
+    }
+
   track->set_charge(params.charge());
   track->set_chisq(trajState.chi2Sum);
   track->set_ndf(trajState.NDF);
@@ -595,11 +665,10 @@ void PHActsTrkFitter::updateSvtxTrack(Trajectory traj,
       
   if(params.covariance())
     {
-   
       Acts::BoundSymMatrix rotatedCov = 
 	rotater->rotateActsCovToSvtxTrack(params,
 					  m_tGeometry->geoContext);
-      
+
       for(int i = 0; i < 6; i++)
 	{
 	  for(int j = 0; j < 6; j++)
@@ -608,14 +677,35 @@ void PHActsTrkFitter::updateSvtxTrack(Trajectory traj,
 	    }
 	}
     
- 
-
       rotater->calculateDCA(params, vertex, rotatedCov,
 			    m_tGeometry->geoContext, 
 			    dca3Dxy, dca3Dz, 
 			    dca3DxyCov, dca3DzCov);
     }
  
+  float firstDCAxy = track->get_dca3d_xy();
+  float firstDCAz = track->get_dca3d_z();
+  float firstDCAxysig = track->get_dca3d_xy_error();
+  float firstDCAzsig = track->get_dca3d_z_error();
+
+  if(m_timeAnalysis)
+    {
+      h_dcaxyDiff->Fill(firstDCAxy, dca3Dxy / 10. - firstDCAxy);
+      h_dcazDiff->Fill(firstDCAz, dca3Dz / 10. - firstDCAz);
+      h_dcaxyComp->Fill(firstDCAxy, dca3Dxy/10.);
+      h_dcazComp->Fill(firstDCAz,dca3Dz/10.);
+      h_dcaxysigComp->Fill(firstDCAxy / firstDCAxysig,
+			   dca3Dxy/sqrt(dca3DxyCov));
+      h_dcazsigComp->Fill(firstDCAz / firstDCAzsig,
+			  dca3Dz/sqrt(dca3DzCov));
+      h_dcazerrComp->Fill(firstDCAzsig,
+			  sqrt(dca3DzCov));
+      h_dcaxyerrComp->Fill(firstDCAxysig,
+			  sqrt(dca3DxyCov));
+      h_dcaxyFirstEta->Fill(eta, firstDCAxy);
+      h_dcaxyEta->Fill(eta, dca3Dxy/10.);
+    }
+
   /// Set the DCA here. The DCA will be updated after the final
   /// vertex fitting in PHActsVertexFinder
   track->set_dca3d_xy(dca3Dxy / Acts::UnitConstants::cm);
