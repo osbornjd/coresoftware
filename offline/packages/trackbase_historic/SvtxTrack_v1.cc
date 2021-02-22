@@ -102,6 +102,9 @@ SvtxTrack_v1& SvtxTrack_v1::operator=(const SvtxTrack_v1& track)
   types.push_back(SvtxTrack::HCALIN);
   types.push_back(SvtxTrack::HCALOUT);
 
+  _cal_x.clear();
+  _cal_y.clear();
+  _cal_z.clear();
   _cal_dphi.clear();
   _cal_deta.clear();
   _cal_energy_3x3.clear();
@@ -112,6 +115,9 @@ SvtxTrack_v1& SvtxTrack_v1::operator=(const SvtxTrack_v1& track)
 
   for (unsigned int i = 0; i < types.size(); ++i)
   {
+    if (!isnan(track.get_cal_proj_x(types[i]))) set_cal_proj_x(types[i], track.get_cal_proj_x(types[i]));
+    if (!isnan(track.get_cal_proj_y(types[i]))) set_cal_proj_y(types[i], track.get_cal_proj_y(types[i]));
+    if (!isnan(track.get_cal_proj_z(types[i]))) set_cal_proj_z(types[i], track.get_cal_proj_z(types[i]));
     if (!isnan(track.get_cal_dphi(types[i]))) set_cal_dphi(types[i], track.get_cal_dphi(types[i]));
     if (!isnan(track.get_cal_deta(types[i]))) set_cal_deta(types[i], track.get_cal_deta(types[i]));
     if (!isnan(track.get_cal_energy_3x3(types[i]))) set_cal_energy_3x3(types[i], track.get_cal_energy_3x3(types[i]));
