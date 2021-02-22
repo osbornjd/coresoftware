@@ -196,6 +196,15 @@ class SvtxTrack : public PHObject
   //
   // calo projection methods ---------------------------------------------------
   //
+  virtual float get_cal_proj_x(CAL_LAYER layer) const { return 0.; }
+  virtual void set_cal_proj_x(CAL_LAYER layer, float x){}
+  
+  virtual float get_cal_proj_y(CAL_LAYER layer) const { return 0.; }
+  virtual void set_cal_proj_y(CAL_LAYER layer, float y){}
+
+  virtual float get_cal_proj_z(CAL_LAYER layer) const { return 0.; }
+  virtual void set_cal_proj_z(CAL_LAYER layer, float z){}
+
   virtual float get_cal_dphi(CAL_LAYER layer) const { return 0.; }
   virtual void set_cal_dphi(CAL_LAYER layer, float dphi) {}
 

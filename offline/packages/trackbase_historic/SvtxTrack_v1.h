@@ -162,6 +162,15 @@ class SvtxTrack_v1 : public SvtxTrack
   //
   // calo projection methods ---------------------------------------------------
   //
+  float get_cal_proj_x(CAL_LAYER layer) const;
+  void set_cal_proj_x(CAL_LAYER layer, float x) { _cal_x[layer] = x;}
+
+  float get_cal_proj_y(CAL_LAYER layer) const;
+  void set_cal_proj_y(CAL_LAYER layer, float y) { _cal_y[layer] = y;}
+
+  float get_cal_proj_z(CAL_LAYER layer) const;
+  void set_cal_proj_z(CAL_LAYER layer, float z) { _cal_z[layer] = z;}
+
   float get_cal_dphi(CAL_LAYER layer) const;
   void set_cal_dphi(CAL_LAYER layer, float dphi) { _cal_dphi[layer] = dphi; }
 
@@ -212,6 +221,9 @@ class SvtxTrack_v1 : public SvtxTrack
   ClusterKeySet _cluster_keys;
 
   // calorimeter matches
+  std::map<CAL_LAYER, float> _cal_x;
+  std::map<CAL_LAYER, float> _cal_y;
+  std::map<CAL_LAYER, float> _cal_z;
   std::map<CAL_LAYER, float> _cal_dphi;
   std::map<CAL_LAYER, float> _cal_deta;
   std::map<CAL_LAYER, float> _cal_energy_3x3;

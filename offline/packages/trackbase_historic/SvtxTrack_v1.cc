@@ -30,6 +30,9 @@ SvtxTrack_v1::SvtxTrack_v1()
   , _states()
   , _cluster_ids()
   , _cluster_keys()
+  , _cal_x()
+  , _cal_y()
+  , _cal_z()
   , _cal_dphi()
   , _cal_deta()
   , _cal_energy_3x3()
@@ -215,6 +218,30 @@ size_t SvtxTrack_v1::erase_state(float pathlength)
   delete iter->second;
   _states.erase(iter);
   return _states.size();
+}
+
+float SvtxTrack_v1::get_cal_proj_x(SvtxTrack::CAL_LAYER layer) const
+{
+  std::map<SvtxTrack::CAL_LAYER,float>::const_iterator citer
+    = _cal_x.find(layer);
+  if(citer == _cal_x.end()) return NAN;
+  return citer->second;
+}
+
+float SvtxTrack_v1::get_cal_proj_y(SvtxTrack::CAL_LAYER layer) const
+{
+  std::map<SvtxTrack::CAL_LAYER,float>::const_iterator citer
+    = _cal_y.find(layer);
+  if(citer == _cal_y.end()) return NAN;
+  return citer->second;
+}
+
+float SvtxTrack_v1::get_cal_proj_z(SvtxTrack::CAL_LAYER layer) const
+{
+  std::map<SvtxTrack::CAL_LAYER,float>::const_iterator citer
+    = _cal_z.find(layer);
+  if(citer == _cal_z.end()) return NAN;
+  return citer->second;
 }
 
 float SvtxTrack_v1::get_cal_dphi(SvtxTrack::CAL_LAYER layer) const
