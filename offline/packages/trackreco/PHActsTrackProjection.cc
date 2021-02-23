@@ -123,12 +123,20 @@ int PHActsTrackProjection::projectTracks(PHCompositeNode *topNode,
 		m_caloSurfaces.find(m_caloNames.at(caloLayer))->second;
 
 	      auto result = propagateTrack(params, cylSurf);
-
+	      std::cout << "Returned from propagate"<<std::endl;
 	      if(result.ok())
 		{
+		  std::cout << "Result okay, updating svtx track" 
+			    << std::endl;
 		  auto trackStateParams = std::move(**result);
 		  updateSvtxTrack(trackStateParams, 
 				  trackKey, caloLayer);
+		}
+	      else
+		{
+		  if(Verbosity() > 1)
+		    std::cout << "Could not update SvtxTrack as propagation failed"
+			      << std::endl;
 		}
 	    }
 	}
@@ -164,6 +172,13 @@ void PHActsTrackProjection::updateSvtxTrack(
 
   if(fabs(projectionEta) >= 1.1)
     return;
+
+  svtxTrack->set_cal_proj_x(m_caloTypes.at(caloLayer), 
+			    projectionPos(0) / Acts::UnitConstants::cm);
+  svtxTrack->set_cal_proj_y(m_caloTypes.at(caloLayer),
+			    projectionPos(1) / Acts::UnitConstants::cm);
+  svtxTrack->set_cal_proj_z(m_caloTypes.at(caloLayer),
+			    projectionPos(2) / Acts::UnitConstants::cm);
 
   auto phiBin = m_towerGeomContainer->get_phibin(projectionPhi);
   auto etaBin = m_towerGeomContainer->get_etabin(projectionEta);
@@ -319,10 +334,14 @@ BoundTrackParamPtrResult PHActsTrackProjection::propagateTrack(
      
       auto result = propagator.propagate(params, *targetSurf, 
 					 options);
-   
+      std::cout << "Returned from propagate call"<<std::endl;
       if(result.ok())
 	return std::move((*result).endParameters);
      
+      if(Verbosity() > 1)
+	std::cout << "Returning an error on track propagation: "
+		  << result.error() << std::endl;
+
       return result.error();
    },
      std::move(m_tGeometry->magField));
