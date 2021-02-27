@@ -90,11 +90,28 @@ int PHSiliconTpcTrackMatching::Process()
   // We will have to expand the number of tracks whenever we find multiple matches to the silicon
 
   if(Verbosity() > 0)
-    cout << PHWHERE << " TPC track map size " << _track_map->size() << " Silicon track map size " << _track_map->size() << endl;
+    cout << PHWHERE << " TPC track map size " << _track_map->size() << " Silicon track map size " << _track_map_silicon->size() << endl;
 
- // We remember the original size of the TPC track map here
+  if(Verbosity() > 2)
+    {
+      // list silicon tracks
+      for (auto phtrk_iter_si = _track_map_silicon->begin();
+	   phtrk_iter_si != _track_map_silicon->end(); 
+	   ++phtrk_iter_si)
+	{
+	  _tracklet_si = phtrk_iter_si->second;	  
+	  
+	  double si_phi = atan2(_tracklet_si->get_py(), _tracklet_si->get_px());
+	  double si_eta = _tracklet_si->get_eta();
+	  
+	  cout << " Si track " << _tracklet_si->get_id()  << " si_phi " << si_phi  << " si_eta " << si_eta << endl;
+	}  
+    }
+  
+  
+  // We remember the original size of the TPC track map here
   const unsigned int original_track_map_lastkey = _track_map->end()->first;
-
+  
   // loop over the original TPC tracks
   for (auto phtrk_iter = _track_map->begin();
        phtrk_iter != _track_map->end(); 
@@ -118,7 +135,7 @@ int PHSiliconTpcTrackMatching::Process()
 
       double tpc_phi = atan2(_tracklet_tpc->get_py(), _tracklet_tpc->get_px());
       double tpc_eta = _tracklet_tpc->get_eta();
-      //double tpc_pt = sqrt( pow(_tracklet_tpc->get_px(),2) + pow(_tracklet_tpc->get_py(),2) );
+      double tpc_pt = sqrt( pow(_tracklet_tpc->get_px(),2) + pow(_tracklet_tpc->get_py(),2) );
 
       // phi correction for PHTpcTracker tracklets is charge dependent
       double sign_phi_correction = _tracklet_tpc->get_charge();
@@ -134,10 +151,10 @@ int PHSiliconTpcTrackMatching::Process()
       // hard code this here for now
       // this factor will increase the window size at low pT
       // otherwise the matching efficiency drops off at low pT
-      // not well optimized yet - smaller may work
+      // it would be better if this was a smooth function
       double mag = 1.0;
-      //if(tpc_pt < 5) mag = 2.0;
-      //if(tpc_pt < 2) mag = 4.0;
+      if(tpc_pt < 6.0) mag = 2;
+      if(tpc_pt < 3.0)  mag = 4.0;
 
       if(Verbosity() > 3)
 	{
@@ -169,7 +186,7 @@ int PHSiliconTpcTrackMatching::Process()
 
 	  double si_phi = atan2(_tracklet_si->get_py(), _tracklet_si->get_px());
 	  double si_eta = _tracklet_si->get_eta();
-	  double si_pt = sqrt(pow(_tracklet_si->get_px(), 2) + pow(_tracklet_si->get_py(), 2) );
+	  //double si_pt = sqrt(pow(_tracklet_si->get_px(), 2) + pow(_tracklet_si->get_py(), 2) );
 
 	  if(Verbosity() >= 2)
 	    {
@@ -190,15 +207,22 @@ int PHSiliconTpcTrackMatching::Process()
 	  else
 	    {
 	      // PHTpcTracker
-	      double si_pt = sqrt( pow(_tracklet_si->get_px(),2) + pow(_tracklet_si->get_py(),2) );
-	      double phi_search_win_lo = fdphi->Eval(si_pt) * sign_phi_correction -  _phi_search_win * mag;
-	      double phi_search_win_hi = fdphi->Eval(si_pt) * sign_phi_correction +  _phi_search_win * mag;
+	      //double si_pt = sqrt( pow(_tracklet_si->get_px(),2) + pow(_tracklet_si->get_py(),2) );
+	      double phi_search_win_lo = fdphi->Eval(tpc_pt) * sign_phi_correction -  _phi_search_win * mag;
+	      double phi_search_win_hi = fdphi->Eval(tpc_pt) * sign_phi_correction +  _phi_search_win * mag;
 
 	      if(Verbosity() > 10) 
 		cout << " phi_search_win_lo " << phi_search_win_lo << " phi_search_win_hi " << phi_search_win_hi << endl;
 
 	      if(  (tpc_phi - si_phi) > phi_search_win_lo && (tpc_phi - si_phi) < phi_search_win_hi) phi_match = true;	      
 	    }
+
+	  /*
+	  // temporary for debugging!
+	  if(_test_windows)
+	    cout << " Try_silicon:  pt " << tpc_pt << " tpc_phi " << tpc_phi << " si_phi " << si_phi << " dphi " << tpc_phi-si_phi  
+		 << " tpc_eta " << tpc_eta << " si_eta " << si_eta << " deta " << tpc_eta-si_eta << endl;
+	  */	  
 	  
 	  if(eta_match && phi_match)
 	    {
@@ -210,8 +234,9 @@ int PHSiliconTpcTrackMatching::Process()
 		       << " tpc_eta " << tpc_eta << " si_eta " << si_eta << " eta_match " << eta_match << endl;
 		}
 
+	      // temporary!
 	      if(_test_windows)
-		cout << " Try_silicon:  pt " << si_pt << " tpc_phi " << tpc_phi << " si_phi " << si_phi << " dphi " << tpc_phi-si_phi  
+		cout << " Try_silicon:  pt " << tpc_pt << " tpc_phi " << tpc_phi << " si_phi " << si_phi << " dphi " << tpc_phi-si_phi  
 		     << " tpc_eta " << tpc_eta << " si_eta " << si_eta << " deta " << tpc_eta-si_eta << endl;
 
 	      si_matches.insert(_tracklet_si->get_id());
@@ -249,7 +274,11 @@ int PHSiliconTpcTrackMatching::Process()
 	    }
 	  else
 	    {
-	      std::cout << PHWHERE << "Failed to find vertex object for vertex ID " << vertexId << " associated with TPC tracklet " << _tracklet_tpc->get_id() << std::endl; 
+	      std::cout << PHWHERE << "Failed to find vertex object for vertex ID " << vertexId 
+			<< " associated with TPC tracklet " << _tracklet_tpc->get_id() 
+			<< " si tracklet " << _tracklet_si->get_id()
+			<< " set vertex to (0,0,0)"
+			<< std::endl; 
 	      std::cout << " ---------- Silicon track --------------" << std::endl;
 	      _tracklet_si->identify();
 	      std::cout << " ---------- TPC track -----------------" << std::endl;
@@ -268,7 +297,7 @@ int PHSiliconTpcTrackMatching::Process()
 	  // get the si tracklet for this id
 	  _tracklet_si = _track_map_silicon->get(*si_it);
 
-	  if(Verbosity() > 3)
+	  if(Verbosity() > 0)
 	    cout << "   isi = " << isi << " si tracklet " << _tracklet_si->get_id() << " was matched to TPC tracklet " << _tracklet_tpc->get_id() << endl;
 
 	  // get the silicon clusters
@@ -300,7 +329,11 @@ int PHSiliconTpcTrackMatching::Process()
 		}
 	      else
 		{
-		  std::cout << PHWHERE << "Failed to find vertex object for vertex ID " << vertexId << " associated with TPC tracklet " << _tracklet_tpc->get_id() << std::endl; 
+		  std::cout << PHWHERE << "Failed to find vertex object for vertex ID " << vertexId 
+			    << " associated with TPC tracklet " << _tracklet_tpc->get_id() 
+			    << " si tracklet " << _tracklet_si->get_id()
+			    << " set vertex to (0,0,0)"
+			    << std::endl; 
 		  std::cout << " ---------- Silicon track --------------" << std::endl;
 		  _tracklet_si->identify();
 		  std::cout << " ---------- TPC track -----------------" << std::endl;
