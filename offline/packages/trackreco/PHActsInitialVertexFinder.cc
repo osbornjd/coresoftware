@@ -123,6 +123,8 @@ int PHActsInitialVertexFinder::End(PHCompositeNode *topNode)
   tree->Write();
   m_file->Write();
   m_file->Close();
+  std::cout << "Acts IVF used " << m_propagateTotals << " prop results out of "
+	    << m_trackTotals << " total tracks " << std::endl;
   std::cout << "Acts IVF succeeded " << m_successFits 
 	    << " out of " << m_totVertexFits << " total fits"
 	    << std::endl;
@@ -349,7 +351,7 @@ VertexVector PHActsInitialVertexFinder::findVertices(TrackParamVec& tracks)
       /// more than once causes vertices with low numbers of tracks to
       /// fail fitting, causing an error to be thrown and 0 vertices 
       /// returned
-      vertexFitterConfig.maxIterations = 1;
+      vertexFitterConfig.maxIterations = m_maxIterations;
 
       VertexFitter vertexFitter(std::move(vertexFitterConfig));
       
@@ -425,7 +427,7 @@ VertexVector PHActsInitialVertexFinder::findVertices(TrackParamVec& tracks)
 TrackParamVec PHActsInitialVertexFinder::getTrackPointers(InitKeyMap& keyMap)
 {
   TrackParamVec tracks;
-
+  
   for(auto& [key,track] : *m_trackMap)
     {
       if(Verbosity() > 3)
@@ -451,19 +453,23 @@ TrackParamVec PHActsInitialVertexFinder::getTrackPointers(InitKeyMap& keyMap)
       /// to the silicon seed resolutions
       Acts::BoundSymMatrix cov;
       if(m_resetTrackCovariance && m_siliconSeeds)
-	cov << 5000 * Acts::UnitConstants::um, 0., 0., 0., 0., 0.,
-	       0., 900 * Acts::UnitConstants::um, 0., 0., 0., 0.,
-	       0., 0., 0.005, 0., 0., 0.,
-	       0., 0., 0., 0.001, 0., 0.,
-	       0., 0., 0., 0., 0.3 , 0.,
-	       0., 0., 0., 0., 0., 1.;
+	{
+	  cov << 5000 * Acts::UnitConstants::um, 0., 0., 0., 0., 0.,
+	         0., 900 * Acts::UnitConstants::um, 0., 0., 0., 0.,
+	         0., 0., 0.005, 0., 0., 0.,
+	         0., 0., 0., 0.001, 0., 0.,
+	         0., 0., 0., 0., 0.3 , 0.,
+	         0., 0., 0., 0., 0., 1.;
+	}
       else if (m_resetTrackCovariance && !m_siliconSeeds)
-	cov << 1000 * Acts::UnitConstants::um, 0., 0., 0., 0., 0.,
-	       0., 900 * Acts::UnitConstants::um, 0., 0., 0., 0.,
-	       0., 0., 0.005, 0., 0., 0.,
-	       0., 0., 0., 0.001, 0., 0.,
-	       0., 0., 0., 0., 0.00005 , 0.,
-	       0., 0., 0., 0., 0., 1.;
+	{
+	  cov << 1000 * Acts::UnitConstants::um, 0., 0., 0., 0., 0.,
+	         0., 900 * Acts::UnitConstants::um, 0., 0., 0., 0.,
+	         0., 0., 0.005, 0., 0., 0.,
+	         0., 0., 0., 0.001, 0., 0.,
+	         0., 0., 0., 0., 0.00005 , 0.,
+	         0., 0., 0., 0., 0., 1.;
+	}
       else 
 	{
 	  ActsTransformations transform;
@@ -471,25 +477,93 @@ TrackParamVec PHActsInitialVertexFinder::getTrackPointers(InitKeyMap& keyMap)
 	  cov = transform.rotateSvtxTrackCovToActs(track,
 						   m_tGeometry->geoContext);
 	}
+   
+      const Acts::CurvilinearTrackParameters cParam(stubVec, stubMom,
+						    trackQ / p, cov);
+      auto result = propagateTrack(cParam);
+      if(result.ok())
+	{
+	  std::unique_ptr<const Acts::BoundTrackParameters> params = std::move(*result);
+	  /// The vertex finder requires raw pointers (not sure why)
+	  /// so convert the unique_ptr to raw
+	  const auto paramRawPtr = new Acts::BoundTrackParameters(*params);
+	  tracks.push_back(paramRawPtr);
+	  keyMap.insert(std::make_pair(paramRawPtr, key));
+	  m_propagateTotals++;
+	}
+      else
+	{
 
-      /// Make a dummy perigeee surface to bound the track to
-      auto perigee = Acts::Surface::makeShared<Acts::PerigeeSurface>(
-	       Acts::Vector3D(track->get_x() * Acts::UnitConstants::cm,
-			      track->get_y() * Acts::UnitConstants::cm,
-			      track->get_z() * Acts::UnitConstants::cm));
-      
-      const auto param = new Acts::BoundTrackParameters(
-			           perigee,
-				   m_tGeometry->geoContext,
-				   stubVec, stubMom, p, 
-				   trackQ, cov);
-      tracks.push_back(param);
-      keyMap.insert(std::make_pair(param, key));
+	  /// If the propagation doesn't work, we'll just add the
+	  /// track on its own surface
+	  /// Make a dummy perigeee surface to bind the track to
+	  auto perigee = Acts::Surface::makeShared<Acts::PerigeeSurface>(
+		 Acts::Vector3D(track->get_x() * Acts::UnitConstants::cm,
+				track->get_y() * Acts::UnitConstants::cm,
+				track->get_z() * Acts::UnitConstants::cm));
+	  const auto paramPtr = new Acts::BoundTrackParameters(
+				    perigee, m_tGeometry->geoContext,
+				    stubVec, stubMom, p, trackQ, cov);
+	  tracks.push_back(paramPtr);
+	  keyMap.insert(std::make_pair(paramPtr, key));
+	}
+      m_trackTotals++;
     }
 
   return tracks;
 }
+BoundTrackParamPtrResult PHActsInitialVertexFinder::propagateTrack(
+			 const Acts::CurvilinearTrackParameters param)
+{
+  /**
+   * This function propagates the determined track parameters to a
+   * perigee surface centered at 0,0,0 so that all parameters are
+   * defined in the same way wrt to the same surface before going 
+   * into the initial vertex finder. Nominally we would do this wrt
+   * the initial vertex estimate, but of course we don't know that yet.
+   */
+  
+  return std::visit([param, this] (auto &&inputField) -> BoundTrackParamPtrResult {
 
+      using InputMagneticField = typename std::decay_t<decltype(inputField)>::element_type;
+      using MagneticField = Acts::SharedBField<InputMagneticField>;
+      using Stepper = Acts::EigenStepper<MagneticField>;
+      using Propagator = Acts::Propagator<Stepper>;
+      
+      
+      MagneticField field(inputField);
+      Stepper stepper(field);
+      Propagator propagator(stepper);
+      
+      Acts::Logging::Level logLevel = Acts::Logging::FATAL;
+      if(Verbosity() > 3)
+	logLevel = Acts::Logging::VERBOSE;
+      
+      auto logger = Acts::getDefaultLogger("PHActsInitialVertexFinder",
+					   logLevel);
+      Acts::PropagatorOptions<> options(m_tGeometry->geoContext,
+					m_tGeometry->magFieldContext,
+					Acts::LoggerWrapper{*logger});
+      auto perigee = Acts::Surface::makeShared<Acts::PerigeeSurface>(
+			            Acts::Vector3D(0.,0.,0.));
+
+      auto result = propagator.propagate(param, *perigee,
+					 options);
+
+      if(result.ok())
+	{
+	  return std::move((*result).endParameters);
+	}
+      else 
+	{
+	std::cout << "IVF propagation error... couldn't transport parameters to perigee" << std::endl;
+	return result.error();
+      }
+      
+    }, m_tGeometry->magField);
+
+
+}
 int PHActsInitialVertexFinder::getNodes(PHCompositeNode *topNode)
 {
 

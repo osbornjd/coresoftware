@@ -24,9 +24,12 @@ class SvtxVertex;
 
 using VertexVector = std::vector<Acts::Vertex<Acts::BoundTrackParameters>>;
 
+using BoundTrackParamPtr = 
+  std::unique_ptr<const Acts::BoundTrackParameters>;
 using TrackParamVec = std::vector<const Acts::BoundTrackParameters*>;
 
 using InitKeyMap = std::map<const Acts::BoundTrackParameters*, const unsigned int>;
+using BoundTrackParamPtrResult = Acts::Result<BoundTrackParamPtr>;
 
 class PHActsInitialVertexFinder: public PHInitVertexing
 {
@@ -51,6 +54,9 @@ class PHActsInitialVertexFinder: public PHInitVertexing
   
   void setSiliconSeeds(const bool silicon)
   { m_siliconSeeds = silicon; }
+  
+  void setMaxIterations(const int iter)
+  { m_maxIterations = iter; }
 
  protected:
   int Setup(PHCompositeNode *topNode) override;
@@ -67,8 +73,11 @@ class PHActsInitialVertexFinder: public PHInitVertexing
   void fillVertexMap(VertexVector& vertices, InitKeyMap& keyMap);
   void createDummyVertex();
   void checkTrackVertexAssociation();
+
+  BoundTrackParamPtrResult propagateTrack(const Acts::CurvilinearTrackParameters param);
   
   int m_maxVertices = 5;
+  int m_maxIterations = 1;
   int m_event = 0;
   unsigned int m_totVertexFits = 0;
   unsigned int m_successFits = 0;
@@ -90,6 +99,8 @@ class PHActsInitialVertexFinder: public PHInitVertexing
   std::vector<float> m_x, m_y, m_z, m_px, m_py, m_pz;
   TH1* dumhist = nullptr;
 
+  int m_trackTotals = 0;
+  int m_propagateTotals = 0;
 };
 
 
