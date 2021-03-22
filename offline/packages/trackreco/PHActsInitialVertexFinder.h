@@ -8,8 +8,11 @@
 
 #include <Acts/Utilities/Result.hpp>
 #include <Acts/Vertexing/Vertex.hpp>
-
-
+#include <TH1.h>
+#include <TTree.h>
+#include <TH2.h>
+#include <TFile.h>
+#include <sstream>
 #include <ActsExamples/EventData/Track.hpp>
 #include <ActsExamples/EventData/TrkrClusterMultiTrajectory.hpp>
 
@@ -45,6 +48,9 @@ class PHActsInitialVertexFinder: public PHInitVertexing
 
   void resetTrackCovariance(const bool initial)
   { m_resetTrackCovariance = initial; }
+  
+  void setSiliconSeeds(const bool silicon)
+  { m_siliconSeeds = silicon; }
 
  protected:
   int Setup(PHCompositeNode *topNode) override;
@@ -72,10 +78,17 @@ class PHActsInitialVertexFinder: public PHInitVertexing
 
   bool m_resetTrackCovariance = true;
   bool m_disableWeights = true;
-
+  bool m_siliconSeeds = true;
+  
   SvtxTrackMap *m_trackMap = nullptr;
   SvtxVertexMap *m_vertexMap = nullptr;
   ActsTrackingGeometry *m_tGeometry = nullptr;
+
+  TFile *m_file= nullptr;
+  TTree *tree = nullptr;
+  float m_vx, m_vy, m_vz, m_ntrk, m_chi2, m_ndf;
+  std::vector<float> m_x, m_y, m_z, m_px, m_py, m_pz;
+  TH1* dumhist = nullptr;
 
 };
 

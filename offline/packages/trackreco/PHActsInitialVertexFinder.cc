@@ -58,7 +58,25 @@ int PHActsInitialVertexFinder::Setup(PHCompositeNode *topNode)
   
   if(createNodes(topNode) != Fun4AllReturnCodes::EVENT_OK)
     return Fun4AllReturnCodes::ABORTEVENT;
-  
+  std::ostringstream name;
+  name.str("");
+  name << Name() <<"IVF.root";
+  m_file = new TFile(name.str().c_str(),"RECREATE");
+  dumhist = new TH1F("dumhist","dumhist",100,0,10);
+  tree = new TTree("ivftree","tree with vertices");
+  tree->Branch("m_vx", &m_vx,"m_vx/F");
+  tree->Branch("m_vy", &m_vy,"m_vy/F");
+  tree->Branch("m_vz", &m_vz,"m_vz/F");  
+  tree->Branch("m_ntrk", &m_ntrk,"m_ntrk/F");
+  tree->Branch("m_chi2",&m_chi2,"m_chi2/F");
+  tree->Branch("m_ndf", &m_ndf,"m_ndf/F");
+  tree->Branch("m_x", &m_x);
+  tree->Branch("m_y", &m_y);
+  tree->Branch("m_z", &m_z);  
+  tree->Branch("m_px", &m_px);
+  tree->Branch("m_py", &m_py);
+  tree->Branch("m_pz", &m_pz);
+
   return Fun4AllReturnCodes::EVENT_OK;
 }
 
@@ -100,7 +118,11 @@ int PHActsInitialVertexFinder::ResetEvent(PHCompositeNode *topNode)
 
 int PHActsInitialVertexFinder::End(PHCompositeNode *topNode)
 {
-
+  m_file->cd();
+  dumhist->Write();
+  tree->Write();
+  m_file->Write();
+  m_file->Close();
   std::cout << "Acts IVF succeeded " << m_successFits 
 	    << " out of " << m_totVertexFits << " total fits"
 	    << std::endl;
@@ -157,7 +179,7 @@ void PHActsInitialVertexFinder::fillVertexMap(VertexVector& vertices,
 		  << std::endl;
       return;
     }
-    
+
   for(auto vertex : vertices)
     {
       const auto &[chi2, ndf] = vertex.fitQuality();
@@ -182,17 +204,31 @@ void PHActsInitialVertexFinder::fillVertexMap(VertexVector& vertices,
       svtxVertex->set_x(vertex.position().x() / Acts::UnitConstants::cm);  
       svtxVertex->set_y(vertex.position().y() / Acts::UnitConstants::cm);
       svtxVertex->set_z(vertex.position().z() / Acts::UnitConstants::cm);
-      for(int i = 0; i < 3; ++i) 
-	for(int j = 0; j < 3; ++j)
+      for(int i = 0; i < 3; ++i) {
+	for(int j = 0; j < 3; ++j) {
 	  svtxVertex->set_error(i, j,
 				vertex.covariance()(i,j) 
 				/ Acts::UnitConstants::cm2); 
-	        
+	}
+      }
       svtxVertex->set_chisq(chi2);
       svtxVertex->set_ndof(ndf);
       svtxVertex->set_t0(vertex.time());
       svtxVertex->set_id(vertexId);
           
+      m_vx = svtxVertex->get_x();
+      m_vy = svtxVertex->get_y();
+      m_vz = svtxVertex->get_z();
+      m_ntrk = numTracks;
+      m_chi2 = chi2;
+      m_ndf = ndf;
+      m_x.clear();
+      m_y.clear();
+      m_z.clear();
+      m_px.clear();
+      m_py.clear();
+      m_pz.clear();
+
       for(const auto track : vertex.tracks())
 	{
 	  const auto originalParams = track.originalParams;
@@ -202,7 +238,12 @@ void PHActsInitialVertexFinder::fillVertexMap(VertexVector& vertices,
 
 	  /// Give the track the appropriate vertex id
 	  const auto svtxTrack = m_trackMap->find(trackKey)->second;
-	  
+	  m_x.push_back(svtxTrack->get_x());
+	  m_y.push_back(svtxTrack->get_y());
+	  m_z.push_back(svtxTrack->get_z());
+	  m_px.push_back(svtxTrack->get_px());
+	  m_py.push_back(svtxTrack->get_py());
+	  m_pz.push_back(svtxTrack->get_pz());
 	  if(Verbosity() > 3)
 	    {   
 	      svtxTrack->identify();
@@ -212,7 +253,7 @@ void PHActsInitialVertexFinder::fillVertexMap(VertexVector& vertices,
 
 	  svtxTrack->set_vertex_id(vertexId);
 	}
-
+      tree->Fill();
       m_vertexMap->insert(svtxVertex.release());
 
       ++vertexId;
@@ -264,7 +305,7 @@ VertexVector PHActsInitialVertexFinder::findVertices(TrackParamVec& tracks)
 {
 
   m_totVertexFits++;
-
+  
   /// Determine the input mag field type from the initial geometry
   /// and run the vertex finding with the determined mag field
   return std::visit([tracks, this](auto &inputField) {
@@ -406,16 +447,23 @@ TrackParamVec PHActsInitialVertexFinder::getTrackPointers(InitKeyMap& keyMap)
       const int trackQ = track->get_charge() * Acts::UnitConstants::e;
       const double p = track->get_p();
       
-      /// Make a dummy loose covariance matrix for Acts
+      /// Make a dummy loose covariance matrix for Acts that corresponds
+      /// to the silicon seed resolutions
       Acts::BoundSymMatrix cov;
-      if(m_resetTrackCovariance)
-	cov << 1000 * Acts::UnitConstants::um, 0., 0., 0., 0., 0.,
-	       0., 1000 * Acts::UnitConstants::um, 0., 0., 0., 0.,
-	       0., 0., 0.05, 0., 0., 0.,
-	       0., 0., 0., 0.05, 0., 0.,
-	       0., 0., 0., 0., 0.1 , 0.,
+      if(m_resetTrackCovariance && m_siliconSeeds)
+	cov << 5000 * Acts::UnitConstants::um, 0., 0., 0., 0., 0.,
+	       0., 900 * Acts::UnitConstants::um, 0., 0., 0., 0.,
+	       0., 0., 0.005, 0., 0., 0.,
+	       0., 0., 0., 0.001, 0., 0.,
+	       0., 0., 0., 0., 0.3 , 0.,
 	       0., 0., 0., 0., 0., 1.;
-      
+      else if (m_resetTrackCovariance && !m_siliconSeeds)
+	cov << 1000 * Acts::UnitConstants::um, 0., 0., 0., 0., 0.,
+	       0., 900 * Acts::UnitConstants::um, 0., 0., 0., 0.,
+	       0., 0., 0.005, 0., 0., 0.,
+	       0., 0., 0., 0.001, 0., 0.,
+	       0., 0., 0., 0., 0.00005 , 0.,
+	       0., 0., 0., 0., 0., 1.;
       else 
 	{
 	  ActsTransformations transform;
@@ -426,17 +474,15 @@ TrackParamVec PHActsInitialVertexFinder::getTrackPointers(InitKeyMap& keyMap)
 
       /// Make a dummy perigeee surface to bound the track to
       auto perigee = Acts::Surface::makeShared<Acts::PerigeeSurface>(
-		 Acts::Vector3D(track->get_x() * Acts::UnitConstants::cm,
-				track->get_y() * Acts::UnitConstants::cm,
-				track->get_z() * Acts::UnitConstants::cm));
-								     
-
+	       Acts::Vector3D(track->get_x() * Acts::UnitConstants::cm,
+			      track->get_y() * Acts::UnitConstants::cm,
+			      track->get_z() * Acts::UnitConstants::cm));
+      
       const auto param = new Acts::BoundTrackParameters(
 			           perigee,
 				   m_tGeometry->geoContext,
-				   stubVec, stubMom,
-				   p, trackQ, cov);
-
+				   stubVec, stubMom, p, 
+				   trackQ, cov);
       tracks.push_back(param);
       keyMap.insert(std::make_pair(param, key));
     }
