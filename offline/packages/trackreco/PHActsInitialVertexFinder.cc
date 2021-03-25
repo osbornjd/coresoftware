@@ -437,12 +437,15 @@ TrackParamVec PHActsInitialVertexFinder::getTrackPointers(InitKeyMap& keyMap)
 	  track->identify();
 	}
 
+      if(fabs(track->get_x()) > 0.01 or fabs(track->get_y()) > 0.01)
+	continue;
+
       const Acts::Vector4D stubVec(
                   track->get_x() * Acts::UnitConstants::cm,
 		  track->get_y() * Acts::UnitConstants::cm,
 		  track->get_z() * Acts::UnitConstants::cm,
 		  10 * Acts::UnitConstants::ns);
-     
+      
       const Acts::Vector3D stubMom(track->get_px(),
 				   track->get_py(),
 				   track->get_pz());
@@ -478,6 +481,10 @@ TrackParamVec PHActsInitialVertexFinder::getTrackPointers(InitKeyMap& keyMap)
 						   m_tGeometry->geoContext);
 	}
    
+      auto perigee = Acts::Surface::makeShared<Acts::PerigeeSurface>(
+                                    Acts::Vector3D(stubVec(0), 
+						   stubVec(1), stubVec(2)));
+      
       const Acts::CurvilinearTrackParameters cParam(stubVec, stubMom,
 						    trackQ / p, cov);
       auto result = propagateTrack(cParam);
@@ -490,23 +497,23 @@ TrackParamVec PHActsInitialVertexFinder::getTrackPointers(InitKeyMap& keyMap)
 	  tracks.push_back(paramRawPtr);
 	  keyMap.insert(std::make_pair(paramRawPtr, key));
 	  m_propagateTotals++;
+      
 	}
+      
       else
-	{
+      {
 
 	  /// If the propagation doesn't work, we'll just add the
 	  /// track on its own surface
 	  /// Make a dummy perigeee surface to bind the track to
-	  auto perigee = Acts::Surface::makeShared<Acts::PerigeeSurface>(
-		 Acts::Vector3D(track->get_x() * Acts::UnitConstants::cm,
-				track->get_y() * Acts::UnitConstants::cm,
-				track->get_z() * Acts::UnitConstants::cm));
+
 	  const auto paramPtr = new Acts::BoundTrackParameters(
 				    perigee, m_tGeometry->geoContext,
 				    stubVec, stubMom, p, trackQ, cov);
+      
 	  tracks.push_back(paramPtr);
 	  keyMap.insert(std::make_pair(paramPtr, key));
-	}
+      }
       m_trackTotals++;
     }
 
