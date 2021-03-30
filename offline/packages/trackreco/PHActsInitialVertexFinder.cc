@@ -437,8 +437,11 @@ TrackParamVec PHActsInitialVertexFinder::getTrackPointers(InitKeyMap& keyMap)
 	  track->identify();
 	}
 
-      if(fabs(track->get_x()) > 0.01 or fabs(track->get_y()) > 0.01)
+      if(track->size_cluster_keys() < 5)
 	continue;
+
+      //if(fabs(track->get_x()) > 0.02 or fabs(track->get_y()) > 0.02)
+      //continue;
 
       const Acts::Vector4D stubVec(
                   track->get_x() * Acts::UnitConstants::cm,
