@@ -18,6 +18,7 @@
 class PHCompositeNode;
 class TrkrCluster;
 class TrkrClusterContainer;
+class TrkrHitSetContainer;
 
 class TpcClusterCleaner : public SubsysReco
 {
@@ -42,8 +43,8 @@ class TpcClusterCleaner : public SubsysReco
   void rotate_error(double erphi, double ez, double phi, double error[][3]);
 
   int GetNodes(PHCompositeNode* topNode);
-
-  TrkrClusterContainer *_cluster_map;
+  TrkrHitSetContainer  *_hitsets = nullptr;
+  TrkrClusterContainer *_cluster_map = nullptr;
 
   double _rphi_error_low_cut = 0.01;
   double _rphi_error_high_cut = 0.1;  // made large enough to not matter for now
