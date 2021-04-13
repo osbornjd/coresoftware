@@ -729,7 +729,7 @@ void PHActsTrkFitter::updateSvtxTrack(Trajectory traj,
   
 }
 
-Acts::BoundSymMatrix PHActsTrkFitter::setDefaultCovariance(double p)
+Acts::BoundSymMatrix PHActsTrkFitter::setDefaultCovariance()
 {
 
   Acts::BoundSymMatrix cov;
@@ -758,7 +758,7 @@ Acts::BoundSymMatrix PHActsTrkFitter::setDefaultCovariance(double p)
            0., 1000 * Acts::UnitConstants::um, 0., 0., 0., 0.,
            0., 0., 0.05, 0., 0., 0.,
            0., 0., 0., 0.05, 0., 0.,
-           0., 0., 0., 0., 0.03 / (pow(p,4)) , 0.,
+           0., 0., 0., 0., 0.00005 , 0.,
            0., 0., 0., 0., 0., 1.;
 
   return cov;

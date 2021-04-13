@@ -512,24 +512,23 @@ void MakeActsGeometry::buildActsSurfaces()
   const int argc = 24;
   char* arg[argc];
  
-  if(Verbosity() > 0)
+  if(Verbosity() > -1)
     std::cout << PHWHERE << "Magnetic field " << m_magField 
 	      << " with rescale " << m_magFieldRescale << std::endl;
 
-  /// If the 2d fieldmap is provided, for now we just assume a 1.4T
-  /// field (which will be properly scaled by 1.4/1.5) from magFieldRescale
+  /// If the 2d fieldmap is provided, we use the big 3d xyz field map
+  /// which provides a better map than a constant field
   if(m_magField.find(".root") != std::string::npos)
     {
-      m_magField = std::string(getenv("CALIBRATIONROOT")) + 
-	           std::string("/Field/Map/sPHENIX.2d.root");
-      
+      m_magField = "/cvmfs/sphenix.sdcc.bnl.gov/gcc-8.3/opt/sphenix/core/fieldmaps/sphenix3dbigmapxyz.root";
+      m_magFieldRescale = -1;
       /// Convert map from Gauss to T
-      m_magFieldRescale *= 0.0001;
+      //m_magFieldRescale *= 0.0001;
+    
+      /// The acts field and geant field are backwards in convention
+      m_magFieldRescale *= -1;
     }
   
-  /// The acts field and geant field are backwards in convention
-  m_magFieldRescale *= -1;
-
   /// Create an ostringstream so that precision is high enough for Acts
   std::ostringstream rescaleStr;
   rescaleStr.precision(12);
@@ -548,7 +547,7 @@ void MakeActsGeometry::buildActsSurfaces()
     "-n1", "-l0", 
       "--response-file", responseFile,
       "--mat-input-file", materialFile,
-      "--bf-values","0","0",m_magField,
+      "--bf-values","0","0", m_magField,
       "--bf-bscalor", rescaleStr.str()
       };
    
@@ -563,10 +562,7 @@ void MakeActsGeometry::buildActsSurfaces()
       argstr[10] = "--bf-lscalor";
       argstr[11] = "10";
       argstr[12] = "--bf-bscalor";
-      argstr[13] = rescaleStr.str();
-      argstr[14] = "--bf-rz";
-      argstr[15] = "true";
-    
+      argstr[13] = rescaleStr.str();    
     }
 
   // Set vector of chars to arguments needed
