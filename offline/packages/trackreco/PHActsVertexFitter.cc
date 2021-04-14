@@ -41,7 +41,6 @@
 
 PHActsVertexFitter::PHActsVertexFitter(const std::string &name)
   : SubsysReco(name)
-  , m_actsFitResults(nullptr)
   , m_tGeometry(nullptr)
 {
 }
@@ -56,6 +55,9 @@ int PHActsVertexFitter::Init(PHCompositeNode *topNode)
 
 int PHActsVertexFitter::End(PHCompositeNode *topNode)
 {
+  std::cout << "PHActsVertexFitter fit " << m_successFits << " out of "
+	    << m_totalFits << " vertices" << std::endl;
+
   if (Verbosity() > 1)
     std::cout << "PHActsVertexFitter::End " << std::endl;
   return Fun4AllReturnCodes::EVENT_OK;
@@ -95,7 +97,7 @@ int PHActsVertexFitter::process_event(PHCompositeNode *topNode)
   for (const auto &[vertexId, trackVec] : vertexTrackMap)
   {
     const auto vertex = fitVertex(trackVec, logLevel);
-
+    m_totalFits++;
     createActsSvtxVertex(vertexId, vertex);
 
     if (m_updateSvtxVertexMap)
@@ -114,9 +116,11 @@ void PHActsVertexFitter::updateSvtxVertex(const unsigned int vertexId,
 {
   auto svtxVertex = m_vertexMap->get(vertexId);
 
-  if (Verbosity() > 1)
-    std::cout << "Updating SvtxVertex id " << vertexId << std::endl;
-
+  if (Verbosity() > 1) 
+    {
+      std::cout << "Updating SvtxVertex id " << vertexId << std::endl;
+      svtxVertex->identify();
+    }
   svtxVertex->set_x(vertex.position().x() / Acts::UnitConstants::cm);
   svtxVertex->set_y(vertex.position().y() / Acts::UnitConstants::cm);
   svtxVertex->set_z(vertex.position().z() / Acts::UnitConstants::cm);
@@ -134,6 +138,12 @@ void PHActsVertexFitter::updateSvtxVertex(const unsigned int vertexId,
   svtxVertex->set_ndof(ndf);
   svtxVertex->set_chisq(chi2);
   svtxVertex->set_t0(vertex.time());
+
+  if(Verbosity() > 1) 
+    {
+      std::cout << "Vertex updated with : " << std::endl;
+      svtxVertex->identify();
+    }
 }
 
 void PHActsVertexFitter::createActsSvtxVertex(const unsigned int vertexId,
@@ -173,11 +183,14 @@ void PHActsVertexFitter::createActsSvtxVertex(const unsigned int vertexId,
   m_actsVertexMap->insert(svtxVertex.release());
 }
 
-ActsVertex PHActsVertexFitter::fitVertex(BoundTrackParamVec tracks, Acts::Logging::Level logLevel) const
+ActsVertex PHActsVertexFitter::fitVertex(BoundTrackParamVec tracks, 
+					 Acts::Logging::Level logLevel)
 {
+
   /// Determine the input mag field type from the initial
   /// geometry created in MakeActsGeometry
   return std::visit([tracks, logLevel, this](auto &inputField) {
+
     /// Setup aliases
     using InputMagneticField =
         typename std::decay_t<decltype(inputField)>::element_type;
@@ -221,6 +234,7 @@ ActsVertex PHActsVertexFitter::fitVertex(BoundTrackParamVec tracks, Acts::Loggin
     if (fitRes.ok())
     {
       fittedVertex = *fitRes;
+      m_successFits++;
       if (Verbosity() > 3)
       {
         std::cout << "Fitted vertex position "
@@ -244,7 +258,7 @@ ActsVertex PHActsVertexFitter::fitVertex(BoundTrackParamVec tracks, Acts::Loggin
 
     return fittedVertex;
   },
-                    m_tGeometry->magField);  /// end std::visit call
+    m_tGeometry->magField);  /// end std::visit call
 }
 
 VertexTrackMap PHActsVertexFitter::getTracks()
@@ -294,7 +308,7 @@ VertexTrackMap PHActsVertexFitter::getTracks()
   return trackPtrs;
 }
 
-const Acts::BoundTrackParameters *PHActsVertexFitter::makeTrackParam(const SvtxTrack *track) const
+const Acts::BoundTrackParameters* PHActsVertexFitter::makeTrackParam(const SvtxTrack *track) const
 {
   const Acts::Vector4D trackPos(
       track->get_x() * Acts::UnitConstants::cm,
@@ -314,31 +328,26 @@ const Acts::BoundTrackParameters *PHActsVertexFitter::makeTrackParam(const SvtxT
   {
     for (int j = 0; j < 6; ++j)
     {
-      cov(i, j) = track->get_error(i, j);
+      cov(i, j) = track->get_acts_covariance(i, j);
     }
   }
 
+  auto vertexId = track->get_vertex_id();
+  const SvtxVertex* svtxVertex = m_vertexMap->get(vertexId);
+  Acts::Vector3D vertex(svtxVertex->get_x() * Acts::UnitConstants::cm, 
+			svtxVertex->get_y() * Acts::UnitConstants::cm, 
+			svtxVertex->get_z() * Acts::UnitConstants::cm);
   auto perigee = Acts::Surface::makeShared<Acts::PerigeeSurface>(
-      Acts::Vector3D(track->get_x() * Acts::UnitConstants::cm,
-                     track->get_y() * Acts::UnitConstants::cm,
-                     track->get_z() * Acts::UnitConstants::cm));
+     vertex);
 
-  const auto param = new Acts::BoundTrackParameters(
+  return new Acts::BoundTrackParameters(
       perigee, m_tGeometry->geoContext,
       trackPos, trackMom, p, trackQ, cov);
 
-  return param;
 }
 
 int PHActsVertexFitter::getNodes(PHCompositeNode *topNode)
 {
-  m_actsFitResults = findNode::getClass<std::map<const unsigned int, Trajectory>>(topNode, "ActsFitResults");
-  if (!m_actsFitResults)
-  {
-    std::cout << PHWHERE << "Acts Trajectories not found on node tree, exiting."
-              << std::endl;
-    return Fun4AllReturnCodes::ABORTEVENT;
-  }
 
   m_trackMap = findNode::getClass<SvtxTrackMap>(topNode,
                                                 "SvtxTrackMap");

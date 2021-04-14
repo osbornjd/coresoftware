@@ -19,8 +19,6 @@ namespace Acts
   class TrackParameters;
 }
 
-using Trajectory = ActsExamples::TrkrClusterMultiTrajectory;
-
 using BoundTrackParamVec = std::vector<const Acts::BoundTrackParameters *>;
 using VertexTrackMap = std::map<const unsigned int,
                                 BoundTrackParamVec>;
@@ -60,7 +58,7 @@ class PHActsVertexFitter : public SubsysReco
 
   /// Run the Acts vertex fitter
   ActsVertex fitVertex(BoundTrackParamVec tracks,
-                       Acts::Logging::Level logLevel) const;
+                       Acts::Logging::Level logLevel);
 
   /// Runs Acts vertex fitter
   void fitVertices(std::vector<const Acts::BoundTrackParameters *> tracks);
@@ -73,7 +71,6 @@ class PHActsVertexFitter : public SubsysReco
 
   int m_event = 0;
 
-  std::map<const unsigned int, Trajectory> *m_actsFitResults;
   ActsTrackingGeometry *m_tGeometry;
   SvtxTrackMap *m_trackMap = nullptr;
   SvtxVertexMap *m_vertexMap = nullptr;
@@ -81,7 +78,11 @@ class PHActsVertexFitter : public SubsysReco
 
   /// Option to update the default SvtxVertexMap. A new SvtxVertexMap
   /// called SvtxVertexMapActs is created by default in the module
-  bool m_updateSvtxVertexMap = false;
+  bool m_updateSvtxVertexMap = true;
+  bool m_createActsVertexMap = false;
+
+  int m_successFits = 0;
+  int m_totalFits = 0;
 };
 
 #endif  //TRACKRECO_PHACTSVERTEXFITTER_H
