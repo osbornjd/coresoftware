@@ -404,21 +404,30 @@ std::vector<SvtxTrack*> PHActsInitialVertexFinder::sortTracks()
   /// m_nCentroid track z PCAs (centroids), assign all tracks to 
   /// a centroid based on which they are closest to, and then iterate
   /// to update clusters and centroids
+  if(Verbosity() > 1)
+    std::cout << "Track map size is " << m_trackMap->size() << std::endl;
 
   std::vector<float> centroids(m_nCentroids);
   std::uniform_int_distribution<int> indices(0,m_trackMap->size() - 1);
+  std::cout << "Got indices"<<std::endl;
   std::vector<int> usedIndices;
-
+  for(const auto& [key, track] : *m_trackMap)
+    track->identify();
+  
   /// Get the original centroids
   for(auto& centroid : centroids) 
     {
+      std::cout << "Getting centroid " << centroid << std::endl;
       auto index = indices(m_random_number_generator);
+      std::cout << "index " << index<<std::endl;
       for(const auto used : usedIndices)
 	if(index == used)
 	  index = indices(m_random_number_generator);
-
+      std::cout << "pushing back "<< index<<std::endl;
       usedIndices.push_back(index);
-
+      std::cout << "Getting centroid"<<std::endl;
+      if(!m_trackMap->get(index))
+        continue;
       centroid = m_trackMap->get(index)->get_z();
       
       if(Verbosity() > 3)
