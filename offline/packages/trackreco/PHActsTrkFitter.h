@@ -23,7 +23,7 @@
 #include <Acts/MagneticField/MagneticFieldContext.hpp>
 #include <Acts/Utilities/CalibrationContext.hpp>
 
-#include <ActsExamples/Fitting/TrkrClusterFittingAlgorithm.hpp>
+#include <ActsExamples/Fitting/TrkrClusterOutlierFittingAlgorithm.hpp>
 #include <ActsExamples/EventData/TrkrClusterMultiTrajectory.hpp>
 
 #include <boost/bimap.hpp>
@@ -105,10 +105,10 @@ class PHActsTrkFitter : public SubsysReco
 
   /// Helper function to call either the regular navigation or direct
   /// navigation, depending on m_fitSiliconMMs
-  ActsExamples::TrkrClusterFittingAlgorithm::FitterResult fitTrack(
+  ActsExamples::TrkrClusterOutlierFittingAlgorithm::FitterResult fitTrack(
            const SourceLinkVec& sourceLinks, 
 	   const ActsExamples::TrackParameters& seed,
-	   const Acts::KalmanFitterOptions<Acts::VoidOutlierFinder>& 
+	   const Acts::KalmanFitterOptions<ResidualOutlierFinder>& 
 	         kfOptions,
 	   const SurfacePtrVec& surfSequence);
 
@@ -135,7 +135,7 @@ class PHActsTrkFitter : public SubsysReco
   ActsTrackingGeometry *m_tGeometry = nullptr;
 
   /// Configuration containing the fitting function instance
-  ActsExamples::TrkrClusterFittingAlgorithm::Config m_fitCfg;
+  ActsExamples::TrkrClusterOutlierFittingAlgorithm::Config m_fitCfg;
 
   /// TrackMap containing SvtxTracks
   SvtxTrackMap *m_trackMap = nullptr;

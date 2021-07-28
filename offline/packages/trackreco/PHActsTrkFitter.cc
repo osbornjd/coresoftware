@@ -60,11 +60,11 @@ int PHActsTrkFitter::InitRun(PHCompositeNode* topNode)
   if (getNodes(topNode) != Fun4AllReturnCodes::EVENT_OK)
     return Fun4AllReturnCodes::ABORTEVENT;
   
-  m_fitCfg.fit = ActsExamples::TrkrClusterFittingAlgorithm::makeFitterFunction(
+  m_fitCfg.fit = ActsExamples::TrkrClusterOutlierFittingAlgorithm::makeFitterFunction(
                m_tGeometry->tGeometry,
 	       m_tGeometry->magField);
 
-  m_fitCfg.dFit = ActsExamples::TrkrClusterFittingAlgorithm::makeFitterFunction(
+  m_fitCfg.dFit = ActsExamples::TrkrClusterOutlierFittingAlgorithm::makeFitterFunction(
 	       m_tGeometry->magField);
 
   if(m_timeAnalysis)
@@ -245,12 +245,15 @@ void PHActsTrkFitter::loopTracks(Acts::Logging::Level logLevel)
       /// associated to this track and the corresponding track seed which
       /// corresponds to the PHGenFitTrkProp track seeds
       Acts::PropagatorPlainOptions ppPlainOptions;
-      ppPlainOptions.absPdgCode = 11;
-      Acts::KalmanFitterOptions<Acts::VoidOutlierFinder> kfOptions(
+
+      ResidualOutlierFinder outlierFinder;
+      outlierFinder.chi2Cut = 4;
+
+      const Acts::KalmanFitterOptions<ResidualOutlierFinder> kfOptions(
 			        m_tGeometry->geoContext,
 				m_tGeometry->magFieldContext,
 				m_tGeometry->calibContext,
-				Acts::VoidOutlierFinder(),
+			        outlierFinder,
 				Acts::LoggerWrapper(*logger),
 			        ppPlainOptions,
 				&(*pSurface));
@@ -507,10 +510,10 @@ void PHActsTrkFitter::getTrackFitResult(const FitResult &fitOutput,
   return;
 }
 
-ActsExamples::TrkrClusterFittingAlgorithm::FitterResult PHActsTrkFitter::fitTrack(
+ActsExamples::TrkrClusterOutlierFittingAlgorithm::FitterResult PHActsTrkFitter::fitTrack(
           const SourceLinkVec& sourceLinks, 
 	  const ActsExamples::TrackParameters& seed,
-	  const Acts::KalmanFitterOptions<Acts::VoidOutlierFinder>& 
+	  const Acts::KalmanFitterOptions<ResidualOutlierFinder>& 
 	         kfOptions, 
 	  const SurfacePtrVec& surfSequence)
 {
