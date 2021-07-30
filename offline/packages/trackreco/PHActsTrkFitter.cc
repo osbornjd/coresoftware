@@ -20,6 +20,8 @@
 #include <trackbase_historic/SvtxVertex.h>
 #include <micromegas/MicromegasDefs.h>
 
+#include <g4main/PHG4HitContainer.h>
+
 #include <fun4all/Fun4AllReturnCodes.h>
 #include <phool/PHCompositeNode.h>
 #include <phool/getClass.h>
@@ -121,7 +123,30 @@ int PHActsTrkFitter::process_event(PHCompositeNode *topNode)
 	}
     }
 
-  loopTracks(logLevel);
+  auto mmnode = findNode::getClass<PHG4HitContainer>(topNode, "G4HIT_MICROMEGAS");
+  std::vector<std::pair<long unsigned int,double>> chi2Cuts;
+
+/// Set outlier finding criteria. The seocnd value in the pair is the maximum allowed
+/// chi2 value for a given detector
+  if(!mmnode) 
+    {
+      chi2Cuts.push_back(std::make_pair(7, 0.)); // mvtx
+      chi2Cuts.push_back(std::make_pair(9, 0.)); // intt
+      chi2Cuts.push_back(std::make_pair(11, 0.)); // tpc
+    }
+  else
+    {
+      chi2Cuts.push_back(std::make_pair(10, 4)); //mvtx
+      chi2Cuts.push_back(std::make_pair(12, 4)); //intt
+      chi2Cuts.push_back(std::make_pair(14, 9)); //tpc
+      chi2Cuts.push_back(std::make_pair(16,4)); //mms
+    }
+  
+  ResidualOutlierFinder outlierFinder;
+  outlierFinder.chi2Cuts = chi2Cuts;
+  outlierFinder.verbosity = Verbosity();
+
+  loopTracks(logLevel, outlierFinder);
 
   eventTimer.stop();
   auto eventTime = eventTimer.get_accumulated_time();
@@ -187,7 +212,8 @@ int PHActsTrkFitter::End(PHCompositeNode *topNode)
   return Fun4AllReturnCodes::EVENT_OK;
 }
 
-void PHActsTrkFitter::loopTracks(Acts::Logging::Level logLevel)
+void PHActsTrkFitter::loopTracks(Acts::Logging::Level logLevel,
+				 ResidualOutlierFinder outlierFinder)
 {
   auto logger = Acts::getDefaultLogger("PHActsTrkFitter", logLevel);
 
@@ -195,6 +221,8 @@ void PHActsTrkFitter::loopTracks(Acts::Logging::Level logLevel)
   /// track map iterator doesn't crash
   std::vector<unsigned int> badTracks;
 
+  Acts::PropagatorPlainOptions ppPlainOptions;
+ 
   for(const auto& [trackKey, track] : *m_trackMap)
     {
       if(!track)
@@ -244,11 +272,6 @@ void PHActsTrkFitter::loopTracks(Acts::Logging::Level logLevel)
       /// Call KF now. Have a vector of sourceLinks corresponding to clusters
       /// associated to this track and the corresponding track seed which
       /// corresponds to the PHGenFitTrkProp track seeds
-      Acts::PropagatorPlainOptions ppPlainOptions;
-
-      ResidualOutlierFinder outlierFinder;
-      outlierFinder.chi2Cut = 4;
-
       const Acts::KalmanFitterOptions<ResidualOutlierFinder> kfOptions(
 			        m_tGeometry->geoContext,
 				m_tGeometry->magFieldContext,
@@ -639,6 +662,10 @@ void PHActsTrkFitter::updateSvtxTrack(Trajectory traj,
   auto trajState =
     Acts::MultiTrajectoryHelpers::trajectoryState(mj, trackTip);
  
+  std::cout << "number of outliers found " 
+	    << trajState.nOutliers << " and nmeas " << trajState.nMeasurements
+	    << " and nstates " << trajState.nStates << std::endl;
+
   const auto& params = traj.trackParameters(trackTip);
 
   /// Acts default unit is mm. So convert to cm

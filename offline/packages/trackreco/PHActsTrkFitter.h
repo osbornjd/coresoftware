@@ -96,7 +96,8 @@ class PHActsTrkFitter : public SubsysReco
   /// Create new nodes
   int createNodes(PHCompositeNode *topNode);
 
-  void loopTracks(Acts::Logging::Level logLevel);
+  void loopTracks(Acts::Logging::Level logLevel, 
+		  ResidualOutlierFinder outlierFinder);
   SourceLinkVec getSourceLinks(SvtxTrack *track);
   Acts::Vector3D getVertex(SvtxTrack *track);
 
