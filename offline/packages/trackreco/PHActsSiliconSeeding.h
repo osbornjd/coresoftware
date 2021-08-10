@@ -211,7 +211,7 @@ class PHActsSiliconSeeding : public SubsysReco
   int m_event = 0;
 
   /// Maximum allowed transverse PCA for seed, cm
-  double m_maxSeedPCA = 0.1;
+  double m_maxSeedPCA = 2.;
   
   const static unsigned int m_nInttLayers = 4;
   const double m_nInttLayerRadii[m_nInttLayers] = 

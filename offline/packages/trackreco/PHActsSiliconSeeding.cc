@@ -58,9 +58,9 @@ int PHActsSiliconSeeding::Init(PHCompositeNode *topNode)
 
   if(m_seedAnalysis)
     {
-      
       m_file = new TFile("seedingOutfile.root","recreate");
     }
+
   createHistograms();
     
   
@@ -534,11 +534,6 @@ int PHActsSiliconSeeding::circleFitSeed(std::vector<TrkrCluster*>& clusters,
 
   findRoot(R, X0, Y0, x, y);
 
-  /// If the xy position is O(100s) microns, the initial vertex 
-  /// finder will throw an eigen stepper error trying to propagate 
-  /// from the PCA. These  are likely bad seeds anyway since the 
-  /// MVTX has position resolution O(5) microns. Units are cm
-  
   if(fabs(x) > m_maxSeedPCA or fabs(y) > m_maxSeedPCA)
     {
       if(Verbosity() > 1)
@@ -1183,7 +1178,7 @@ Acts::SpacePointGridConfig PHActsSiliconSeeding::configureSPGrid()
   Acts::SpacePointGridConfig config;
 
   config.bFieldInZ = m_bField;
-  config.minPt = m_minSeedPt;
+  config.minPt = m_minSeedPt / 2.;
   config.rMax = m_rMax;
   config.zMax = m_zMax;
   config.zMin = m_zMin;
@@ -1210,7 +1205,7 @@ Acts::SeedfinderConfig<SpacePoint> PHActsSiliconSeeding::configureSeeder()
   /// Limiting collision region in z
   config.collisionRegionMin = -100.;
   config.collisionRegionMax = 100.;
-  config.sigmaScattering = 50.;
+  config.sigmaScattering = 5.;
   config.maxSeedsPerSpM = m_maxSeedsPerSpM;
   config.cotThetaMax = m_cotThetaMax;
   config.minPt = m_minSeedPt;
@@ -1296,12 +1291,12 @@ int PHActsSiliconSeeding::createNodes(PHCompositeNode *topNode)
     dstNode->addNode(svtxNode);
   }
 
-  m_trackMap = findNode::getClass<SvtxTrackMap>(topNode,"SvtxSiliconTrackMap");
+  m_trackMap = findNode::getClass<SvtxTrackMap>(topNode,"SvtxTrackMap");
   if(!m_trackMap)
     {
       m_trackMap = new SvtxTrackMap_v1;
       PHIODataNode<PHObject> *trackNode = 
-	new PHIODataNode<PHObject>(m_trackMap,"SvtxSiliconTrackMap","PHObject");
+	new PHIODataNode<PHObject>(m_trackMap,"SvtxTrackMap","PHObject");
       svtxNode->addNode(trackNode);
 
     }
