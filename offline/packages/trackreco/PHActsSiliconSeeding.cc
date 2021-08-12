@@ -1178,7 +1178,7 @@ Acts::SpacePointGridConfig PHActsSiliconSeeding::configureSPGrid()
   Acts::SpacePointGridConfig config;
 
   config.bFieldInZ = m_bField;
-  config.minPt = m_minSeedPt / 2.;
+  config.minPt = m_minSeedPt / 3.;
   config.rMax = m_rMax;
   config.zMax = m_zMax;
   config.zMin = m_zMin;
@@ -1199,7 +1199,7 @@ Acts::SeedfinderConfig<SpacePoint> PHActsSiliconSeeding::configureSeeder()
   config.zMax = m_zMax;
 
   /// Min/max distance between two measurements in one seed
-  config.deltaRMin = 1.;
+  config.deltaRMin = 1;
   config.deltaRMax = m_deltaRMax;
 
   /// Limiting collision region in z

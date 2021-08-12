@@ -196,7 +196,7 @@ class PHActsSiliconSeeding : public SubsysReco
   float m_zMin = -300.;
  
   /// max distance between two measurements in one seed
-  float m_deltaRMax = 15;
+  float m_deltaRMax = 25;
   
   /// Cot of maximum theta angle. Equivalent to eta=1.1 here
   float m_cotThetaMax = 1.335647;
