@@ -133,19 +133,25 @@ void PHActsVertexFinder::checkTrackVertexAssociation()
       if(!m_svtxVertexMap->get(vertId)) 
 	{
 	  /// Secondary not used in Acts vertex fitting. Assign
-	  /// closest vertex based on z position
-
-	  const auto trackZ = track->get_z();
-	  double closestVertZ = 9999;
+	  /// closest vertex based on r position closest to vertex
+	  
+	  const float trackZ = track->get_z();
+	  const float trackY = track->get_y();
+	  const float trackX = track->get_x();
+	  
+	  double closestVert = 9999;
 	  vertId = UINT_MAX;
 
 	  for(auto& [vertexKey, vertex] : *m_svtxVertexMap)
 	    {
-	      double dz = fabs(trackZ - vertex->get_z());
-	      if(dz < closestVertZ)
+	      double dr = sqrt(pow(trackX - vertex->get_x(), 2) +
+			       pow(trackY - vertex->get_y(), 2) +
+			       pow(trackZ - vertex->get_z(), 2));
+	      
+	      if(dr < closestVert)
 		{
 		  vertId = vertexKey;
-		  closestVertZ = dz;
+		  closestVert = dr;
 		}
 	    }
 	  
@@ -163,6 +169,26 @@ TrackPtrVector PHActsVertexFinder::getTracks(KeyMap& keyMap)
 
   for(const auto &[key, track] : *m_svtxTrackMap)
   {
+    int nMaps = 0;
+    int nIntt = 0;
+    for (SvtxTrack::ConstClusterKeyIter clusIter = track->begin_cluster_keys();
+	 clusIter != track->end_cluster_keys();
+	 ++clusIter)
+      {
+	auto key = *clusIter;
+	auto trkrId = TrkrDefs::getTrkrId(key);
+	if(trkrId == TrkrDefs::TrkrId::mvtxId)
+	  { nMaps++; }
+	if(trkrId == TrkrDefs::TrkrId::inttId)
+	  { nIntt++; }
+      }
+
+    if(nMaps < 3 or nIntt < 1)
+      { continue; }
+
+    if(track->get_dca3d_xy() > 0.1 or track->get_dca3d_z() > 0.1)
+      { continue; }
+
     Acts::Vector3D momentum(track->get_px(), 
 			    track->get_py(), 
 			    track->get_pz());
@@ -171,18 +197,18 @@ TrackPtrVector PHActsVertexFinder::getTracks(KeyMap& keyMap)
 			    track->get_z() * Acts::UnitConstants::cm,
 			    10. * Acts::UnitConstants::ns);
     
-    auto vertexId = track->get_vertex_id();
-    const SvtxVertex* svtxVertex = m_svtxVertexMap->get(vertexId);
-    Acts::Vector3D vertex(svtxVertex->get_x() * Acts::UnitConstants::cm, 
-			  svtxVertex->get_y() * Acts::UnitConstants::cm, 
-			  svtxVertex->get_z() * Acts::UnitConstants::cm);
-
     Acts::BoundSymMatrix cov = Acts::BoundSymMatrix::Zero();
     for(int i = 0; i < 6; i++)
       for(int j = 0; j < 6; j++)
 	cov(i,j) = track->get_acts_covariance(i,j);
     
-    auto pSurface = Acts::Surface::makeShared<Acts::PerigeeSurface>(vertex);
+    auto pSurface = Acts::Surface::makeShared<Acts::PerigeeSurface>(
+					      Acts::Vector3D(position(0), 
+							     position(1), 
+							     position(2)));
+    
+  
+
 
     int charge = track->get_charge();
     if(m_fieldMap.find("3d") != std::string::npos)
