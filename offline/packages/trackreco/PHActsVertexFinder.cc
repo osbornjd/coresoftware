@@ -186,7 +186,7 @@ TrackPtrVector PHActsVertexFinder::getTracks(KeyMap& keyMap)
     if(nMaps < 3 or nIntt < 1)
       { continue; }
 
-    if(track->get_dca3d_xy() > 0.1 or track->get_dca3d_z() > 0.1)
+    if(track->get_dca3d_xy() > 0.01 or track->get_dca3d_z() > 0.01)
       { continue; }
 
     Acts::Vector3D momentum(track->get_px(), 
@@ -283,6 +283,7 @@ VertexVector PHActsVertexFinder::findVertices(TrackPtrVector& tracks)
       
       /// Setup vertex finder now
       typename VertexFitter::Config vertexFitterConfig;
+      vertexFitterConfig.maxIterations = 1;
       VertexFitter vertexFitter(std::move(vertexFitterConfig));
       
       typename Linearizer::Config linearizerConfig(bField, propagator);
