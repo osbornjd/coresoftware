@@ -65,6 +65,9 @@ class PHActsVertexFinder: public PHInitVertexing
   /// Call acts vertex finder
   VertexVector findVertices(TrackPtrVector& tracks);
 
+  /// Call acts vertex fitter
+  VertexVector fitVertex(TrackPtrVector& tracks);
+
   /// Fill maps with relevant vertex information 
   void fillVertexMap(VertexVector& vertices,
 		     KeyMap& keyMap);
@@ -85,6 +88,7 @@ class PHActsVertexFinder: public PHInitVertexing
   int m_goodFits = 0;
   int m_totalFits = 0;
   std::string m_fieldMap = "";
+  bool m_ivfFailed = false;
 
   SvtxVertexMap *m_svtxVertexMap = nullptr;
   SvtxVertexMap *m_svtxVertexMapActs = nullptr;

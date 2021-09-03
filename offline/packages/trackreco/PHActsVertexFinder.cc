@@ -75,6 +75,18 @@ int PHActsVertexFinder::Process(PHCompositeNode *topNode)
   int ret = getNodes(topNode);
   if(ret != Fun4AllReturnCodes::EVENT_OK)
     return ret;
+  
+  /// If we had to skip the initial vertexing because there were no
+  /// silicon seeds found, there will only be one vertex with position
+  /// (0,0,0). In this case a DCA cut isn't useful in the track selection, 
+  /// so flag this so that we can run without it
+  if(m_svtxVertexMap->size() == 1 and
+     m_svtxVertexMap->get(0)->get_x() == 0 and
+     m_svtxVertexMap->get(0)->get_y() == 0 and
+     m_svtxVertexMap->get(0)->get_z() == 0)
+    {
+      m_ivfFailed = true;
+    }
 
   /// Create a map that correlates the track momentum to the track key
   KeyMap keyMap;
@@ -83,7 +95,15 @@ int PHActsVertexFinder::Process(PHCompositeNode *topNode)
   auto trackPointers = getTracks(keyMap);
 
   auto vertices = findVertices(trackPointers);
-
+  
+  /// If the vertex finding failed, try to run a single vtx
+  /// fit on the list of tracks
+  if(vertices.size() == 0)
+    {
+      std::cout << "running vertex fitter"<<std::endl;
+      vertices = fitVertex(trackPointers);
+    }
+  
   fillVertexMap(vertices, keyMap);
   
   checkTrackVertexAssociation();
@@ -167,10 +187,20 @@ TrackPtrVector PHActsVertexFinder::getTracks(KeyMap& keyMap)
 {
   std::vector<const Acts::BoundTrackParameters*> trackPtrs;
 
+  std::cout << "SvtxTrackMap size is " << m_svtxTrackMap->size() << std::endl;
   for(const auto &[key, track] : *m_svtxTrackMap)
   {
+    if(Verbosity() > 4)
+      { 
+	std::cout << "track px,py,pz: " << track->get_px() << ", " <<
+	  track->get_py() << ", " << track->get_pz() << " and x,y,z " 
+		  << track->get_x() << ", " << track->get_y() << ", " 
+		  << track->get_z() << " and nclus " << track->size_cluster_keys() << std::endl;
+      }
+
     int nMaps = 0;
     int nIntt = 0;
+    int nTpc = 0;
     for (SvtxTrack::ConstClusterKeyIter clusIter = track->begin_cluster_keys();
 	 clusIter != track->end_cluster_keys();
 	 ++clusIter)
@@ -181,13 +211,24 @@ TrackPtrVector PHActsVertexFinder::getTracks(KeyMap& keyMap)
 	  { nMaps++; }
 	if(trkrId == TrkrDefs::TrkrId::inttId)
 	  { nIntt++; }
+	if(trkrId == TrkrDefs::TrkrId::tpcId)
+	  { nTpc++; }
       }
 
-    if(nMaps < 3 or nIntt < 1)
+    if((nMaps + nIntt + nTpc) < 35)
       { continue; }
 
-    if(track->get_dca3d_xy() > 0.01 or track->get_dca3d_z() > 0.01)
+    if(track->get_pt() < 0.5)
       { continue; }
+
+    if(!m_ivfFailed)
+      {
+	/// if ivf succeeded, we can use additional stringent cuts
+	if(track->get_dca3d_xy() > 0.01 or track->get_dca3d_z() > 0.01)
+	  { continue; }
+	if(nMaps < 2)
+	  { continue; }
+      }
 
     Acts::Vector3D momentum(track->get_px(), 
 			    track->get_py(), 
@@ -244,8 +285,6 @@ VertexVector PHActsVertexFinder::findVertices(TrackPtrVector& tracks)
 {
   m_totalFits++;
   
-  auto field = m_tGeometry->magField;
-
   /// Determine the input mag field type from the initial geometry
   /// and run the vertex finding with the determined mag field
   return std::visit([tracks, this](auto &inputField) {
@@ -338,11 +377,88 @@ VertexVector PHActsVertexFinder::findVertices(TrackPtrVector& tracks)
       return vertexVector;
       
     } /// end lambda
-    , field
+    , m_tGeometry->magField
     ); /// end std::visit call
 }
 
+VertexVector PHActsVertexFinder::fitVertex(TrackPtrVector& tracks)
+{
 
+  return std::visit([tracks, this](auto &inputField) {
+      /// Setup aliases
+      using InputMagneticField =
+        typename std::decay_t<decltype(inputField)>::element_type;
+      using MagneticField = Acts::SharedBField<InputMagneticField>;
+      using Stepper = Acts::EigenStepper<MagneticField>;
+      using Propagator = Acts::Propagator<Stepper>;
+      using PropagatorOptions = Acts::PropagatorOptions<>;
+      using TrackParameters = Acts::BoundTrackParameters;
+      using Linearizer = Acts::HelicalTrackLinearizer<Propagator>;
+      using VertexFitter =
+        Acts::FullBilloirVertexFitter<TrackParameters, Linearizer>;
+      using VertexFitterOptions = Acts::VertexingOptions<TrackParameters>;
+      
+      auto logLevel = Acts::Logging::FATAL;
+      if(Verbosity() > 4)
+	logLevel = Acts::Logging::VERBOSE;
+      auto logger = Acts::getDefaultLogger("PHActsVertexFitting", logLevel);
+
+      /// Create necessary templated inputs for Acts vertex fitter
+      MagneticField bField(inputField);
+      auto propagator = std::make_shared<Propagator>(Stepper(bField));
+      PropagatorOptions propagatorOpts(m_tGeometry->geoContext,
+				       m_tGeometry->magFieldContext,
+				       Acts::LoggerWrapper(*logger));
+      
+      typename VertexFitter::Config vertexFitterCfg;
+      vertexFitterCfg.maxIterations = 3;
+      VertexFitter fitter(vertexFitterCfg);
+      typename VertexFitter::State state(m_tGeometry->magFieldContext);
+      
+      typename Linearizer::Config linConfig(bField, propagator);
+      Linearizer linearizer(linConfig);
+      
+      /// Can add a vertex fitting constraint as an option, if desired
+      VertexFitterOptions vfOptions(m_tGeometry->geoContext,
+				    m_tGeometry->magFieldContext);
+      
+      /// Call the fitter and get the result
+      auto fitRes = fitter.fit(tracks, linearizer,
+			       vfOptions, state);
+
+      VertexVector vertex;
+      Acts::Vertex<TrackParameters> fittedVertex;
+      
+      if (fitRes.ok())
+	{
+	  fittedVertex = *fitRes;
+	  vertex.push_back(*fitRes);
+	  if (Verbosity() > 3)
+	    {
+	      std::cout << "Fitted vertex position "
+			<< fittedVertex.position().x()
+			<< ", "
+			<< fittedVertex.position().y()
+			<< ", "
+			<< fittedVertex.position().z()
+			<< std::endl;
+	    }
+	}
+      else
+	{
+	  if (Verbosity() > 3)
+	    {
+	      std::cout << "Acts vertex fit error: "
+			<< fitRes.error().message()
+			<< std::endl;
+	    }
+	}
+
+      return vertex;
+
+    } , m_tGeometry->magField);
+
+}
 
 
 void PHActsVertexFinder::fillVertexMap(VertexVector& vertices,
