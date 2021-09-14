@@ -43,6 +43,7 @@ pkginclude_HEADERS = \
   PHActsTrkFitter.h \
   PHActsVertexFitter.h \
   PHActsTrackProjection.h \
+  PHCircleFit.h \
   PHGenFitTrkProp.h \
   PHHoughSeeding.h \
   PHTrackCleaner.h \
@@ -144,6 +145,7 @@ endif
 
 libtrack_reco_la_SOURCES = \
   $(ACTS_SOURCES) \
+  PHCircleFit.cc \
   PHInitVertexing.cc \
   PHInitZVertexing.cc \
   PHTrackSeeding.cc \
