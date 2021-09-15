@@ -5,6 +5,8 @@
 #include <trackbase_historic/SvtxTrack.h>     // for SvtxTrack, SvtxTra...
 #include <trackbase_historic/SvtxTrackMap.h>  // for SvtxTrackMap, Svtx...
 #include <trackbase_historic/SvtxTrack_FastSim_v2.h>
+#include <trackbase_historic/SvtxVertexMap.h>
+#include <trackbase_historic/SvtxVertex.h>
 
 #include <trackbase/TrkrCluster.h>
 #include <trackbase/TrkrClusterContainer.h>
@@ -141,7 +143,7 @@ int PHTruthTrackSeeding::Process(PHCompositeNode* topNode)
     // Smear the truth values out by 5% so that the seed momentum and
     // position aren't completely exact
     
-    double random = 0;//((double) rand() / (RAND_MAX)) * 0.05;
+    double random = ((double) rand() / (RAND_MAX)) * 0.05;
     // make it negative sometimes
     if(rand() % 2)
       random *= -1;
@@ -164,7 +166,9 @@ int PHTruthTrackSeeding::Process(PHCompositeNode* topNode)
       {
 	double x, y, z, px, py, pz;
 	circleFitSeed(ClusterKeyList, x, y, z,
-		      px, py, pz, svtx_track->get_charge());
+		      px, py, pz, svtx_track->get_charge(),
+		      svtx_track->get_vertex_id());
+
 	svtx_track->set_x(x);
 	svtx_track->set_y(y);
 	svtx_track->set_z(z);
@@ -219,6 +223,12 @@ int PHTruthTrackSeeding::Process(PHCompositeNode* topNode)
 
 int PHTruthTrackSeeding::GetNodes(PHCompositeNode* topNode)
 {
+  m_vertexMap = findNode::getClass<SvtxVertexMap>(topNode,"SvtxVertexMap");
+  if(!m_vertexMap)
+    {
+      cerr << PHWHERE << "Error can't find vertex map" << std::endl;
+      return Fun4AllReturnCodes::ABORTEVENT;
+    }
 
  m_clusterMap = findNode::getClass<TrkrClusterContainer>(topNode,
 							 "TRKR_CLUSTER");
@@ -271,12 +281,12 @@ int PHTruthTrackSeeding::End()
 void PHTruthTrackSeeding::circleFitSeed(std::vector<TrkrDefs::cluskey> clusters,
 					double& x, double& y, double& z,
 					double& px, double& py, double& pz, 
-					int charge)
+					int charge, const int& vtxid)
 {
   double R, X0, Y0;
   circleFitByTaubin(clusters, R, X0, Y0);
 
-  findRoot(R, X0, Y0, x, y);
+  findRoot(R, X0, Y0, x, y, vtxid);
 
   double phi = atan2(-1 * (X0-x), Y0-y);
 
@@ -333,20 +343,29 @@ void PHTruthTrackSeeding::lineFit(std::vector<TrkrDefs::cluskey>& clusters,
   B = (x2sum*ysum-xsum*xysum) / (x2sum*clusters.size()-xsum*xsum);
   
 }
-void PHTruthTrackSeeding::findRoot(const double& R, const double& X0, const double& Y0, double& x, double& y)
+void PHTruthTrackSeeding::findRoot(const double& R, const double& X0, const double& Y0, double& x, double& y, const int& vtxid)
 {
+
+  auto vertex = m_vertexMap->get(vtxid);
+
+  float vx = 0; 
+  float vy = 0;
+  if(vertex != nullptr)
+    {
+      vx = vertex->get_x();
+      vy = vertex->get_y();
+    }
+
   
-  double miny = (sqrt(pow(X0, 2) * pow(R, 2) * pow(Y0, 2) + pow(R, 2) 
-		      * pow(Y0,4)) + pow(X0,2) * Y0 + pow(Y0, 3)) 
-    / (pow(X0, 2) + pow(Y0, 2));
+  double a = vx*vx + 2*vx*X0 + X0*X0 + vy*vy - 2*vy*Y0 + Y0*Y0;
+  double b = -2*vx*vx*Y0 - 4*vx*X0*Y0 - 2*X0*X0*Y0 - 2*vy*vy*Y0 - 2*Y0*Y0*Y0 + 4*Y0*Y0*vy;
+  double c = vx*vx*Y0*Y0 + 2*vx*X0*Y0*Y0 + X0*X0*Y0*Y0 + vy*vy*Y0*Y0 - R*R*vy*vy - 2*vy*Y0*Y0*Y0 + 2*R*R*vy*Y0 + Y0*Y0*Y0*Y0 - R*R*Y0*Y0;
 
-  double miny2 = (-sqrt(pow(X0, 2) * pow(R, 2) * pow(Y0, 2) + pow(R, 2) 
-		      * pow(Y0,4)) + pow(X0,2) * Y0 + pow(Y0, 3)) 
-    / (pow(X0, 2) + pow(Y0, 2));
-
+  double miny = (-1 * b - sqrt(b*b - 4*a*c)) / (2.*a);
+  double miny2 = (-1 * b + sqrt(b*b - 4*a*c)) / (2.*a);
   double minx = sqrt(pow(R, 2) - pow(miny - Y0, 2)) + X0;
   double minx2 = -sqrt(pow(R, 2) - pow(miny2 - Y0, 2)) + X0;
-  
+
   /// Figure out which of the two roots is actually closer to the origin
   if(fabs(minx) < fabs(minx2))
     x = minx;

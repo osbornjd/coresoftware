@@ -111,6 +111,7 @@ void PHCircleFit::circleFitTrack(SvtxTrack *track, Acts::Vector3D& position,
   
   if(Verbosity() > 2)
     {  
+      std::cout << "Phi,eta : " << phi << " , " << eta << std::endl;
       std::cout << "Momentum vector estimate: " << momentum.transpose() 
 		<< std::endl; 
       std::cout << "Position estimate: " << position.transpose() 
@@ -254,13 +255,15 @@ void PHCircleFit::findRoot(double& R, double& X0, double& Y0,
     }
 
   double a = vx*vx + 2*vx*X0 + X0*X0 + vy*vy - 2*vy*Y0 + Y0*Y0;
-  double b = -2*vx*vx*Y0 - 4*vx*X0*Y0 - 2*X0*X0*Y0 - 2*vy*vy*Y0 - 2*Y0*Y0*Y0;
-  double c = vx*vx*Y0*Y0 + 2*vx*X0*Y0*Y0 + X0*X0*Y0*Y0 + vy*vy*Y0*Y0 - R*R*vy*vy - 2*vy*Y0*Y0*Y0 + 4*vy*Y0*Y0 + 2*R*R*vy*Y0 + Y0*Y0*Y0*Y0 - R*R*Y0*Y0;
+  double b = -2*vx*vx*Y0 - 4*vx*X0*Y0 - 2*X0*X0*Y0 - 2*vy*vy*Y0 
+             - 2*Y0*Y0*Y0 + 4*Y0*Y0*vy;
+  double c = vx*vx*Y0*Y0 + 2*vx*X0*Y0*Y0 + X0*X0*Y0*Y0 + vy*vy*Y0*Y0 
+            - R*R*vy*vy - 2*vy*Y0*Y0*Y0 + 2*R*R*vy*Y0 + Y0*Y0*Y0*Y0 - R*R*Y0*Y0;
 
   double y1 = (-1 * b - sqrt(b*b - 4*a*c)) / (2.*a);
   double y2 = (-1 * b + sqrt(b*b - 4*a*c)) / (2.*a);
   double x1 = sqrt(pow(R, 2) - pow(y1 - Y0, 2)) + X0;
-  double x2 = sqrt(pow(R, 2) - pow(y2 - Y0, 2)) + X0;
+  double x2 = -sqrt(pow(R, 2) - pow(y2 - Y0, 2)) + X0;
 
   if(fabs(x1) < fabs(x2))
     x = x1;

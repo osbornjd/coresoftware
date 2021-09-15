@@ -19,6 +19,7 @@ class PHG4HitContainer;
 class TrkrHitTruthAssoc;
 class TrkrClusterContainer;
 class SvtxClusterEval;
+class SvtxVertexMap;
 
 //class SvtxHitMap;
 //class PHG4CellContainer;
@@ -79,15 +80,17 @@ void helicalTrackFit(const bool helicalTrackFit)
 
   void circleFitSeed(std::vector<TrkrDefs::cluskey> clusters,
 		     double& x, double& y, double&z,
-		       double& px, double& py, double& pz, int charge);
+		     double& px, double& py, double& pz, int charge,
+		     const int& vtxid);
 void circleFitByTaubin(std::vector<TrkrDefs::cluskey>& clusters,
 			 double& R, double& X0, double& Y0);
   void findRoot(const double& R, const double& X0, const double& Y0,
-		double& x, double& y);
+		double& x, double& y, const int& vtxid);
   void lineFit(std::vector<TrkrDefs::cluskey>& clusters,
 	       double& A, double& B);
   PHG4TruthInfoContainer* _g4truth_container = nullptr;
   TrkrClusterContainer *m_clusterMap = nullptr;
+  SvtxVertexMap* m_vertexMap = nullptr;
   PHG4HitContainer* phg4hits_tpc = nullptr;
   PHG4HitContainer* phg4hits_intt = nullptr;
   PHG4HitContainer* phg4hits_mvtx = nullptr;
