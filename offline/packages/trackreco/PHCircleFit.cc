@@ -37,10 +37,17 @@ int PHCircleFit::process_event(PHCompositeNode *topNode)
     {
       Acts::Vector3D position, momentum;
       int charge;
+      if(Verbosity() > 3)
+	{ track->identify(); }
       circleFitTrack(track, position, momentum, charge);
 
-      updateTrack(track);
-
+      track->set_x(position(0));
+      track->set_y(position(1));
+      track->set_z(position(2));
+      track->set_px(momentum(0));
+      track->set_py(momentum(1));
+      track->set_pz(momentum(2));
+      track->set_charge(charge);
     }
 
   return Fun4AllReturnCodes::EVENT_OK;
@@ -131,6 +138,7 @@ void PHCircleFit::lineFit(const std::vector<TrkrCluster*>& clusters,
   double xsum = 0,x2sum = 0,ysum = 0,xysum = 0;    
   for(auto& cluster : clusters)
     {
+  
       double z = cluster->getZ();
       double r = sqrt(pow(cluster->getX(),2) + pow(cluster->getY(), 2));
       
@@ -254,11 +262,9 @@ void PHCircleFit::findRoot(double& R, double& X0, double& Y0,
 	{ std::cout << "Vertex values are " << vx << ", " << vy << std::endl; }
     }
 
-  double a = vx*vx + 2*vx*X0 + X0*X0 + vy*vy - 2*vy*Y0 + Y0*Y0;
-  double b = -2*vx*vx*Y0 - 4*vx*X0*Y0 - 2*X0*X0*Y0 - 2*vy*vy*Y0 
-             - 2*Y0*Y0*Y0 + 4*Y0*Y0*vy;
-  double c = vx*vx*Y0*Y0 + 2*vx*X0*Y0*Y0 + X0*X0*Y0*Y0 + vy*vy*Y0*Y0 
-            - R*R*vy*vy - 2*vy*Y0*Y0*Y0 + 2*R*R*vy*Y0 + Y0*Y0*Y0*Y0 - R*R*Y0*Y0;
+  double a = 2*X0*vx-vx*vx-X0*X0-vy*vy+2*vy*Y0-Y0*Y0;
+  double b = 2*Y0*Y0*Y0 - 4*Y0*Y0*vy + 2*Y0*vy*vy+2*X0*X0*Y0-4*X0*Y0*vx+2*Y0*vx*vx;
+  double c = 2*Y0*Y0*Y0*vy-Y0*Y0*Y0*Y0-Y0*Y0*vy*vy+R*R*Y0*Y0-2*R*R*Y0*vy+R*R*vy*vy-X0*X0*Y0*Y0+2*X0*Y0*Y0*vx-Y0*Y0*vx*vx;
 
   double y1 = (-1 * b - sqrt(b*b - 4*a*c)) / (2.*a);
   double y2 = (-1 * b + sqrt(b*b - 4*a*c)) / (2.*a);
@@ -395,17 +401,18 @@ std::vector<TrkrCluster*> PHCircleFit::getClusters(SvtxTrack *track)
        ++iter)
     {
       auto cluster = m_clusterContainer->findCluster(*iter);
+      /// Skip whatever layers are requested to skip
+      auto layer = TrkrDefs::getLayer(cluster->getClusKey());
+      if(layer < m_minLayer or layer > m_maxLayer)
+	{ continue; }
+      
       clusters.push_back(cluster);
     }
 
   return clusters;
 }
 
-void PHCircleFit::updateTrack(SvtxTrack *track)
-{
 
-
-}
 
 int PHCircleFit::End(PHCompositeNode *topNode)
 {

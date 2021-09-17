@@ -25,6 +25,11 @@ class PHCircleFit : public SubsysReco
   int process_event(PHCompositeNode* topNode) override;
   int End(PHCompositeNode *topNode) override;
 
+  void minLayer(int layer)
+    { m_minLayer = layer; }
+  void maxLayer(int layer)
+    { m_maxLayer = layer; }
+ 
  private:
 
   int getNodes(PHCompositeNode *topNode);
@@ -43,11 +48,13 @@ class PHCircleFit : public SubsysReco
 	       double& A, double& B);
   double normPhi2Pi(const double& phi);
 
-  void updateTrack(SvtxTrack *track);
 
   SvtxTrackMap *m_trackMap = nullptr;
   TrkrClusterContainer *m_clusterContainer = nullptr;
   SvtxVertexMap *m_vertexMap = nullptr;
+
+  int m_minLayer = 0;
+  int m_maxLayer = 53;
 
 };
 
