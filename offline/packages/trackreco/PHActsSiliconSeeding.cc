@@ -534,11 +534,7 @@ int PHActsSiliconSeeding::circleFitSeed(std::vector<TrkrCluster*>& clusters,
 
   findRoot(R, X0, Y0, x, y);
 
-  /// If the xy position is O(100s) microns, the initial vertex 
-  /// finder will throw an eigen stepper error trying to propagate 
-  /// from the PCA. These  are likely bad seeds anyway since the 
-  /// MVTX has position resolution O(5) microns. Units are cm
-  
+  //Units are cm
   if(fabs(x) > m_maxSeedPCA or fabs(y) > m_maxSeedPCA)
     {
       if(Verbosity() > 1)
@@ -573,7 +569,6 @@ int PHActsSiliconSeeding::circleFitSeed(std::vector<TrkrCluster*>& clusters,
   double m, B;
   
   /// m is slope as a function of radius, B is z intercept (vertex)
-  
   lineFit(clusters, m, B);
   z = B;
   
@@ -1010,7 +1005,7 @@ void PHActsSiliconSeeding::circleFitByTaubin(const std::vector<TrkrCluster*>& cl
   double meanY = 0;
   double weight = 0;
   
-  for(auto clus : clusters)
+  for(auto& clus : clusters)
     {
       meanX += clus->getX();
       meanY += clus->getY();
@@ -1021,7 +1016,7 @@ void PHActsSiliconSeeding::circleFitByTaubin(const std::vector<TrkrCluster*>& cl
 
   Mxx=Myy=Mxy=Mxz=Myz=Mzz=0.;
 
-  for(auto clus : clusters)
+  for(auto& clus : clusters)
     {
       double Xi = clus->getX() - meanX;
       double Yi = clus->getY() - meanY;

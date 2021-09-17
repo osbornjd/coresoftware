@@ -35,10 +35,12 @@ int PHCircleFit::process_event(PHCompositeNode *topNode)
 
   for(const auto& [key, track] : *m_trackMap)
     {
-      Acts::Vector3D position, momentum;
-      int charge;
       if(Verbosity() > 3)
 	{ track->identify(); }
+      
+      Acts::Vector3D position, momentum;
+      int charge;
+
       circleFitTrack(track, position, momentum, charge);
 
       track->set_x(position(0));
@@ -93,7 +95,9 @@ void PHCircleFit::circleFitTrack(SvtxTrack *track, Acts::Vector3D& position,
   /// m is slope as a function of radius, B is z intercept (vertex)
   
   lineFit(clusters, m, B);
-  position(2) = B;
+
+  /// Need to evaluate position at r intercept given by x,y positions
+  position(2) = evaluateZVertex(track->get_vertex_id(), m, B, x, y);
   
   double theta = atan(1./m);
 
@@ -128,6 +132,30 @@ void PHCircleFit::circleFitTrack(SvtxTrack *track, Acts::Vector3D& position,
 
 }
 
+double PHCircleFit::evaluateZVertex(const int vtxid, double& m, 
+				    double& B, double& x, double& y)
+{
+  auto vertex = m_vertexMap->get(vtxid);
+  double vz = vertex->get_z();
+  double r = sqrt(x*x + y*y);
+
+  /// Because R can only be positive, we can have two z solutions
+  double z1 = m * r + B;
+  double z2 = -z1;
+
+  /// determine which is closer to the z vertex position
+  double dz1 = fabs(vz - z1);
+  double dz2 = fabs(vz - z2);
+  
+  std::cout << "vz " << vz << "z1 z2 " << z1 << ", " << z2 << " dz1,dz2" 
+	    << dz1 << ", " << dz2 << std::endl;
+  if(dz1 < dz2)
+    return z1;
+
+  return z2;
+
+}
+
 void PHCircleFit::lineFit(const std::vector<TrkrCluster*>& clusters,
 			  double& A, double& B)
 {
@@ -135,10 +163,15 @@ void PHCircleFit::lineFit(const std::vector<TrkrCluster*>& clusters,
  // copied from: https://www.bragitoff.com
   // we want to fit z vs radius
   
-  double xsum = 0,x2sum = 0,ysum = 0,xysum = 0;    
+  double xsum = 0,x2sum = 0,ysum = 0,xysum = 0;
+  int clussize = 0;
   for(auto& cluster : clusters)
     {
-  
+      /// Intt has bad z resolution. Screws up fit
+      if(TrkrDefs::getTrkrId(cluster->getClusKey()) == TrkrDefs::inttId)
+	{ continue; }
+      
+      clussize++;
       double z = cluster->getZ();
       double r = sqrt(pow(cluster->getX(),2) + pow(cluster->getY(), 2));
       
@@ -149,12 +182,23 @@ void PHCircleFit::lineFit(const std::vector<TrkrCluster*>& clusters,
     }
   
   /// calculate slope
-  A = (clusters.size()*xysum-xsum*ysum) / (clusters.size()*x2sum-xsum*xsum);
+  A = (clussize*xysum-xsum*ysum) / (clussize*x2sum-xsum*xsum);
 
   /// calculate intercept
-  B = (x2sum*ysum-xsum*xysum) / (x2sum*clusters.size()-xsum*xsum);
+  B = (x2sum*ysum-xsum*xysum) / (x2sum*clussize-xsum*xsum);
   
- 
+  if(Verbosity() > 2)
+    {
+      for(auto& cluster : clusters)
+	{
+	  
+	  double r = sqrt(pow(cluster->getX(),2) + pow(cluster->getY(),2));
+	  double zfit = A * r + B;
+	  std::cout << "r " << r << ", clus z " << cluster->getZ() 
+		    << ", z fit " << zfit << std::endl;
+	}
+
+    }
   
 
 }
@@ -403,6 +447,7 @@ std::vector<TrkrCluster*> PHCircleFit::getClusters(SvtxTrack *track)
       auto cluster = m_clusterContainer->findCluster(*iter);
       /// Skip whatever layers are requested to skip
       auto layer = TrkrDefs::getLayer(cluster->getClusKey());
+  
       if(layer < m_minLayer or layer > m_maxLayer)
 	{ continue; }
       

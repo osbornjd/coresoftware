@@ -46,6 +46,8 @@ class PHCircleFit : public SubsysReco
 		const double& circPhi);
   void lineFit(const std::vector<TrkrCluster*>& clusters,
 	       double& A, double& B);
+  double evaluateZVertex(const int vtxid, double& m, double& B, 
+			 double& x, double& y);
   double normPhi2Pi(const double& phi);
 
 
