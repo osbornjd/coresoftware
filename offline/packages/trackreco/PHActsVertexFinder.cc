@@ -127,7 +127,7 @@ int PHActsVertexFinder::Process(PHCompositeNode *topNode)
   return Fun4AllReturnCodes::EVENT_OK;
 }
 
-int PHActsVertexFinder::ResetEvent(PHCompositeNode *topNode)
+int PHActsVertexFinder::ResetEvent(PHCompositeNode */*topNode*/)
 {
   m_actsVertexMap->clear();
   m_svtxVertexMap->clear();
@@ -136,7 +136,7 @@ int PHActsVertexFinder::ResetEvent(PHCompositeNode *topNode)
 
 }
 
-int PHActsVertexFinder::End(PHCompositeNode *topNode)
+  int PHActsVertexFinder::End(PHCompositeNode */*topNode*/)
 {
   std::cout << "Acts Final vertex finder succeeeded " << m_goodFits
 	    << " out of " << m_totalFits << " events processed"

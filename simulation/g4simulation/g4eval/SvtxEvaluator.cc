@@ -56,7 +56,7 @@
 
 using namespace std;
 
-SvtxEvaluator::SvtxEvaluator(const string& name, const string& filename, const string& trackmapname,
+SvtxEvaluator::SvtxEvaluator(const string& /*name*/, const string& filename, const string& trackmapname,
                              unsigned int nlayers_maps,
                              unsigned int nlayers_intt,
                              unsigned int nlayers_tpc,
@@ -109,7 +109,7 @@ SvtxEvaluator::~SvtxEvaluator()
   delete _timer;
 }
 
-int SvtxEvaluator::Init(PHCompositeNode* topNode)
+int SvtxEvaluator::Init(PHCompositeNode* /*topNode*/)
 {
   _ievent = 0;
 
@@ -215,7 +215,7 @@ int SvtxEvaluator::Init(PHCompositeNode* topNode)
   return Fun4AllReturnCodes::EVENT_OK;
 }
 
-int SvtxEvaluator::InitRun(PHCompositeNode* topNode)
+int SvtxEvaluator::InitRun(PHCompositeNode* /*topNode*/)
 {
   //clustermap = findNode::getClass<TrkrClusterContainer>(topNode, "TRKR_CLUSTER");
 
@@ -282,7 +282,7 @@ int SvtxEvaluator::process_event(PHCompositeNode* topNode)
   return Fun4AllReturnCodes::EVENT_OK;
 }
 
-int SvtxEvaluator::End(PHCompositeNode* topNode)
+int SvtxEvaluator::End(PHCompositeNode* /*topNode*/)
 {
   _tfile->cd();
 
@@ -1995,7 +1995,8 @@ void SvtxEvaluator::fillOutputNtuples(PHCompositeNode* topNode)
 	      PHG4Hit* g4hit = clustereval->max_truth_hit_by_energy(cluster_key);
 	      PHG4Particle* g4particle = trutheval->get_particle(g4hit);
 	      
-	      float hitID = cluster_key;
+	      //float hitID = cluster_key;
+	      float hitID = (float) TrkrDefs::getClusIndex(cluster_key);
 	      float x = cluster->getX();
 	      float y = cluster->getY();
 	      float z = cluster->getZ();

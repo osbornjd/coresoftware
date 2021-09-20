@@ -90,7 +90,7 @@ int PHActsTrkFitter::InitRun(PHCompositeNode* topNode)
   return Fun4AllReturnCodes::EVENT_OK;
 }
 
-int PHActsTrkFitter::process_event(PHCompositeNode *topNode)
+int PHActsTrkFitter::process_event(PHCompositeNode */*topNode*/)
 {
   PHTimer eventTimer("eventTimer");
   eventTimer.stop();
@@ -146,7 +146,7 @@ int PHActsTrkFitter::process_event(PHCompositeNode *topNode)
   return Fun4AllReturnCodes::EVENT_OK;
 }
 
-int PHActsTrkFitter::ResetEvent(PHCompositeNode *topNode)
+int PHActsTrkFitter::ResetEvent(PHCompositeNode */*topNode*/)
 {
   
   if(Verbosity() > 1)
@@ -163,7 +163,7 @@ int PHActsTrkFitter::ResetEvent(PHCompositeNode *topNode)
   return Fun4AllReturnCodes::EVENT_OK;
 }
 
-int PHActsTrkFitter::End(PHCompositeNode *topNode)
+int PHActsTrkFitter::End(PHCompositeNode */*topNode*/)
 {
   if(m_timeAnalysis)
     {
@@ -694,12 +694,13 @@ void PHActsTrkFitter::updateSvtxTrack(Trajectory traj,
 	  std::cout << PHWHERE << " vertex ID " << vertexId << " not found!" << " for track " << track->get_id() << std::endl;
 	 return; 
 	}
-   
+
+
       Acts::Vector3D vertex(
 		  svtxVertex->get_x() * Acts::UnitConstants::cm, 
 		  svtxVertex->get_y() * Acts::UnitConstants::cm, 
 		  svtxVertex->get_z() * Acts::UnitConstants::cm);
-   
+      
       rotater.calculateDCA(params, vertex, rotatedCov,
 			    m_tGeometry->geoContext, 
 			    dca3Dxy, dca3Dz, 

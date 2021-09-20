@@ -1,15 +1,12 @@
 // Tell emacs that this is a C++ source
 //  -*- C++ -*-.
-#ifndef G4DETECTORS_PHG4FORWARDECALDETECTOR_H
-#define G4DETECTORS_PHG4FORWARDECALDETECTOR_H
+#ifndef G4DETECTORS_PHG4ZDCDETECTOR_H
+#define G4DETECTORS_PHG4ZDCDETECTOR_H
 
 #include <g4main/PHG4Detector.h>
 
-#include <cassert>
-#include <map>
 #include <set>
 #include <string>
-#include <utility>                // for pair, make_pair
 
 class G4LogicalVolume;
 class G4VPhysicalVolume;
@@ -20,9 +17,6 @@ class PHG4GDMLConfig;
 class PHParameters;
 
 /**
- * \file ${file_name}
- * \brief Module to build forward sampling Hadron calorimeterr (endcap) in Geant4
- * \author Nils Feege <nils.feege@stonybrook.edu>
  */
 
 class PHG4ZDCDetector : public PHG4Detector
@@ -39,7 +33,7 @@ class PHG4ZDCDetector : public PHG4Detector
 
   //!@name volume accessors
   int IsInZDC(G4VPhysicalVolume *) const;
-  
+
   void SuperDetector(const std::string &name) { m_SuperDetector = name; }
   const std::string SuperDetector() const { return m_SuperDetector; }
 
@@ -49,20 +43,20 @@ class PHG4ZDCDetector : public PHG4Detector
 
  private:
   G4LogicalVolume *ConstructTower(int type);
-  
 
   PHG4ZDCDisplayAction *m_DisplayAction;
   PHParameters *m_Params;
   //! registry for volumes that should not be exported, i.e. fibers
   PHG4GDMLConfig *m_GdmlConfig;
 
+  bool m_Window;
   /* ZDC geometry */
   double m_Angle;
 
   double m_TPlate;
   double m_HPlate;
   double m_WPlate;
-  
+
   double m_TAbsorber;
   double m_HAbsorber;
   double m_WAbsorber;
@@ -82,6 +76,19 @@ class PHG4ZDCDetector : public PHG4Detector
   double m_PlaceY;
   double m_PlaceZ;
 
+  double m_TSMD;
+  double m_HSMD;
+  double m_WSMD;
+
+  double m_RHole;
+  double m_TWin;
+  double m_RWin;
+
+  double m_PlaceHole;
+  double m_Pxwin;
+  double m_Pywin;
+  double m_Pzwin;
+
   int m_NMod;
   int m_NLay;
 
@@ -90,13 +97,12 @@ class PHG4ZDCDetector : public PHG4Detector
   int m_Layer;
 
   std::string m_SuperDetector;
-  
 
   std::set<G4LogicalVolume *> m_AbsorberLogicalVolSet;
   std::set<G4LogicalVolume *> m_ScintiLogicalVolSet;
+  std::set<G4LogicalVolume *> m_FiberLogicalVolSet;
 
  protected:
- 
   PHParameters *GetParams() const { return m_Params; }
   void AbsorberLogicalVolSetInsert(G4LogicalVolume *logvol)
   {
@@ -106,8 +112,6 @@ class PHG4ZDCDetector : public PHG4Detector
   {
     m_ScintiLogicalVolSet.insert(logvol);
   }
- 
- 
 };
 
 #endif
