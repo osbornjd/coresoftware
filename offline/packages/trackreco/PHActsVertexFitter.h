@@ -73,7 +73,6 @@ class PHActsVertexFitter : public SubsysReco
 
   int m_event = 0;
 
-  std::map<const unsigned int, Trajectory> *m_actsFitResults;
   ActsTrackingGeometry *m_tGeometry;
   SvtxTrackMap *m_trackMap = nullptr;
   SvtxVertexMap *m_vertexMap = nullptr;

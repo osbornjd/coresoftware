@@ -41,7 +41,6 @@
 
 PHActsVertexFitter::PHActsVertexFitter(const std::string &name)
   : SubsysReco(name)
-  , m_actsFitResults(nullptr)
   , m_tGeometry(nullptr)
 {
 }
@@ -95,7 +94,7 @@ int PHActsVertexFitter::process_event(PHCompositeNode */*topNode*/)
   for (const auto &[vertexId, trackVec] : vertexTrackMap)
   {
     const auto vertex = fitVertex(trackVec, logLevel);
-
+    
     createActsSvtxVertex(vertexId, vertex);
 
     if (m_updateSvtxVertexMap)
@@ -139,11 +138,8 @@ void PHActsVertexFitter::updateSvtxVertex(const unsigned int vertexId,
 void PHActsVertexFitter::createActsSvtxVertex(const unsigned int vertexId,
                                               ActsVertex vertex)
 {
-#if __cplusplus < 201402L
-  auto svtxVertex = boost::make_unique<SvtxVertex_v1>();
-#else
+
   auto svtxVertex = std::make_unique<SvtxVertex_v1>();
-#endif
 
   if (Verbosity() > 2)
   {
@@ -173,7 +169,8 @@ void PHActsVertexFitter::createActsSvtxVertex(const unsigned int vertexId,
   m_actsVertexMap->insert(svtxVertex.release());
 }
 
-ActsVertex PHActsVertexFitter::fitVertex(BoundTrackParamVec tracks, Acts::Logging::Level logLevel) const
+ActsVertex PHActsVertexFitter::fitVertex(BoundTrackParamVec tracks, 
+					 Acts::Logging::Level logLevel) const
 {
   /// Determine the input mag field type from the initial
   /// geometry created in MakeActsGeometry
@@ -255,6 +252,19 @@ VertexTrackMap PHActsVertexFitter::getTracks()
   {
     const unsigned int vertexId = track->get_vertex_id();
     const auto trackParam = makeTrackParam(track);
+    int nmvtx = 0;
+    for(auto iter = track->begin_cluster_keys();
+	iter != track->end_cluster_keys();
+	++iter)
+      {
+	auto ckey = *iter;
+	if(TrkrDefs::getTrkrId(ckey) == TrkrDefs::mvtxId)
+	  { nmvtx++; }
+      }
+
+    if(nmvtx < 3 or track->get_quality() > 5)
+      { continue; }
+
     auto trackVecPos = trackPtrs.find(vertexId);
 
     if (trackVecPos == trackPtrs.end())
@@ -319,9 +329,9 @@ const Acts::BoundTrackParameters *PHActsVertexFitter::makeTrackParam(const SvtxT
   }
 
   auto perigee = Acts::Surface::makeShared<Acts::PerigeeSurface>(
-      Acts::Vector3D(track->get_x() * Acts::UnitConstants::cm,
-                     track->get_y() * Acts::UnitConstants::cm,
-                     track->get_z() * Acts::UnitConstants::cm));
+	         Acts::Vector3D(track->get_x() * Acts::UnitConstants::cm,
+				track->get_y() * Acts::UnitConstants::cm,
+				track->get_z() * Acts::UnitConstants::cm));
 
   const auto param = new Acts::BoundTrackParameters(
       perigee, m_tGeometry->geoContext,
@@ -332,13 +342,6 @@ const Acts::BoundTrackParameters *PHActsVertexFitter::makeTrackParam(const SvtxT
 
 int PHActsVertexFitter::getNodes(PHCompositeNode *topNode)
 {
-  m_actsFitResults = findNode::getClass<std::map<const unsigned int, Trajectory>>(topNode, "ActsFitResults");
-  if (!m_actsFitResults)
-  {
-    std::cout << PHWHERE << "Acts Trajectories not found on node tree, exiting."
-              << std::endl;
-    return Fun4AllReturnCodes::ABORTEVENT;
-  }
 
   m_trackMap = findNode::getClass<SvtxTrackMap>(topNode,
                                                 "SvtxTrackMap");

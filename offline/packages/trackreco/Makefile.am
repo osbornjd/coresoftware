@@ -38,6 +38,7 @@ pkginclude_HEADERS = \
   PHGenFitTrkFitter.h \
   PHActsSiliconSeeding.h \
   PHActsVertexPropagator.h \
+  PHActsVertexFitter.h \
   PHActsTrkFitter.h \
   PHActsTrackProjection.h \
   PHGenFitTrkProp.h \
@@ -117,6 +118,7 @@ ACTS_SOURCES = \
   PHActsSiliconSeeding.cc \
   PHActsTrkFitter.cc \
   PHActsVertexPropagator.cc \
+  PHActsVertexFitter.cc \
   PHActsTrackProjection.cc
 
 $OFFLINE_MAIN/share:
