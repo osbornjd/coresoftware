@@ -414,7 +414,7 @@ BoundTrackParamPtrResult PHTpcResiduals::propagateTrackState(
       else
 	return result.error();
    },
-     std::move(m_tGeometry->magField));
+     m_tGeometry->magField);
 
 }
 void PHTpcResiduals::calculateTpcResiduals(
