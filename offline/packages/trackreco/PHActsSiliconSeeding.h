@@ -142,7 +142,7 @@ class PHActsSiliconSeeding : public SubsysReco
 			       const SourceLink& sl);
   
   /// Get all space points for the seeder
-  std::vector<const SpacePoint*> getMvtxSpacePoints();
+  std::map<unsigned int, std::vector<const SpacePoint*>> getMvtxSpacePoints();
 
   /// Perform circle/line fits with the final MVTX seed to get
   /// initial point and momentum estimates for stub matching

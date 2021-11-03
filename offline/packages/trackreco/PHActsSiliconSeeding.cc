@@ -110,8 +110,8 @@ int PHActsSiliconSeeding::process_event(PHCompositeNode *topNode)
   eventTimer->stop();
   auto circleFitTime = eventTimer->get_accumulated_time();
 
-  for(auto sp : spVec)
-    delete sp;
+  for(auto& sp : spVec)
+    { delete sp; }
   spVec.clear();
 
   if(Verbosity() > 0)
@@ -161,34 +161,63 @@ GridSeeds PHActsSiliconSeeding::runSeeder(std::vector<const SpacePoint*>& spVec)
     -> Acts::Vector2D { return {sp.m_varianceRphi, sp.m_varianceZ};
   };
 
-   spVec = getMvtxSpacePoints();
+  auto spMap = getMvtxSpacePoints();
+  std::cout <<"got sps"<<std::endl;
+  for(const auto& [layer, layerSpVector] : spMap)
+    { spVec.insert(spVec.end(), layerSpVector.begin(), layerSpVector.end()); }
 
   h_nInputMeas->Fill(spVec.size());
-
+  std::cout << "making binned spgroups"<<std::endl;
   std::unique_ptr<Acts::SpacePointGrid<SpacePoint>> grid = 
     Acts::SpacePointGridCreator::createGrid<SpacePoint>(m_gridCfg);
-
-  auto spGroup = Acts::BinnedSPGroup<SpacePoint>(spVec.begin(),
-						 spVec.end(),
-						 covConverter,
-						 m_bottomBinFinder,
-						 m_topBinFinder,
-						 std::move(grid),
-						 m_seedFinderCfg);
-
+ 
+  auto layer0SpGroup = Acts::BinnedSPGroup<SpacePoint>(spMap.find(0)->second.begin(),
+						       spMap.find(0)->second.end(),
+						       covConverter,
+						       m_bottomBinFinder,
+						       m_topBinFinder,
+						       std::move(grid),
+						       m_seedFinderCfg);
+  std::cout << "layer0"<<std::endl;
+  auto layer1SpGroup = Acts::BinnedSPGroup<SpacePoint>(spMap.find(1)->second.begin(),
+						       spMap.find(1)->second.end(),
+						       covConverter,
+						       m_bottomBinFinder,
+						       m_topBinFinder,
+						       std::move(grid),
+						       m_seedFinderCfg);
+  std::cout << "layer1"<<std::endl;
+  auto layer2SpGroup = Acts::BinnedSPGroup<SpacePoint>(spMap.find(2)->second.begin(),
+						       spMap.find(2)->second.end(),
+						       covConverter,
+						       m_bottomBinFinder,
+						       m_topBinFinder,
+						       std::move(grid),
+						       m_seedFinderCfg);
+  std::cout << "layer2"<<std::endl;
   /// This is a vector of seeds inside of a vector which represents 
   /// volume grids of the detector area. The seeds can be accessed
   /// by iterating over each area, and then collecting the seeds in 
   /// that area
   GridSeeds seedVector;
-  auto groupIt = spGroup.begin();
-  auto endGroup = spGroup.end();
-
-  for(; !(groupIt == endGroup); ++groupIt)
+  auto group0It = layer0SpGroup.begin();
+  auto endGroup0 = layer0SpGroup.end();
+  auto group1It = layer1SpGroup.begin();
+  auto endGroup1 = layer1SpGroup.end();
+  auto group2It = layer2SpGroup.begin();
+  auto endGroup2 = layer2SpGroup.end();
+  std::cout << "seeding"<<std::endl;
+  for(; !(group1It == endGroup1); ++group1It)
     {
-      seedVector.push_back(seedFinder.createSeedsForGroup(groupIt.bottom(),
-							  groupIt.middle(),
-							  groupIt.top()));
+      for(; !(group0It == endGroup0); ++group0It) 
+	{
+	  for(; !(group2It == endGroup2); ++group2It)
+	    {
+	      seedVector.push_back(seedFinder.createSeedsForGroup(group0It.bottom(),
+								  group1It.middle(),
+								  group2It.top()));
+	    }
+	}
     }
   
   return seedVector;
@@ -1213,9 +1242,14 @@ SpacePointPtr PHActsSiliconSeeding::makeSpacePoint(const TrkrDefs::cluskey clusk
 
 }
 
-std::vector<const SpacePoint*> PHActsSiliconSeeding::getMvtxSpacePoints()
+std::map<unsigned int, std::vector<const SpacePoint*>> PHActsSiliconSeeding::getMvtxSpacePoints()
 {
-  std::vector<const SpacePoint*> spVec;
+  std::map<unsigned int, std::vector<const SpacePoint*>> spMap;
+  std::vector<const SpacePoint*> layer0, layer1, layer2;
+  spMap.insert(std::make_pair(0, layer0));
+  spMap.insert(std::make_pair(1, layer1));
+  spMap.insert(std::make_pair(2, layer2));
+  
   unsigned int numSiliconHits = 0;
   
   auto hitsetrange = m_hitsets->getHitSets(TrkrDefs::TrkrId::mvtxId);
@@ -1236,6 +1270,8 @@ std::vector<const SpacePoint*> PHActsSiliconSeeding::getMvtxSpacePoints()
 	  }
 
 	  const auto hitsetkey = TrkrDefs::getHitSetKeyFromClusKey(cluskey);
+	  const auto layer = TrkrDefs::getLayer(cluskey);
+	  
 	  const auto surface = getSurface(hitsetkey);
 	  if(!surface)
 	    continue;
@@ -1257,19 +1293,24 @@ std::vector<const SpacePoint*> PHActsSiliconSeeding::getMvtxSpacePoints()
 	  SourceLink sl(cluskey, surface, loc, cov);
 
 	  auto sp = makeSpacePoint(cluskey, sl).release();
-	  spVec.push_back(sp);
+	  spMap.find(layer)->second.push_back(sp);
 	  numSiliconHits++;
 	}
     }
 
   h_nInputMvtxMeas->Fill(numSiliconHits);
 
-  if(Verbosity() > 1)
+  if(Verbosity() > 1) {
     std::cout << "Total number of silicon hits to seed find with is "
 	      << numSiliconHits << std::endl;
+    for(const auto& [layer, layerSps] : spMap)
+      {
+	std::cout << "Layer " << layer << " has " 
+		  << layerSps.size() << " sps "<< std::endl;
+      }
+  }
 
-
-  return spVec;
+  return spMap;
 }
 Surface PHActsSiliconSeeding::getSurface(TrkrDefs::hitsetkey hitsetkey)
 {
