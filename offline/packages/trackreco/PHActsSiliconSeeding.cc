@@ -74,8 +74,37 @@ int PHActsSiliconSeeding::InitRun(PHCompositeNode *topNode)
   
   if(createNodes(topNode) != Fun4AllReturnCodes::EVENT_OK)
     return Fun4AllReturnCodes::ABORTEVENT;
+
+  cacheInttGeometry();  
   
   return Fun4AllReturnCodes::EVENT_OK;
+}
+
+void PHActsSiliconSeeding::cacheInttGeometry()
+{
+  auto hitsetrange = m_hitsets->getHitSets(TrkrDefs::TrkrId::inttId);
+  
+  for(auto hitsetitr = hitsetrange.first;
+      hitsetitr != hitsetrange.second;
+      ++hitsetitr)
+    {
+      const auto layer = TrkrDefs::getLayer(hitsetitr->first);
+      const int ladderzindex = InttDefs::getLadderZId(hitsetitr->first);
+      const int ladderphiindex = InttDefs::getLadderPhiId(hitsetitr->first);
+      double ladderLocation[3] = {0.,0.,0.};
+      
+      // Add three to skip the mvtx layers for comparison
+      // to projections
+      auto layerGeom = dynamic_cast<CylinderGeomIntt*>
+	(m_geomContainerIntt->GetLayerGeom(layer));
+      
+      layerGeom->find_segment_center(ladderzindex, ladderphiindex, ladderLocation);
+      const float ladderphi = atan2(ladderLocation[1], ladderLocation[0]) + layerGeom->get_strip_phi_tilt();
+
+      m_inttGeometry.insert(std::make_pair(ladderphi, hitsetitr->first));
+
+    }
+
 }
 
 int PHActsSiliconSeeding::process_event(PHCompositeNode *topNode)
@@ -840,94 +869,108 @@ std::vector<TrkrDefs::cluskey> PHActsSiliconSeeding::matchInttClusters(
 
   for(int inttlayer = 0; inttlayer < m_nInttLayers; inttlayer++)
     {
-      auto hitsetrange = m_hitsets->getHitSets(TrkrDefs::TrkrId::inttId, inttlayer+3);
       const double projR = sqrt(pow(xProj[inttlayer], 2) + 
 				pow(yProj[inttlayer], 2));
       const double projPhi = atan2(yProj[inttlayer], xProj[inttlayer]);
       const double projRphi = projR * projPhi;
 
-      for (auto hitsetitr = hitsetrange.first;
-	   hitsetitr != hitsetrange.second;
-	   ++hitsetitr)
-	{
-	  const int ladderzindex = InttDefs::getLadderZId(hitsetitr->first);
-	  const int ladderphiindex = InttDefs::getLadderPhiId(hitsetitr->first);
-	  double ladderLocation[3] = {0.,0.,0.};
+      std::map<const float, TrkrDefs::hitsetkey>::iterator low, prev;
+      low = m_inttGeometry.lower_bound(projPhi);
 
-	  // Add three to skip the mvtx layers for comparison
-	  // to projections
-	  auto layerGeom = dynamic_cast<CylinderGeomIntt*>
-	    (m_geomContainerIntt->GetLayerGeom(inttlayer+3));
-	  
-	  layerGeom->find_segment_center(ladderzindex, ladderphiindex, ladderLocation);
-	  const double ladderphi = atan2(ladderLocation[1], ladderLocation[0]) + layerGeom->get_strip_phi_tilt();
-	  const auto stripZSpacing = layerGeom->get_strip_z_spacing();
-	  
-	  float dphi = ladderphi - projPhi;
-	  if(dphi > M_PI)
-	    { dphi -= 2. * M_PI; }
-	  else if (dphi < -1 * M_PI)
-	    { dphi += 2. * M_PI; }
-	  
-	  /// Check that the projection is within some reasonable amount of the segment
-	  /// to reject e.g. looking at segments in the opposite hemisphere. This is about
-	  /// the size of one intt segment (256 * 80 micron strips in a segment)
-	  if(fabs(dphi) > 0.2)
-	    { continue; }
-
-	  TVector3 projectionLocal(0,0,0);
-	  TVector3 projectionGlobal(xProj[inttlayer],yProj[inttlayer],zProj[inttlayer]);
-	  projectionLocal = layerGeom->get_local_from_world_coords(ladderzindex, 
-								   ladderphiindex,
-								   projectionGlobal);
-
-	  auto range = m_clusterMap->getClusters(hitsetitr->first);	
-	  for(auto clusIter = range.first; clusIter != range.second; ++clusIter )
-	    {
-	      const auto cluskey = clusIter->first;
-	      const auto cluster = clusIter->second;
+      TrkrDefs::hitsetkey closestHitSet = UINT32_MAX;
+      float dphi = 0;
+      if(low == m_inttGeometry.end()) {
+	std::cout << "Should never not find a closest INTT segment..." << std::endl;
+      }
+      else if (low == m_inttGeometry.begin()) {
+	closestHitSet = low->second;
+	dphi = normPhi2MinPiPi(low->first - projPhi);
+      }
+      else {
+	prev = std::prev(low);
+	float prevdphi = normPhi2MinPiPi(prev->first - projPhi);
+	float lowphi = normPhi2MinPiPi(low->first - projPhi);
+	if(fabs(prevdphi) < fabs(lowphi))
+	  { 
+	    closestHitSet = prev->second; 
+	    dphi = prevdphi;
+	  }
+	else
+	  { 
+	    closestHitSet = low->second; 
+	    dphi = lowphi;
+	  }
+      }
+      std::cout << "Closest hitset is " << closestHitSet << " with dphi " 
+		<< dphi << std::endl;
+      const int ladderzindex = InttDefs::getLadderZId(closestHitSet);
+      const int ladderphiindex = InttDefs::getLadderPhiId(closestHitSet);
       
-	      /// Z strip spacing is the entire strip, so because we use fabs
-	      /// we divide by two
-	      if(fabs(projectionLocal[1] - cluster->getLocalX()) < m_rPhiSearchWin and
-		 fabs(projectionLocal[2] - cluster->getLocalY()) < stripZSpacing / 2.)
-		{
-	
-		  matchedClusters.push_back(cluskey);
-		  /// Cache INTT global positions with seed
-		  const auto globalPos = transform.getGlobalPosition(cluster, m_surfMaps,
-								     m_tGeometry);
-		  clusters.push_back(globalPos);
+      // Add three to skip the mvtx layers for comparison
+      // to projections
+      auto layerGeom = dynamic_cast<CylinderGeomIntt*>
+	(m_geomContainerIntt->GetLayerGeom(inttlayer+3));
+	  
+      const auto stripZSpacing = layerGeom->get_strip_z_spacing();
+  
+      /// Check that the projection is within some reasonable amount of the segment
+      /// to reject e.g. looking at segments in the opposite hemisphere. This is about
+      /// the size of one intt segment (256 * 80 micron strips in a segment)
+      if(fabs(dphi) > 0.2)
+	{ continue; }
 
-		  /// Diagnostic
-		  float inttClusRphi = sqrt(pow(globalPos(0),2)+pow(globalPos(1),2)) * atan2(globalPos(1),globalPos(0));
-		  if(m_seedAnalysis)
-		    { 
-		      h_nInttProj->Fill(projectionLocal[1] - cluster->getLocalX(),
-					projectionLocal[2] - cluster->getLocalY()); 
-		      h_hits->Fill(globalPos(0), globalPos(1));
-		      h_zhits->Fill(globalPos(2),
-				    sqrt(pow(globalPos(0),2)+pow(globalPos(1),2)));
+      TVector3 projectionLocal(0,0,0);
+      TVector3 projectionGlobal(xProj[inttlayer],yProj[inttlayer],zProj[inttlayer]);
+      projectionLocal = layerGeom->get_local_from_world_coords(ladderzindex, 
+							       ladderphiindex,
+							       projectionGlobal);
+
+      auto range = m_clusterMap->getClusters(closestHitSet);	
+      for(auto clusIter = range.first; clusIter != range.second; ++clusIter )
+	{
+	  const auto cluskey = clusIter->first;
+	  const auto cluster = clusIter->second;
+	  
+	  /// Z strip spacing is the entire strip, so because we use fabs
+	  /// we divide by two
+	  if(fabs(projectionLocal[1] - cluster->getLocalX()) < m_rPhiSearchWin and
+	     fabs(projectionLocal[2] - cluster->getLocalY()) < stripZSpacing / 2.)
+	    {
+	      
+	      matchedClusters.push_back(cluskey);
+	      /// Cache INTT global positions with seed
+	      const auto globalPos = transform.getGlobalPosition(cluster, m_surfMaps,
+								 m_tGeometry);
+	      clusters.push_back(globalPos);
+	      
+	      /// Diagnostic
+	      float inttClusRphi = sqrt(pow(globalPos(0),2)+pow(globalPos(1),2)) * atan2(globalPos(1),globalPos(0));
+	      if(m_seedAnalysis)
+		{ 
+		  h_nInttProj->Fill(projectionLocal[1] - cluster->getLocalX(),
+				    projectionLocal[2] - cluster->getLocalY()); 
+		  h_hits->Fill(globalPos(0), globalPos(1));
+		  h_zhits->Fill(globalPos(2),
+				sqrt(pow(globalPos(0),2)+pow(globalPos(1),2)));
 		  
-		      h_resids->Fill(zProj[inttlayer] - globalPos(2),
-				     projRphi - inttClusRphi);
-		    }		  	      
-		  if(Verbosity() > 4)
-		    {
-		      std::cout << "Matched INTT cluster with cluskey " << cluskey 
-				<< " and position " << globalPos.transpose() 
-				<< std::endl << " with projections rphi "
-				<< projRphi << " and inttclus rphi " << inttClusRphi
-				<< " and proj z " << zProj[inttlayer] << " and inttclus z "
-				<< globalPos(2) << " in layer " << inttlayer 
-				<< " with search windows " << m_rPhiSearchWin 
-				<< " in rphi and strip z spacing " << stripZSpacing 
-				<< std::endl;
-		    }
+		  h_resids->Fill(zProj[inttlayer] - globalPos(2),
+				 projRphi - inttClusRphi);
+		}		  	      
+	      if(Verbosity() > 4)
+		{
+		  std::cout << "Matched INTT cluster with cluskey " << cluskey 
+			    << " and position " << globalPos.transpose() 
+			    << std::endl << " with projections rphi "
+			    << projRphi << " and inttclus rphi " << inttClusRphi
+			    << " and proj z " << zProj[inttlayer] << " and inttclus z "
+			    << globalPos(2) << " in layer " << inttlayer 
+			    << " with search windows " << m_rPhiSearchWin 
+			    << " in rphi and strip z spacing " << stripZSpacing 
+			    << std::endl;
 		}
 	    }
-	}  
-    }
+	}
+    }  
   
   return matchedClusters;
 }
@@ -1531,7 +1574,16 @@ double PHActsSiliconSeeding::normPhi2Pi(const double phi)
     returnPhi += 2 * M_PI;
   return returnPhi;
 }
+double PHActsSiliconSeeding::normPhi2MinPiPi(const double phi)
+{
+  double returnphi = phi;
+  if( returnphi > M_PI)
+    { returnphi -= 2. * M_PI; }
+  else if (returnphi < -1 * M_PI)
+    { returnphi += 2. * M_PI; }
 
+  return returnphi;
+}
 
 void PHActsSiliconSeeding::largeGridSpacing(const bool spacing)
 {

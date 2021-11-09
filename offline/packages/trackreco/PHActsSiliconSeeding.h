@@ -126,6 +126,7 @@ class PHActsSiliconSeeding : public SubsysReco
 
   int getNodes(PHCompositeNode *topNode);
   int createNodes(PHCompositeNode *topNode);
+  void cacheInttGeometry();
 
   GridSeeds runSeeder(std::vector<const SpacePoint*>& spVec);
 
@@ -206,6 +207,7 @@ class PHActsSiliconSeeding : public SubsysReco
   void createHistograms();
   void writeHistograms();
   double normPhi2Pi(const double phi);
+  double normPhi2MinPiPi(const double phi);
 
   ActsTrackingGeometry *m_tGeometry = nullptr;
   SvtxTrackMap *m_trackMap = nullptr;
@@ -214,6 +216,9 @@ class PHActsSiliconSeeding : public SubsysReco
   PHG4CylinderGeomContainer *m_geomContainerIntt = nullptr;
   ActsSurfaceMaps *m_surfMaps = nullptr;
   
+  /// Cache for INTT geometry for faster lookup
+  std::map<const float, TrkrDefs::hitsetkey> m_inttGeometry;
+
   /// Configuration classes for Acts seeding
   Acts::SeedfinderConfig<SpacePoint> m_seedFinderCfg;
   Acts::SpacePointGridConfig m_gridCfg;
