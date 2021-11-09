@@ -12,10 +12,6 @@
 #include <phool/PHObject.h>
 #include <phool/PHTimer.h>
 
-#if __cplusplus < 201402L
-#include <boost/make_unique.hpp>
-#endif
-
 #include <intt/CylinderGeomIntt.h>
 #include <intt/InttDefs.h>
 
@@ -75,15 +71,13 @@ int PHActsSiliconSeeding::InitRun(PHCompositeNode *topNode)
   if(createNodes(topNode) != Fun4AllReturnCodes::EVENT_OK)
     return Fun4AllReturnCodes::ABORTEVENT;
 
-  cacheInttGeometry();  
-  
+ 
   return Fun4AllReturnCodes::EVENT_OK;
 }
 
 void PHActsSiliconSeeding::cacheInttGeometry()
 {
   auto hitsetrange = m_hitsets->getHitSets(TrkrDefs::TrkrId::inttId);
-  
   for(auto hitsetitr = hitsetrange.first;
       hitsetitr != hitsetrange.second;
       ++hitsetitr)
@@ -100,11 +94,11 @@ void PHActsSiliconSeeding::cacheInttGeometry()
       
       layerGeom->find_segment_center(ladderzindex, ladderphiindex, ladderLocation);
       const float ladderphi = atan2(ladderLocation[1], ladderLocation[0]) + layerGeom->get_strip_phi_tilt();
-
       m_inttGeometry.insert(std::make_pair(ladderphi, hitsetitr->first));
 
+      std::cout << "caching phi : " << ladderphi << " with hitsetkey " 
+		<< hitsetitr->first << std::endl;
     }
-
 }
 
 int PHActsSiliconSeeding::process_event(PHCompositeNode *topNode)
@@ -116,15 +110,19 @@ int PHActsSiliconSeeding::process_event(PHCompositeNode *topNode)
       return Fun4AllReturnCodes::ABORTEVENT;
     }
   }
-
+  
+  cacheInttGeometry();  
+  
   auto eventTimer = std::make_unique<PHTimer>("eventTimer");
   eventTimer->stop();
   eventTimer->restart();
 
   if(Verbosity() > 0)
-    std::cout << "Processing PHActsSiliconSeeding event "
+    {
+      std::cout << "Processing PHActsSiliconSeeding event "
 	      << m_event << std::endl;
-
+    }
+  
   std::vector<const SpacePoint*> spVec;
   auto seedVector = runSeeder(spVec);
 
@@ -137,16 +135,17 @@ int PHActsSiliconSeeding::process_event(PHCompositeNode *topNode)
   eventTimer->stop();
   auto circleFitTime = eventTimer->get_accumulated_time();
 
+  /// Clean up some things on event-by-event basis
   for(auto sp : spVec)
     { delete sp; }
   spVec.clear();
 
-  if(Verbosity() > 0)
-    std::cout << "Finished PHActsSiliconSeeding process_event"
-	      << std::endl;
+  m_inttGeometry.clear();
 
   if(Verbosity() > 0)
     {
+      std::cout << "Finished PHActsSiliconSeeding process_event"
+		<< std::endl;
       std::cout << "PHActsSiliconSeeding Acts seed time "
 		<< seederTime << std::endl;
       std::cout << "PHActsSiliconSeeding circle fit time "
@@ -794,8 +793,6 @@ std::vector<TrkrDefs::cluskey> PHActsSiliconSeeding::findInttMatches(
 			    sqrt(pow(glob(0),2) + pow(glob(1),2)));
 	}
     }
-  
-  
 
   /// Project the seed to the INTT to find matches
   for(int layer = 0; layer < m_nInttLayers; ++layer)
@@ -876,20 +873,25 @@ std::vector<TrkrDefs::cluskey> PHActsSiliconSeeding::matchInttClusters(
 
       std::map<const float, TrkrDefs::hitsetkey>::iterator low, prev;
       low = m_inttGeometry.lower_bound(projPhi);
-
+      std::cout << "Projection phi is " << projPhi << std::endl;
+      std::cout << "Testing layer " << inttlayer<<std::endl;
       TrkrDefs::hitsetkey closestHitSet = UINT32_MAX;
       float dphi = 0;
       if(low == m_inttGeometry.end()) {
-	std::cout << "Should never not find a closest INTT segment..." << std::endl;
+	std::cout << "Should never not find a closest INTT segment..." 
+		  << std::endl;
       }
       else if (low == m_inttGeometry.begin()) {
 	closestHitSet = low->second;
+	std::cout << "Found closets hitset with phi " << low->first << std::endl;
 	dphi = normPhi2MinPiPi(low->first - projPhi);
       }
       else {
 	prev = std::prev(low);
 	float prevdphi = normPhi2MinPiPi(prev->first - projPhi);
 	float lowphi = normPhi2MinPiPi(low->first - projPhi);
+	std::cout << "Testing else with " << prev->first << " and "
+		  << low->first << std::endl;
 	if(fabs(prevdphi) < fabs(lowphi))
 	  { 
 	    closestHitSet = prev->second; 
@@ -931,6 +933,10 @@ std::vector<TrkrDefs::cluskey> PHActsSiliconSeeding::matchInttClusters(
 	  const auto cluskey = clusIter->first;
 	  const auto cluster = clusIter->second;
 	  
+	  std::cout << "Checking cluster and projection : " << projectionLocal[1] << ", " 
+		    << cluster->getLocalX() << ", " << projectionLocal[2] << ", " 
+		    << cluster->getLocalY() << " wiwth spacing " << m_rPhiSearchWin
+		    << " and " << stripZSpacing / 2. << std::endl;
 	  /// Z strip spacing is the entire strip, so because we use fabs
 	  /// we divide by two
 	  if(fabs(projectionLocal[1] - cluster->getLocalX()) < m_rPhiSearchWin and
@@ -1474,6 +1480,7 @@ int PHActsSiliconSeeding::getNodes(PHCompositeNode *topNode)
 		<< std::endl;
       return Fun4AllReturnCodes::ABORTEVENT;
     }
+  
   m_hitsets = findNode::getClass<TrkrHitSetContainer>(topNode, "TRKR_HITSET");
   if(!m_hitsets)
     {
