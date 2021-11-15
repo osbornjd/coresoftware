@@ -95,9 +95,6 @@ void PHActsSiliconSeeding::cacheInttGeometry()
       layerGeom->find_segment_center(ladderzindex, ladderphiindex, ladderLocation);
       const float ladderphi = atan2(ladderLocation[1], ladderLocation[0]) + layerGeom->get_strip_phi_tilt();
       m_inttGeometry[layer-3].insert(std::make_pair(ladderphi, hitsetitr->first));
-
-      std::cout << "caching phi : " << ladderphi << " with hitsetkey " 
-		<< hitsetitr->first << std::endl;
     }
 }
 
@@ -878,9 +875,16 @@ std::vector<TrkrDefs::cluskey> PHActsSiliconSeeding::matchInttClusters(
       TrkrDefs::hitsetkey closestHitSet = UINT32_MAX;
       float dphi = 0;
       if(low == m_inttGeometry[inttlayer].end()) {
-	std::cout << "Should never not find a closest INTT segment..." 
-		  << std::endl;
-	continue;
+	if(m_inttGeometry[inttlayer].size() == 1)
+	  {
+	    closestHitSet = m_inttGeometry[inttlayer].begin()->second;
+	    dphi = normPhi2MinPiPi(m_inttGeometry[inttlayer].begin()->first - projPhi);
+	  }
+        else
+	  { 	
+	    /// No measurements in this layer
+	    continue;
+	  }
       }
       else if (low == m_inttGeometry[inttlayer].begin()) {
 	closestHitSet = low->second;
