@@ -94,7 +94,7 @@ void PHActsSiliconSeeding::cacheInttGeometry()
       
       layerGeom->find_segment_center(ladderzindex, ladderphiindex, ladderLocation);
       const float ladderphi = atan2(ladderLocation[1], ladderLocation[0]) + layerGeom->get_strip_phi_tilt();
-      m_inttGeometry.insert(std::make_pair(ladderphi, hitsetitr->first));
+      m_inttGeometry[layer-3].insert(std::make_pair(ladderphi, hitsetitr->first));
 
       std::cout << "caching phi : " << ladderphi << " with hitsetkey " 
 		<< hitsetitr->first << std::endl;
@@ -140,7 +140,8 @@ int PHActsSiliconSeeding::process_event(PHCompositeNode *topNode)
     { delete sp; }
   spVec.clear();
 
-  m_inttGeometry.clear();
+  for(int i = 0; i < m_nInttLayers; i++)
+    { m_inttGeometry[i].clear(); }
 
   if(Verbosity() > 0)
     {
@@ -872,26 +873,23 @@ std::vector<TrkrDefs::cluskey> PHActsSiliconSeeding::matchInttClusters(
       const double projRphi = projR * projPhi;
 
       std::map<const float, TrkrDefs::hitsetkey>::iterator low, prev;
-      low = m_inttGeometry.lower_bound(projPhi);
-      std::cout << "Projection phi is " << projPhi << std::endl;
-      std::cout << "Testing layer " << inttlayer<<std::endl;
+      low = m_inttGeometry[inttlayer].lower_bound(projPhi);
+   
       TrkrDefs::hitsetkey closestHitSet = UINT32_MAX;
       float dphi = 0;
-      if(low == m_inttGeometry.end()) {
+      if(low == m_inttGeometry[inttlayer].end()) {
 	std::cout << "Should never not find a closest INTT segment..." 
 		  << std::endl;
+	continue;
       }
-      else if (low == m_inttGeometry.begin()) {
+      else if (low == m_inttGeometry[inttlayer].begin()) {
 	closestHitSet = low->second;
-	std::cout << "Found closets hitset with phi " << low->first << std::endl;
 	dphi = normPhi2MinPiPi(low->first - projPhi);
       }
       else {
 	prev = std::prev(low);
 	float prevdphi = normPhi2MinPiPi(prev->first - projPhi);
 	float lowphi = normPhi2MinPiPi(low->first - projPhi);
-	std::cout << "Testing else with " << prev->first << " and "
-		  << low->first << std::endl;
 	if(fabs(prevdphi) < fabs(lowphi))
 	  { 
 	    closestHitSet = prev->second; 
@@ -903,8 +901,7 @@ std::vector<TrkrDefs::cluskey> PHActsSiliconSeeding::matchInttClusters(
 	    dphi = lowphi;
 	  }
       }
-      std::cout << "Closest hitset is " << closestHitSet << " with dphi " 
-		<< dphi << std::endl;
+
       const int ladderzindex = InttDefs::getLadderZId(closestHitSet);
       const int ladderphiindex = InttDefs::getLadderPhiId(closestHitSet);
       
@@ -932,11 +929,7 @@ std::vector<TrkrDefs::cluskey> PHActsSiliconSeeding::matchInttClusters(
 	{
 	  const auto cluskey = clusIter->first;
 	  const auto cluster = clusIter->second;
-	  
-	  std::cout << "Checking cluster and projection : " << projectionLocal[1] << ", " 
-		    << cluster->getLocalX() << ", " << projectionLocal[2] << ", " 
-		    << cluster->getLocalY() << " wiwth spacing " << m_rPhiSearchWin
-		    << " and " << stripZSpacing / 2. << std::endl;
+
 	  /// Z strip spacing is the entire strip, so because we use fabs
 	  /// we divide by two
 	  if(fabs(projectionLocal[1] - cluster->getLocalX()) < m_rPhiSearchWin and

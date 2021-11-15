@@ -215,9 +215,6 @@ class PHActsSiliconSeeding : public SubsysReco
   TrkrHitSetContainer  *m_hitsets = nullptr;
   PHG4CylinderGeomContainer *m_geomContainerIntt = nullptr;
   ActsSurfaceMaps *m_surfMaps = nullptr;
-  
-  /// Cache for INTT geometry for faster lookup
-  std::map<const float, TrkrDefs::hitsetkey> m_inttGeometry;
 
   /// Configuration classes for Acts seeding
   Acts::SeedfinderConfig<SpacePoint> m_seedFinderCfg;
@@ -263,7 +260,10 @@ class PHActsSiliconSeeding : public SubsysReco
   const static unsigned int m_nInttLayers = 4;
   const double m_nInttLayerRadii[m_nInttLayers] = 
     {7.188, 7.732, 9.680,10.262}; /// cm
-  
+    
+  /// Cache for INTT geometry for faster lookup
+  std::map<const float, TrkrDefs::hitsetkey> m_inttGeometry[m_nInttLayers];
+
   /// Search window for phi to match intt clusters in cm
   double m_rPhiSearchWin = 0.1;
 
