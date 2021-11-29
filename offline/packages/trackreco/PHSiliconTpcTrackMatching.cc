@@ -5,12 +5,12 @@
 /// Tracking includes
 #include <trackbase/TrkrDefs.h>                // for cluskey, getTrkrId, tpcId
 #include <trackbase/TpcSeedTrackMapv1.h>     
+#include <trackbase/TrkrClusterContainerv3.h>   
+#include <trackbase/TrkrClusterv3.h>   
 #include <trackbase_historic/SvtxTrack_v2.h>
 #include <trackbase_historic/SvtxTrackMap.h>
 #include <trackbase_historic/SvtxVertex.h>     // for SvtxVertex
 #include <trackbase_historic/SvtxVertexMap.h>
-
-#include <trackreco/AssocInfoContainer.h>
 
 #include <g4main/PHG4Hit.h>  // for PHG4Hit
 #include <g4main/PHG4Particle.h>  // for PHG4Particle
@@ -411,6 +411,11 @@ int PHSiliconTpcTrackMatching::process_event(PHCompositeNode*)
 	  isi++;
 	}
     }
+
+  // loop over all tracks and copy the silicon clusters to the corrected cluster map
+  if(_corrected_cluster_map)
+    copySiliconClustersToCorrectedMap();
+
   
   if(Verbosity() > 0)  
     cout << " Final track map size " << _track_map->size() << " seed-track map size " << _seed_track_map->size() << endl;
@@ -485,6 +490,56 @@ int  PHSiliconTpcTrackMatching::GetNodes(PHCompositeNode* topNode)
       svtxNode->addNode(node);
     }
 
-  return Fun4AllReturnCodes::EVENT_OK;
+ _corrected_cluster_map = findNode::getClass<TrkrClusterContainer>(topNode,"CORRECTED_TRKR_CLUSTER");
+  if(_corrected_cluster_map)
+    {
+      std::cout << " Found CORRECTED_TRKR_CLUSTER node " << std::endl;
+    }
+  
+ _cluster_map = findNode::getClass<TrkrClusterContainer>(topNode,"TRKR_CLUSTER");
+ if (!_cluster_map)
+   {
+     std::cout << PHWHERE << " ERROR: Can't find node TRKR_CLUSTER" << std::endl;
+     return Fun4AllReturnCodes::ABORTEVENT;
+   }
+ 
+ return Fun4AllReturnCodes::EVENT_OK;
 }
+
+void PHSiliconTpcTrackMatching::copySiliconClustersToCorrectedMap( )
+{
+  // loop over final track map, copy silicon clusters to corrected cluster map
+  for (auto phtrk_iter = _track_map->begin();
+       phtrk_iter != _track_map->end(); 
+       ++phtrk_iter)
+    {
+      SvtxTrack *track = phtrk_iter->second;
+
+      // loop over associated clusters to get keys for silicon cluster
+      for (SvtxTrack::ConstClusterKeyIter iter = track->begin_cluster_keys();
+	   iter != track->end_cluster_keys();
+	   ++iter)
+	{
+	  TrkrDefs::cluskey cluster_key = *iter;
+	  unsigned int trkrid = TrkrDefs::getTrkrId(cluster_key);
+	  if(trkrid == TrkrDefs::mvtxId || trkrid == TrkrDefs::inttId)
+	    {
+	      TrkrCluster *cluster =  _cluster_map->findCluster(cluster_key);	
+	      TrkrCluster *newclus = _corrected_cluster_map->findOrAddCluster(cluster_key)->second;
+	  
+	      newclus->setSubSurfKey(cluster->getSubSurfKey());
+	      newclus->setAdc(cluster->getAdc());
+	      
+	      newclus->setActsLocalError(0,0,cluster->getActsLocalError(0,0));
+	      newclus->setActsLocalError(1,0,cluster->getActsLocalError(1,0));
+	      newclus->setActsLocalError(0,1,cluster->getActsLocalError(0,1));
+	      newclus->setActsLocalError(1,1,cluster->getActsLocalError(1,1));
+	      
+	      newclus->setLocalX(cluster->getLocalX());
+	      newclus->setLocalY(cluster->getLocalY());
+	    }
+	}      
+    }
+}
+  
 
