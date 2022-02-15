@@ -15,8 +15,8 @@
 
 class PHCompositeNode;
 //class PHG4CellContainer;
-class PHG4CylinderCellGeomContainer;
-class PHG4CylinderCellGeom;
+class PHG4TpcCylinderGeomContainer;
+class PHG4TpcCylinderGeom;
 class TNtuple;
 class TrkrHitSetContainer;
 class TrkrHitTruthAssoc;
@@ -28,7 +28,9 @@ class PHG4TpcPadPlaneReadout : public PHG4TpcPadPlane
 
   ~PHG4TpcPadPlaneReadout() override;
 
-  int CreateReadoutGeometry(PHCompositeNode *topNode, PHG4CylinderCellGeomContainer *seggeo) override;
+  //int CreateReadoutGeometry(PHCompositeNode *topNode, PHG4TpcCylinderGeomContainer *seggeo) override;
+  using PHG4TpcPadPlane::CreateReadoutGeometry;
+  int CreateReadoutGeometry(PHCompositeNode *topNode, PHG4TpcCylinderGeomContainer *seggeo);// override;
 
   //  void MapToPadPlane(PHG4CellContainer *g4cells, const double x_gem, const double y_gem, const double t_gem, PHG4HitContainer::ConstIterator hiter, TNtuple *ntpad, TNtuple *nthit) override;
 
@@ -47,8 +49,8 @@ class PHG4TpcPadPlaneReadout : public PHG4TpcPadPlane
 
   std::string seggeonodename;
 
-  PHG4CylinderCellGeomContainer *GeomContainer = nullptr;
-  PHG4CylinderCellGeom *LayerGeom = nullptr;
+  PHG4TpcCylinderGeomContainer *GeomContainer = nullptr;
+  PHG4TpcCylinderGeom *LayerGeom = nullptr;
 
   double rad_gem = NAN;
   double output_radius = 0;
@@ -61,6 +63,10 @@ class PHG4TpcPadPlaneReadout : public PHG4TpcPadPlane
   std::array<double, 3> MinRadius;
   std::array<double, 3> MaxRadius;
   std::array<double, 3> Thickness;
+
+  std::array< std::array< std::array< float,3 >,12 >,2 > dR;
+  std::array< std::array< std::array< float,3 >,12 >,2 > dPhi;
+  
   double MinZ = NAN;
   double MaxZ = NAN;
   double sigmaT = NAN;
@@ -73,6 +79,7 @@ class PHG4TpcPadPlaneReadout : public PHG4TpcPadPlane
   int NZBins = INT_MAX;
   std::array<int, 3> NPhiBins;
   std::array<int, 3> NTpcLayers;
+  std::array<float, 3> SectorPhi;
   int m_NHits = 0;
 
   // gaussian sampling

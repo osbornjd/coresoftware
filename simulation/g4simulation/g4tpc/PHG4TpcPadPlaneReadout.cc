@@ -1,8 +1,8 @@
 #include "PHG4TpcPadPlaneReadout.h"
 
 #include <g4detectors/PHG4CellDefs.h>  // for genkey, keytype
-#include <g4detectors/PHG4CylinderCellGeom.h>
-#include <g4detectors/PHG4CylinderCellGeomContainer.h>
+#include <g4detectors/PHG4TpcCylinderGeom.h>
+#include <g4detectors/PHG4TpcCylinderGeomContainer.h>
 
 #include <g4main/PHG4Hit.h>  // for PHG4Hit
 #include <g4main/PHG4HitContainer.h>
@@ -65,46 +65,53 @@ PHG4TpcPadPlaneReadout::~PHG4TpcPadPlaneReadout()
   gsl_rng_free(RandomGenerator);
 }
 
-int PHG4TpcPadPlaneReadout::CreateReadoutGeometry(PHCompositeNode * /*topNode*/, PHG4CylinderCellGeomContainer *seggeo)
+int PHG4TpcPadPlaneReadout::CreateReadoutGeometry(PHCompositeNode * /*topNode*/, PHG4TpcCylinderGeomContainer *seggeo)
 {
   if (Verbosity()) std::cout << "PHG4TpcPadPlaneReadout: CreateReadoutGeometry: " << std::endl;
-
-  for (int iregion = 0; iregion < 3; ++iregion)
+  int zside=0;
+  for (int isector = 0; isector < 12; ++isector)//12 sectors
   {
-    for (int layer = MinLayer[iregion]; layer < MinLayer[iregion] + NTpcLayers[iregion]; ++layer)
+    for (int iregion = 0; iregion < 3; ++iregion)//R1/2/3
     {
-      if (Verbosity())
+      for (int layer = MinLayer[iregion]; layer < MinLayer[iregion] + NTpcLayers[iregion]; ++layer)
       {
-        std::cout << " layer " << layer << " MinLayer " << MinLayer[iregion] << " region " << iregion
-                  << " radius " << MinRadius[iregion] + ((double) (layer - MinLayer[iregion]) + 0.5) * Thickness[iregion]
-                  << " thickness " << Thickness[iregion]
-                  << " NZbins " << NZBins << " zmin " << MinZ << " zstep " << ZBinWidth
-                  << " phibins " << NPhiBins[iregion] << " phistep " << PhiBinWidth[iregion] << std::endl;
-      }
+        if (Verbosity())
+        {
+          std::cout << " layer " << layer << " MinLayer " << MinLayer[iregion] << " region " << iregion
+                    << " radius " << MinRadius[iregion] + ((double) (layer - MinLayer[iregion]) + 0.5) * Thickness[iregion]
+                    << " thickness " << Thickness[iregion]
+                    << " NZbins " << NZBins << " zmin " << MinZ << " zstep " << ZBinWidth
+                    << " phibins " << NPhiBins[iregion] << " phistep " << PhiBinWidth[iregion] << std::endl;
+        }
 
-      PHG4CylinderCellGeom *layerseggeo = new PHG4CylinderCellGeom();
-      layerseggeo->set_layer(layer);
-      layerseggeo->set_radius(MinRadius[iregion] + ((double) (layer - MinLayer[iregion]) + 0.5) * Thickness[iregion]);
-      layerseggeo->set_thickness(Thickness[iregion]);
-      layerseggeo->set_binning(PHG4CellDefs::sizebinning);
-      layerseggeo->set_zbins(NZBins);
-      layerseggeo->set_zmin(MinZ);
-      layerseggeo->set_zstep(ZBinWidth);
-      layerseggeo->set_phibins(NPhiBins[iregion]);
-      layerseggeo->set_phistep(PhiBinWidth[iregion]);
-      // Chris Pinkenburg: greater causes huge memory growth which causes problems
-      // on our farm. If you need to increase this - TALK TO ME first
-      if (NPhiBins[iregion] * NZBins > 5100000)
-      {
-        std::cout << "increase Tpc cellsize, number of cells "
-                  << NPhiBins[iregion] * NZBins << " for layer " << layer
-                  << " exceed 5.1M limit" << std::endl;
-        gSystem->Exit(1);
+        PHG4TpcCylinderGeom *layerseggeo = new PHG4TpcCylinderGeom();
+        layerseggeo->set_side(zside);
+        layerseggeo->set_sector(isector);
+        layerseggeo->set_r_bias(dR[zside][isector][iregion]);
+        layerseggeo->set_phi_bias(dPhi[zside][isector][iregion]);
+        layerseggeo->set_layer(layer);
+        layerseggeo->set_radius(MinRadius[iregion] + ((double) (layer - MinLayer[iregion]) + 0.5) * Thickness[iregion]);
+        layerseggeo->set_thickness(Thickness[iregion]);
+        layerseggeo->set_binning(PHG4CellDefs::sizebinning);
+        layerseggeo->set_zbins(NZBins);
+        layerseggeo->set_zmin(MinZ);
+        layerseggeo->set_zstep(ZBinWidth);
+        layerseggeo->set_phibins(NPhiBins[iregion]);
+        layerseggeo->set_phistep(PhiBinWidth[iregion]);
+        // Chris Pinkenburg: greater causes huge memory growth which causes problems
+        // on our farm. If you need to increase this - TALK TO ME first
+        if (NPhiBins[iregion] * NZBins > 5100000)
+        {
+          std::cout << "increase Tpc cellsize, number of cells "
+                    << NPhiBins[iregion] * NZBins << " for layer " << layer
+                    << " exceed 5.1M limit" << std::endl;
+          gSystem->Exit(1);
+        }
+        seggeo->AddLayerGeom(layerseggeo);
+        //seggeo->AddLayerCellGeom(layerseggeo);
       }
-      seggeo->AddLayerCellGeom(layerseggeo);
     }
   }
-
   GeomContainer = seggeo;
 
   return 0;
@@ -143,8 +150,8 @@ void PHG4TpcPadPlaneReadout::MapToPadPlane(TrkrHitSetContainer *single_hitsetcon
 
   // Find which readout layer this electron ends up in
 
-  PHG4CylinderCellGeomContainer::ConstRange layerrange = GeomContainer->get_begin_end();
-  for (PHG4CylinderCellGeomContainer::ConstIterator layeriter = layerrange.first;
+  PHG4TpcCylinderGeomContainer::ConstRange layerrange = GeomContainer->get_begin_end();
+  for (PHG4TpcCylinderGeomContainer::ConstIterator layeriter = layerrange.first;
        layeriter != layerrange.second;
        ++layeriter)
   {
@@ -557,13 +564,13 @@ void PHG4TpcPadPlaneReadout::SetDefaultParameters()
 
   set_default_int_param("tpc_minlayer_inner", 7);
 
-  set_default_double_param("tpc_minradius_inner", 30.0);  // cm
-  set_default_double_param("tpc_minradius_mid", 40.0);
-  set_default_double_param("tpc_minradius_outer", 60.0);
+  set_default_double_param("tpc_minradius_inner", 31.105);//30.0);  // cm
+  set_default_double_param("tpc_minradius_mid", 41.153);//40.0);
+  set_default_double_param("tpc_minradius_outer", 58.367);//60.0);
 
-  set_default_double_param("tpc_maxradius_inner", 40.0);  // cm
-  set_default_double_param("tpc_maxradius_mid", 60.0);
-  set_default_double_param("tpc_maxradius_outer", 77.0);  // from Tom
+  set_default_double_param("tpc_maxradius_inner", 40.249);//40.0);  // cm
+  set_default_double_param("tpc_maxradius_mid", 57.475);//60.0);
+  set_default_double_param("tpc_maxradius_outer", 75.911);//77.0);  // from Tom
 
   set_default_double_param("neffelectrons_threshold", 1.0);
   set_default_double_param("maxdriftlength", 105.5);         // cm
@@ -574,9 +581,14 @@ void PHG4TpcPadPlaneReadout::SetDefaultParameters()
   set_default_double_param("sampa_shaping_lead", 32.0);  // ns, for 80 ns SAMPA
   set_default_double_param("sampa_shaping_tail", 48.0);  // ns, for 80 ns SAMPA
 
-  set_default_int_param("ntpc_phibins_inner", 1152);
-  set_default_int_param("ntpc_phibins_mid", 1536);
-  set_default_int_param("ntpc_phibins_outer", 2304);
+  set_default_int_param("tpc_sector_phi_inner", 0.5024);//sector size in phi for R1 sector
+  set_default_int_param("tpc_sector_phi_mid",   0.5087);//sector size in phi for R2 sector
+  set_default_int_param("tpc_sector_phi_outer", 0.5097);//sector size in phi for R3 sector
+
+  set_default_int_param("ntpc_phibins_inner", 1152/12);//bins per R1 sector
+  set_default_int_param("ntpc_phibins_mid", 1536/12);//bins per R2 sector
+  set_default_int_param("ntpc_phibins_outer", 2304/12);//bins per R3 sector
+
 
   // GEM Gain
   /*
@@ -596,6 +608,72 @@ void PHG4TpcPadPlaneReadout::UpdateInternalParameters()
   MinLayer[0] = get_int_param("tpc_minlayer_inner");
   MinLayer[1] = MinLayer[0] + NTpcLayers[0];
   MinLayer[2] = MinLayer[1] + NTpcLayers[1];
+
+
+  std::array< std::array< std::array< float,3 >,12 >,2 > dR_tmp = {{
+    {{
+      {0.,0.,0.},
+      {0.,0.,0.},
+      {0.,0.,0.},
+      {0.,0.,0.},
+      {0.,0.,0.},
+      {0.,0.,0.},
+      {0.,0.,0.},
+      {0.,0.,0.},
+      {0.,0.,0.},
+      {0.,0.,0.},
+      {0.,0.,0.},
+      {0.,0.,0.}
+    }},
+    {{
+      {0.,0.,0.},
+      {0.,0.,0.},
+      {0.,0.,0.},
+      {0.,0.,0.},
+      {0.,0.,0.},
+      {0.,0.,0.},
+      {0.,0.,0.},
+      {0.,0.,0.},
+      {0.,0.,0.},
+      {0.,0.,0.},
+      {0.,0.,0.},
+      {0.,0.,0.}
+    }}
+  }};
+
+  std::array< std::array< std::array< float,3 >,12 >,2 > dPhi_tmp = {{
+    {{
+      {2*M_PI/12*0 ,2*M_PI/12*0 ,2*M_PI/12*0 },
+      {2*M_PI/12*1 ,2*M_PI/12*1 ,2*M_PI/12*1 },
+      {2*M_PI/12*2 ,2*M_PI/12*2 ,2*M_PI/12*2 },
+      {2*M_PI/12*3 ,2*M_PI/12*3 ,2*M_PI/12*3 },
+      {2*M_PI/12*4 ,2*M_PI/12*4 ,2*M_PI/12*4 },
+      {2*M_PI/12*5 ,2*M_PI/12*5 ,2*M_PI/12*5 },
+      {2*M_PI/12*6 ,2*M_PI/12*6 ,2*M_PI/12*6 },
+      {2*M_PI/12*7 ,2*M_PI/12*7 ,2*M_PI/12*7 },
+      {2*M_PI/12*8 ,2*M_PI/12*8 ,2*M_PI/12*8 },
+      {2*M_PI/12*9 ,2*M_PI/12*9 ,2*M_PI/12*9 },
+      {2*M_PI/12*10,2*M_PI/12*10,2*M_PI/12*10},
+      {2*M_PI/12*11,2*M_PI/12*11,2*M_PI/12*11}
+    }},
+    {{
+      {2*M_PI/12*0 ,2*M_PI/12*0 ,2*M_PI/12*0 },
+      {2*M_PI/12*1 ,2*M_PI/12*1 ,2*M_PI/12*1 },
+      {2*M_PI/12*2 ,2*M_PI/12*2 ,2*M_PI/12*2 },
+      {2*M_PI/12*3 ,2*M_PI/12*3 ,2*M_PI/12*3 },
+      {2*M_PI/12*4 ,2*M_PI/12*4 ,2*M_PI/12*4 },
+      {2*M_PI/12*5 ,2*M_PI/12*5 ,2*M_PI/12*5 },
+      {2*M_PI/12*6 ,2*M_PI/12*6 ,2*M_PI/12*6 },
+      {2*M_PI/12*7 ,2*M_PI/12*7 ,2*M_PI/12*7 },
+      {2*M_PI/12*8 ,2*M_PI/12*8 ,2*M_PI/12*8 },
+      {2*M_PI/12*9 ,2*M_PI/12*9 ,2*M_PI/12*9 },
+      {2*M_PI/12*10,2*M_PI/12*10,2*M_PI/12*10},
+      {2*M_PI/12*11,2*M_PI/12*11,2*M_PI/12*11}
+    }}
+  }};
+
+  dR = dR_tmp;
+  dPhi = dPhi_tmp;
 
   neffelectrons_threshold = get_double_param("neffelectrons_threshold");
 
@@ -630,9 +708,13 @@ void PHG4TpcPadPlaneReadout::UpdateInternalParameters()
   NPhiBins[1] = get_int_param("ntpc_phibins_mid");
   NPhiBins[2] = get_int_param("ntpc_phibins_outer");
 
-  PhiBinWidth[0] = 2.0 * M_PI / (double) NPhiBins[0];
-  PhiBinWidth[1] = 2.0 * M_PI / (double) NPhiBins[1];
-  PhiBinWidth[2] = 2.0 * M_PI / (double) NPhiBins[2];
+  SectorPhi[0] = get_int_param("tpc_sector_phi_inner");
+  SectorPhi[1] = get_int_param("tpc_sector_phi_mid");
+  SectorPhi[2] = get_int_param("tpc_sector_phi_outer");
+
+  PhiBinWidth[0] = SectorPhi[0] / (double) NPhiBins[0];
+  PhiBinWidth[1] = SectorPhi[1] / (double) NPhiBins[1];
+  PhiBinWidth[2] = SectorPhi[2] / (double) NPhiBins[2];
 
   averageGEMGain = get_double_param("gem_amplification");
 }
