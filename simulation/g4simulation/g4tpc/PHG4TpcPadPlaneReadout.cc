@@ -581,9 +581,13 @@ void PHG4TpcPadPlaneReadout::SetDefaultParameters()
   set_default_double_param("sampa_shaping_lead", 32.0);  // ns, for 80 ns SAMPA
   set_default_double_param("sampa_shaping_tail", 48.0);  // ns, for 80 ns SAMPA
 
-  set_default_int_param("ntpc_phibins_inner", 1152);
-  set_default_int_param("ntpc_phibins_mid", 1536);
-  set_default_int_param("ntpc_phibins_outer", 2304);
+  set_default_int_param("tpc_sector_phi_inner", 0.5024);//sector size in phi for R1 sector
+  set_default_int_param("tpc_sector_phi_mid",   0.5087);//sector size in phi for R2 sector
+  set_default_int_param("tpc_sector_phi_outer", 0.5097);//sector size in phi for R3 sector
+
+  set_default_int_param("ntpc_phibins_inner", 1152/12);//bins per R1 sector
+  set_default_int_param("ntpc_phibins_mid", 1536/12);//bins per R2 sector
+  set_default_int_param("ntpc_phibins_outer", 2304/12);//bins per R3 sector
 
 
   // GEM Gain
@@ -639,32 +643,32 @@ void PHG4TpcPadPlaneReadout::UpdateInternalParameters()
 
   std::array< std::array< std::array< float,3 >,12 >,2 > dPhi_tmp = {{
     {{
-      {0.,0.,0.},
-      {0.,0.,0.},
-      {0.,0.,0.},
-      {0.,0.,0.},
-      {0.,0.,0.},
-      {0.,0.,0.},
-      {0.,0.,0.},
-      {0.,0.,0.},
-      {0.,0.,0.},
-      {0.,0.,0.},
-      {0.,0.,0.},
-      {0.,0.,0.}
+      {2*M_PI/12*0 ,2*M_PI/12*0 ,2*M_PI/12*0 },
+      {2*M_PI/12*1 ,2*M_PI/12*1 ,2*M_PI/12*1 },
+      {2*M_PI/12*2 ,2*M_PI/12*2 ,2*M_PI/12*2 },
+      {2*M_PI/12*3 ,2*M_PI/12*3 ,2*M_PI/12*3 },
+      {2*M_PI/12*4 ,2*M_PI/12*4 ,2*M_PI/12*4 },
+      {2*M_PI/12*5 ,2*M_PI/12*5 ,2*M_PI/12*5 },
+      {2*M_PI/12*6 ,2*M_PI/12*6 ,2*M_PI/12*6 },
+      {2*M_PI/12*7 ,2*M_PI/12*7 ,2*M_PI/12*7 },
+      {2*M_PI/12*8 ,2*M_PI/12*8 ,2*M_PI/12*8 },
+      {2*M_PI/12*9 ,2*M_PI/12*9 ,2*M_PI/12*9 },
+      {2*M_PI/12*10,2*M_PI/12*10,2*M_PI/12*10},
+      {2*M_PI/12*11,2*M_PI/12*11,2*M_PI/12*11}
     }},
     {{
-      {0.,0.,0.},
-      {0.,0.,0.},
-      {0.,0.,0.},
-      {0.,0.,0.},
-      {0.,0.,0.},
-      {0.,0.,0.},
-      {0.,0.,0.},
-      {0.,0.,0.},
-      {0.,0.,0.},
-      {0.,0.,0.},
-      {0.,0.,0.},
-      {0.,0.,0.}
+      {2*M_PI/12*0 ,2*M_PI/12*0 ,2*M_PI/12*0 },
+      {2*M_PI/12*1 ,2*M_PI/12*1 ,2*M_PI/12*1 },
+      {2*M_PI/12*2 ,2*M_PI/12*2 ,2*M_PI/12*2 },
+      {2*M_PI/12*3 ,2*M_PI/12*3 ,2*M_PI/12*3 },
+      {2*M_PI/12*4 ,2*M_PI/12*4 ,2*M_PI/12*4 },
+      {2*M_PI/12*5 ,2*M_PI/12*5 ,2*M_PI/12*5 },
+      {2*M_PI/12*6 ,2*M_PI/12*6 ,2*M_PI/12*6 },
+      {2*M_PI/12*7 ,2*M_PI/12*7 ,2*M_PI/12*7 },
+      {2*M_PI/12*8 ,2*M_PI/12*8 ,2*M_PI/12*8 },
+      {2*M_PI/12*9 ,2*M_PI/12*9 ,2*M_PI/12*9 },
+      {2*M_PI/12*10,2*M_PI/12*10,2*M_PI/12*10},
+      {2*M_PI/12*11,2*M_PI/12*11,2*M_PI/12*11}
     }}
   }};
 
@@ -704,9 +708,13 @@ void PHG4TpcPadPlaneReadout::UpdateInternalParameters()
   NPhiBins[1] = get_int_param("ntpc_phibins_mid");
   NPhiBins[2] = get_int_param("ntpc_phibins_outer");
 
-  PhiBinWidth[0] = 2.0 * M_PI / (double) NPhiBins[0];
-  PhiBinWidth[1] = 2.0 * M_PI / (double) NPhiBins[1];
-  PhiBinWidth[2] = 2.0 * M_PI / (double) NPhiBins[2];
+  SectorPhi[0] = get_int_param("tpc_sector_phi_inner");
+  SectorPhi[1] = get_int_param("tpc_sector_phi_mid");
+  SectorPhi[2] = get_int_param("tpc_sector_phi_outer");
+
+  PhiBinWidth[0] = SectorPhi[0] / (double) NPhiBins[0];
+  PhiBinWidth[1] = SectorPhi[1] / (double) NPhiBins[1];
+  PhiBinWidth[2] = SectorPhi[2] / (double) NPhiBins[2];
 
   averageGEMGain = get_double_param("gem_amplification");
 }

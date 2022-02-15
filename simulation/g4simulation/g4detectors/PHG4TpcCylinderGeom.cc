@@ -368,3 +368,18 @@ PHG4TpcCylinderGeom::get_zstep() const
   //check_binning_method(PHG4CylinderCellDefs::sizebinning);
   return zstep;
 }
+
+void PHG4TpcCylinderGeom::set_zmin(const double z)
+{
+  //check_binning_method(PHG4CylinderCellDefs::sizebinning);
+  zmin = z;
+}
+
+double
+PHG4TpcCylinderGeom::get_zmin() const
+{
+  //check_binning_method(PHG4CylinderCellDefs::sizebinning);
+  return zmin;
+}
+
+

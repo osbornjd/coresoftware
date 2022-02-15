@@ -309,6 +309,16 @@ class PHG4TpcCylinderGeom : public PHG4CylinderGeomv2
 
   ///@}
 
+  void set_layer(const int i) override { layer = i; } 
+  int get_layer() const override { return layer; } 
+
+  void set_radius(const double r) override { radius = r; } 
+  double get_radius() const override { return radius; } 
+
+  void set_thickness(const double t)  override { thickness = t; }
+  double get_thickness() const  override { return thickness; }
+
+
   int get_zbins() const;
   int get_phibins() const;
 
@@ -325,13 +335,21 @@ class PHG4TpcCylinderGeom : public PHG4CylinderGeomv2
   void set_zstep(const double z);
   void set_phibins(const int i);
   void set_phistep(const double phi);
+
   void set_r_bias(const double dr){dR=dr;}
   void set_phi_bias(const double dphi){dPhi=dphi;}
+
+  void set_zmin(const double z) override;
+  double get_zmin() const  override ;
+  //double get_zstep() const;
+
 
   void set_side(int i){zside = i;}
   void set_sector(int i){isector = i;}
   int get_side(){return zside;}
   int get_sector(){return isector;}
+  float get_r_bias(){return dR;}
+  float get_phi_bias(){return dPhi;}
 
  protected:
   std::string absorber_mat;
@@ -347,6 +365,10 @@ class PHG4TpcCylinderGeom : public PHG4CylinderGeomv2
   bool virualize_fiber;
   int construction_verbose;
   
+  int layer = -999;
+  double radius = NAN;
+  double thickness = NAN;
+
   int zside =-1;
   int isector=-1;
   int binning = 0;

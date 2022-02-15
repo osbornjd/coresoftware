@@ -79,6 +79,7 @@ class PHG4TpcPadPlaneReadout : public PHG4TpcPadPlane
   int NZBins = INT_MAX;
   std::array<int, 3> NPhiBins;
   std::array<int, 3> NTpcLayers;
+  std::array<float, 3> SectorPhi;
   int m_NHits = 0;
 
   // gaussian sampling
