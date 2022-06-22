@@ -33,36 +33,55 @@ namespace
 }
 
 //________________________________________________________________________________
-TVector3 CylinderGeomMicromegas::get_local_from_world_coords( uint tileid, const TVector3& world_coordinates ) const
+TVector2 CylinderGeomMicromegas::get_local_from_world_coords( uint tileid, ActsSurfaceMaps* surfmaps, ActsTrackingGeometry* tGeometry, const TVector3& world_coordinates ) const
 {
   assert( tileid < m_tiles.size() );
 
-  // store world coordinates in array
-  std::array<double,3> master;
-  world_coordinates.GetXYZ( &master[0] );
+  const auto hitsetkey = MicromegasDefs::genHitSetKey(get_layer(), get_segmentation_type(), tileid);
 
-  // convert to local coordinate
-  std::array<double,3> local;
-  transformation_matrix(tileid).MasterToLocal( &master[0], &local[0] );
+  const auto surface = surfmaps->getMMSurface(hitsetkey);
 
-  return TVector3( &local[0] );
+  Acts::Vector3 global( world_coordinates[0], world_coordinates[1], world_coordinates[2] );
+  global *= Acts::UnitConstants::cm;
 
+  Acts::Vector2 local;
+
+  /// Acts requires a dummy vector to be passed as well
+  auto localresult = surface->globalToLocal(tGeometry->geoContext,
+					    global, Acts::Vector3(1,1,1));
+  if(localresult.ok())
+    {
+      local = localresult.value();
+      local /= Acts::UnitConstants::cm;
+    }
+  else
+    {
+      std::cout << "Transformation could not be completed on Acts surface. Returning NAN "
+		<< std::endl;
+      local(0) = NAN;
+      local(1) = NAN;
+    }
+
+  return TVector2( &local(0) );
 }
 
 //________________________________________________________________________________
-TVector3 CylinderGeomMicromegas::get_world_from_local_coords( uint tileid, const TVector3& local_coordinates ) const
+TVector3 CylinderGeomMicromegas::get_world_from_local_coords( uint tileid, ActsSurfaceMaps* surfmaps, ActsTrackingGeometry* tGeometry, const TVector2& local_coordinates ) const
 {
   assert( tileid < m_tiles.size() );
 
-  // store world coordinates in array
-  std::array<double,3> local;
-  local_coordinates.GetXYZ( &local[0] );
+  const auto hitsetkey = MicromegasDefs::genHitSetKey(get_layer(), get_segmentation_type(), tileid);
 
-  // convert to local coordinate
-  std::array<double,3> master;
-  transformation_matrix(tileid).LocalToMaster( &local[0], &master[0] );
+  const auto surface = surfmaps->getMMSurface(hitsetkey);
+  
+  Acts::Vector2 local( local_coordinates.X(), local_coordinates.Y() );
+  local *= Acts::UnitConstants::cm;
 
-  return TVector3( &master[0] );
+  auto global = surface->localToGlobal(tGeometry->geoContext,
+				       local, Acts::Vector3(1,1,1));
+  global /= Acts::UnitConstants::cm;
+
+  return TVector3( &global[0] );
 
 }
 

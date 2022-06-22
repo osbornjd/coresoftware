@@ -14,12 +14,17 @@
 
 #include <g4detectors/PHG4CylinderGeom.h>
 
+#include <trackbase/ActsTrackingGeometry.h>
+#include <trackbase/ActsSurfaceMaps.h>
+#include <Acts/Definitions/Units.hpp>
+
 #include <TGeoMatrix.h>
 
 #include <cmath>
 #include <iostream>
 
 class TVector3;
+class TVector2;
 class PHG4Hit;
 
 class CylinderGeomMicromegas : public PHG4CylinderGeom
@@ -64,7 +69,9 @@ class CylinderGeomMicromegas : public PHG4CylinderGeom
    * - y axis perpendicular to the surface, outward,
    * - x axis perpendicular to y and z to have a direct ref. frame
    **/
-  TVector3 get_local_from_world_coords( uint tileid, const TVector3& ) const;
+  TVector2 get_local_from_world_coords( uint tileid, ActsSurfaceMaps* surfmaps,
+					ActsTrackingGeometry* tGeometry,
+					const TVector3& ) const;
 
   //! convert world to local direction coordinates in (planar) tile reference frame
   TVector3 get_local_from_world_vect( uint tileid, const TVector3& ) const;
@@ -77,7 +84,9 @@ class CylinderGeomMicromegas : public PHG4CylinderGeom
    * - y axis perpendicular to the surface, outward,
    * - x axis perpendicular to y and z to have a direct ref. system
    **/
-  TVector3 get_world_from_local_coords( uint tileid, const TVector3& ) const;
+  TVector3 get_world_from_local_coords( uint tileid, ActsSurfaceMaps* surfmaps,
+					ActsTrackingGeometry* tGeometry,
+					const TVector2& ) const;
 
   //! convert local to world direction coordinates in (planar) tile reference frame
   TVector3 get_world_from_local_vect( uint tileid, const TVector3& ) const;
