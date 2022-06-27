@@ -258,7 +258,7 @@ int MicromegasClusterizer::process_event(PHCompositeNode *topNode)
       const auto ckey = TrkrDefs::genClusKey( hitsetkey, cluster_count++ );
       auto cluster = std::make_unique<TrkrClusterv3>();
 
-      TVector3 local_coordinates;
+      TVector2 local_coordinates;
       double weight_sum = 0;
 
       // needed for proper error calculation
@@ -298,15 +298,15 @@ int MicromegasClusterizer::process_event(PHCompositeNode *topNode)
           case MicromegasDefs::SegmentationType::SEGMENTATION_PHI:
           {
 
-            coord_sum += strip_local_coordinate.x()*weight;
-            coordsquare_sum += square(strip_local_coordinate.x())*weight;
+            coord_sum += strip_local_coordinate.X()*weight;
+            coordsquare_sum += square(strip_local_coordinate.X())*weight;
             break;
           }
 
           case MicromegasDefs::SegmentationType::SEGMENTATION_Z:
           {
-            coord_sum += strip_local_coordinate.z()*weight;
-            coordsquare_sum += square(strip_local_coordinate.z())*weight;
+            coord_sum += strip_local_coordinate.Y()*weight;
+            coordsquare_sum += square(strip_local_coordinate.Y())*weight;
             break;
           }
         }
@@ -353,7 +353,7 @@ int MicromegasClusterizer::process_event(PHCompositeNode *topNode)
        * this is to accomodate possible discrepencies between the two
        */
       {
-        const auto world_coordinates = layergeom->get_world_from_local_coords( tileid, local_coordinates);
+        const auto world_coordinates = layergeom->get_world_from_local_coords( tileid, acts_geometry, local_coordinates);
         const Acts::Vector3 world_coordinates_acts = {
           world_coordinates.x()*Acts::UnitConstants::cm,
           world_coordinates.y()*Acts::UnitConstants::cm,

@@ -14,8 +14,7 @@
 
 #include <g4detectors/PHG4CylinderGeom.h>
 
-#include <trackbase/ActsTrackingGeometry.h>
-#include <trackbase/ActsSurfaceMaps.h>
+#include <trackbase/ActsGeometry.h>
 #include <Acts/Definitions/Units.hpp>
 
 #include <TGeoMatrix.h>
@@ -69,8 +68,7 @@ class CylinderGeomMicromegas : public PHG4CylinderGeom
    * - y axis perpendicular to the surface, outward,
    * - x axis perpendicular to y and z to have a direct ref. frame
    **/
-  TVector2 get_local_from_world_coords( uint tileid, ActsSurfaceMaps* surfmaps,
-					ActsTrackingGeometry* tGeometry,
+  TVector2 get_local_from_world_coords( uint tileid, ActsGeometry* geometry,
 					const TVector3& ) const;
 
   //! convert world to local direction coordinates in (planar) tile reference frame
@@ -84,8 +82,7 @@ class CylinderGeomMicromegas : public PHG4CylinderGeom
    * - y axis perpendicular to the surface, outward,
    * - x axis perpendicular to y and z to have a direct ref. system
    **/
-  TVector3 get_world_from_local_coords( uint tileid, ActsSurfaceMaps* surfmaps,
-					ActsTrackingGeometry* tGeometry,
+  TVector3 get_world_from_local_coords( uint tileid, ActsGeometry* geometry,
 					const TVector2& ) const;
 
   //! convert local to world direction coordinates in (planar) tile reference frame
@@ -99,7 +96,7 @@ class CylinderGeomMicromegas : public PHG4CylinderGeom
   int find_tile_cylindrical( const TVector3& ) const;
 
   //! get tile for a given world location assuming tiles are planes centered on tile center and tengent to local cylinder
-  int find_tile_planar( const TVector3& ) const;
+  int find_tile_planar( ActsGeometry* geometry, const TVector3& ) const;
 
   //! get number of tiles
   size_t get_tiles_count() const { return m_tiles.size(); }
@@ -112,10 +109,10 @@ class CylinderGeomMicromegas : public PHG4CylinderGeom
   }
 
   //! get strip for a give world location and tile
-  int find_strip_from_world_coords( uint tileid, const TVector3& ) const;
+  int find_strip_from_world_coords( uint tileid, ActsGeometry* geometry, const TVector3& ) const;
 
   //! get strip for a give world location and tile
-  int find_strip_from_local_coords( uint tileid, const TVector3& ) const;
+  int find_strip_from_local_coords( uint tileid, const TVector2& ) const;
 
   //! get strip length for a given tile
   double get_strip_length( uint tileid ) const;
@@ -124,10 +121,10 @@ class CylinderGeomMicromegas : public PHG4CylinderGeom
   uint get_strip_count( uint tileid ) const;
 
   //! get local coordinates for a given tile and strip
-  TVector3 get_local_coordinates( uint tileid, uint stripnum ) const;
+  TVector2 get_local_coordinates( uint tileid, uint stripnum ) const;
 
   //! get world coordinates for a given tile and strip
-  TVector3 get_world_coordinates( uint tileid, uint stripnum ) const;
+  TVector3 get_world_coordinates( uint tileid, ActsGeometry* geometry, uint stripnum ) const;
 
   //! get phi angle at center of tile
   double get_center_phi( uint tileid ) const
