@@ -38,7 +38,6 @@ class TGeoVolume;
 
 namespace ActsExamples 
 {
-  class IBaseDetector;
   class IContextDecorator;
 }
 
@@ -106,6 +105,14 @@ class MakeActsGeometry : public SubsysReco
   //!Create New nodes
   int createNodes(PHCompositeNode*);
   
+  std::pair<std::shared_ptr<const Acts::TrackingGeometry>,
+          std::vector<std::shared_ptr<ActsExamples::IContextDecorator>>>
+    build(const boost::program_options::variables_map& vm,
+	  ActsExamples::TGeoDetector& detector); 
+
+  void readTGeoLayerBuilderConfigs(const std::string& path,
+				   ActsExamples::TGeoDetector::Config& config);
+
   /// Functions to edit TGeoManager to include TPC boxes
   void setPlanarSurfaceDivisions();
   void editTPCGeometry(PHCompositeNode *topNode);
@@ -117,7 +124,7 @@ class MakeActsGeometry : public SubsysReco
 
   /// Function that mimics ActsExamples::GeometryExampleBase
   void makeGeometry(int argc, char* argv[], 
-		    ActsExamples::IBaseDetector& detector);
+		    ActsExamples::TGeoDetector& detector);
  
   void setMaterialResponseFile(std::string& responseFile,
 			       std::string& materialFile);
@@ -203,9 +210,6 @@ class MakeActsGeometry : public SubsysReco
   const double half_width_clearance_phi = 0.4999;
   /// z does not need spacing as the boxes are rotated around the z axis
   const double half_width_clearance_z = 0.5;
-
-  /// The acts geometry object
-  ActsExamples::TGeoDetector m_detector;
 
   /// Acts geometry objects that are needed to create (for example) the fitter
   TrackingGeometry m_tGeometry;

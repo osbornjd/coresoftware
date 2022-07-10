@@ -47,7 +47,6 @@
 #include <Acts/Surfaces/Surface.hpp>
 #include <Acts/Utilities/CalibrationContext.hpp>
 
-#include <ActsExamples/Detector/IBaseDetector.hpp>
 #include <ActsExamples/EventData/Track.hpp>
 #include <ActsExamples/Framework/AlgorithmContext.hpp>
 #include <ActsExamples/Framework/IContextDecorator.hpp>
@@ -56,6 +55,10 @@
 #include <ActsExamples/Options/CommonOptions.hpp>
 #include <ActsExamples/Utilities/Options.hpp>
 #include <ActsExamples/MagneticField/MagneticFieldOptions.hpp>
+#include <ActsExamples/TGeoDetector/JsonTGeoDetectorConfig.hpp>
+
+#include <Acts/Plugins/Json/JsonMaterialDecorator.hpp>
+#include <Acts/Plugins/Json/MaterialMapJsonConverter.hpp>
 
 #include <TGeoManager.h>
 #include <TMatrixT.h>
@@ -474,8 +477,8 @@ void MakeActsGeometry::buildActsSurfaces()
   // We replicate the relevant functionality of  
   //acts/Examples/Run/Common/src/GeometryExampleBase::ProcessGeometry() in MakeActsGeometry()
   // so we get access to the results. The layer builder magically gets the TGeoManager
-  
-  makeGeometry(argc, arg, m_detector);
+  ActsExamples::TGeoDetector detector;
+  makeGeometry(argc, arg, detector);
 
   for(int i=0; i<argc; i++)
     free(arg[i]);
@@ -523,7 +526,7 @@ void MakeActsGeometry::setMaterialResponseFile(std::string& responseFile,
 
 }
 void MakeActsGeometry::makeGeometry(int argc, char* argv[], 
-				    ActsExamples::IBaseDetector &detector)
+				    ActsExamples::TGeoDetector &detector)
 {
   
   /// setup and parse options
@@ -537,11 +540,15 @@ void MakeActsGeometry::makeGeometry(int argc, char* argv[],
   auto vm = ActsExamples::Options::parse(desc, argc, argv);
  
   /// The geometry, material and decoration
-  auto geometry = ActsExamples::Geometry::build(vm, detector);
+  /// We copy the top level functionality of CommonGeometry.cpp so that
+  /// we can customize the geometry building
+  auto geometry = build(vm, detector);
   /// Geometry is a pair of (tgeoTrackingGeometry, tgeoContextDecorators)
 
   m_tGeometry = geometry.first;
   m_contextDecorators = geometry.second;
+  if(!m_tGeometry)
+    std::cout << "no geometry built"<<std::endl;
   if(m_useField)
     { m_magneticField = ActsExamples::Options::readMagneticField(vm); }
   else
@@ -565,6 +572,60 @@ void MakeActsGeometry::makeGeometry(int argc, char* argv[],
   unpackVolumes();
   
   return;
+}
+
+
+std::pair<std::shared_ptr<const Acts::TrackingGeometry>,
+	  std::vector<std::shared_ptr<ActsExamples::IContextDecorator>>>
+  MakeActsGeometry::build(const boost::program_options::variables_map& vm,
+	ActsExamples::TGeoDetector& detector)
+ {
+   auto fileName = vm["mat-input-file"].template as<std::string>();
+   Acts::MaterialMapJsonConverter::Config jsonGeoConvConfig;
+   // Set up the json-based decorator
+   auto matDeco = std::make_shared<const Acts::JsonMaterialDecorator>(
+          jsonGeoConvConfig, fileName, Acts::Logging::INFO);
+ 
+   /// The following is the relevant functionality from 
+   /// TGeoDetector::finalize(vm, matDeco)
+   ActsExamples::TGeoDetector::Config config;
+
+   /// tell detector to build with sphenix detector element
+   //config.factory = 
+   const auto path = vm["geo-tgeo-jsonconfig"].template as<std::string>();
+   readTGeoLayerBuilderConfigs(path, config);
+ 
+  return detector.finalize(config, std::move(matDeco));
+
+ }
+
+ /// Read the TGeo layer builder configurations from the user configuration.
+void MakeActsGeometry::readTGeoLayerBuilderConfigs(
+  const std::string& path,
+  ActsExamples::TGeoDetector::Config& config) {
+  if (path.empty()) {
+    return;
+  }
+  nlohmann::json djson;
+  std::ifstream infile(path, std::ifstream::in | std::ifstream::binary);
+  infile >> djson;
+
+  config.unitScalor = djson["geo-tgeo-unit-scalor"];
+
+  config.buildBeamPipe = djson["geo-tgeo-build-beampipe"];
+  if (config.buildBeamPipe) {
+    const auto beamPipeParameters =
+        djson["geo-tgeo-beampipe-parameters"].get<std::array<double, 3>>();
+    config.beamPipeRadius = beamPipeParameters[0];
+    config.beamPipeHalflengthZ = beamPipeParameters[1];
+    config.beamPipeLayerThickness = beamPipeParameters[2];
+  }
+
+  // Fill nested volume configs
+  for (const auto& volume : djson["Volumes"]) {
+    auto& vol = config.volumes.emplace_back();
+    vol = volume;
+  }
 }
 
 void MakeActsGeometry::unpackVolumes()
