@@ -9,6 +9,8 @@
 
 #include <string>
 #include <map>
+#include <TFile.h>
+#include <TH2.h>
 
 class PHCompositeNode;
 class TrackSeedContainer;
@@ -106,6 +108,13 @@ class PHSiliconTpcTrackMatching : public SubsysReco, public PHParameterInterface
   double _y_search_win = 0.3;
   double _z_search_win = 0.4;
   
+  TFile* _file = nullptr;
+  TH2 *h_x = nullptr;
+  TH2 *h_y = nullptr;
+  TH2 *h_z = nullptr;
+  TH2 *h_phi = nullptr;
+  TH2 *h_eta = nullptr;
+
   TrackSeedContainer *_svtx_seed_map{nullptr};
   TrackSeedContainer *_track_map{nullptr};
   TrackSeedContainer *_track_map_silicon{nullptr};

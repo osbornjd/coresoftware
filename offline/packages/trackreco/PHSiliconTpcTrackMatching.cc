@@ -52,6 +52,14 @@ PHSiliconTpcTrackMatching::~PHSiliconTpcTrackMatching()
 //____________________________________________________________________________..
 int PHSiliconTpcTrackMatching::InitRun(PHCompositeNode *topNode)
 {
+  _file = new TFile(std::string(Name()).c_str(), 
+		    "RECREATE");
+  h_x = new TH2F("h_x",";p_{T} [GeV]; x_{sil}-x_{tpc} [cm]",40,0,20,10000,-10,10);
+  h_y = new TH2F("h_y",";p_{T} [GeV]; y_{sil}-y_{tpc} [cm]",40,0,20,10000,-10,10);
+  h_z = new TH2F("h_z",";p_{T} [GeV]; z_{sil}-z_{tpc} [cm]",40,0,20,10000,-10,10);
+  h_phi = new TH2F("h_phi",";p_{T} [GeV]; #phi_{sil}-#phi_{tpc} [rad]",40,0,20,1000,-1,1);
+  h_eta = new TH2F("h_eta",";p_{T} [GeV]; #eta_{sil}-#eta_{tpc} ",40,0,20,1000,-1,1);
+
   UpdateParametersWithMacro();
 
   // put these in the output file
@@ -151,6 +159,14 @@ int PHSiliconTpcTrackMatching::process_event(PHCompositeNode*)
   
 int PHSiliconTpcTrackMatching::End(PHCompositeNode* )
 {
+  _file->cd();
+  h_x->Write();
+  h_y->Write();
+  h_z->Write();
+  h_phi->Write();
+  h_eta->Write();
+  _file->Write();
+  _file->Close();
   return Fun4AllReturnCodes::EVENT_OK;
 }
 
@@ -292,6 +308,8 @@ void PHSiliconTpcTrackMatching::findEtaPhiMatches(
 
 	  bool eta_match = false;
 	  double si_eta = _tracklet_si->get_eta();
+	  h_eta->Fill(_tracklet_tpc->get_pt(), si_eta - tpc_eta);
+
 	  if(  fabs(tpc_eta - si_eta) < _eta_search_win * mag)  eta_match = true;
 	  if(!eta_match) continue;
 
@@ -299,7 +317,9 @@ void PHSiliconTpcTrackMatching::findEtaPhiMatches(
 	  double si_x = _tracklet_si->get_x();
 	  double si_y = _tracklet_si->get_y();
 	  double si_z = _tracklet_si->get_z();
-
+	  h_x->Fill(_tracklet_tpc->get_pt(), si_x - tpc_x);
+	  h_y->Fill(_tracklet_tpc->get_pt(), si_y - tpc_y);
+	  h_z->Fill(_tracklet_tpc->get_pt(), si_z - tpc_z);
 	  bool position_match = false;
 	  if(_pp_mode)
 	    {
@@ -319,11 +339,13 @@ void PHSiliconTpcTrackMatching::findEtaPhiMatches(
 		position_match = true;	    
 	    }
 	  
-	  if(!position_match)
-	    { continue; }
+	
 
 	  bool phi_match = false;
 	  double si_phi = _tracklet_si->get_phi(_cluster_map,_tGeometry);
+	  h_phi->Fill(_tracklet_tpc->get_pt(), si_phi - tpc_phi);
+	    if(!position_match)
+	    { continue; }
 	  if(  fabs(tpc_phi - si_phi)  < _phi_search_win * mag) phi_match = true;
 	  if(  fabs( fabs(tpc_phi - si_phi)  - 2.0 * M_PI)  < _phi_search_win * mag ) phi_match = true;
 	  if(!phi_match) continue;

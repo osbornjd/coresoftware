@@ -12,6 +12,8 @@
 #include <array>
 #include <string>
 #include <vector>
+#include <TFile.h>
+#include <TH2.h> 
 
 class ActsGeometry;
 class TrkrClusterContainer;
@@ -104,6 +106,10 @@ class PHMicromegasTpcTrackMatching : public SubsysReco
   //! true to printout actual residuals for testing
   bool _test_windows = false;   
   
+  TFile *_file = nullptr;
+  TH2 *h_rphi[2];
+  TH2 *h_z[2];
+
 };
 
 #endif // PHMICROMEGASTPCTRACKMATCHING_H

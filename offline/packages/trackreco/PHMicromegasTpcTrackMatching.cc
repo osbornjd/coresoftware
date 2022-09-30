@@ -114,6 +114,12 @@ PHMicromegasTpcTrackMatching::PHMicromegasTpcTrackMatching(const std::string &na
 //____________________________________________________________________________..
 int PHMicromegasTpcTrackMatching::InitRun(PHCompositeNode *topNode)
 {
+  _file = new TFile(std::string(Name()+ "tpcmm").c_str(), 
+		    "RECREATE");
+  h_rphi[0] = new TH2F("h_rphi0",";p_{T} [GeV]; r#phi_{tpot}-r#phi_{tpc} [cm]",40,0,20,1000,-1,1);
+  h_z[0] = new TH2F("h_z0",";p_{T} [GeV]; z_{tpot}-z_{tpc} [cm]", 40,0,20,1000,-1,1);
+  h_rphi[1] = new TH2F("h_rphi1",";p_{T} [GeV]; r#phi_{tpot}-r#phi_{tpc} [cm]",40,0,20,1000,-1,1);
+  h_z[1] = new TH2F("h_z1",";p_{T} [GeV]; z_{tpot}-z_{tpc} [cm]", 40,0,20,1000,-1,1);
 
   std::cout << std::endl << PHWHERE
 	    << " rphi_search_win inner layer " << _rphi_search_win[0]
@@ -361,6 +367,9 @@ int PHMicromegasTpcTrackMatching::process_event(PHCompositeNode* topNode)
         const double drphi = local_intersection_planar.x() - cluster->getLocalX();
         const double dz = local_intersection_planar.y() - cluster->getLocalY();
 
+
+	h_rphi[imm]->Fill(tracklet_tpc->get_pt(), drphi);
+	h_z[imm]->Fill(tracklet_tpc->get_pt(), dz);
         // compare to cuts and add to track if matching
         if( std::abs(drphi) < _rphi_search_win[imm] && std::abs(dz) < _z_search_win[imm] )
         {
@@ -414,7 +423,16 @@ int PHMicromegasTpcTrackMatching::process_event(PHCompositeNode* topNode)
 
 //_________________________________________________________________________________________________
 int PHMicromegasTpcTrackMatching::End(PHCompositeNode*)
-{ return Fun4AllReturnCodes::EVENT_OK; }
+{ 
+  _file->cd();
+  for(int i=0; i<2; i++){
+    h_rphi[i]->Write();
+    h_z[i]->Write();
+  }
+  _file->Write();
+  _file->Close();
+  return Fun4AllReturnCodes::EVENT_OK; 
+}
 
 //_________________________________________________________________________________________________
 int  PHMicromegasTpcTrackMatching::GetNodes(PHCompositeNode* topNode)
