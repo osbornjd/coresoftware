@@ -373,15 +373,15 @@ std::vector<const SpacePoint*> PHActsKDTreeSeeding::getMvtxSpacePoints()
 
 
 SpacePointPtr PHActsKDTreeSeeding::makeSpacePoint(const Surface& surf,
-						   const TrkrDefs::cluskey key,
-						   TrkrCluster* clus)
+						  const TrkrDefs::cluskey key,
+						  TrkrCluster* clus)
 {
   Acts::Vector2 localPos(clus->getLocalX() * Acts::UnitConstants::cm, 
 			 clus->getLocalY() * Acts::UnitConstants::cm);
-  Acts::Vector3 globalPos(0,0,0);
+
   Acts::Vector3 mom(1,1,1);
-  globalPos = surf->localToGlobal(m_tGeometry->geometry().getGeoContext(),
-				  localPos, mom);
+  Acts::Vector3 globalPos = surf->localToGlobal(m_tGeometry->geometry().getGeoContext(),
+  				  localPos, mom);
 
   Acts::SymMatrix2 localCov = Acts::SymMatrix2::Zero();
   if(m_clusterVersion==3)
@@ -539,7 +539,8 @@ Acts::SeedFinderOrthogonalConfig<SpacePoint> PHActsKDTreeSeeding::configureSeedF
   cfg.seedFilter =
       std::make_unique<Acts::SeedFilter<SpacePoint>>(
           Acts::SeedFilter<SpacePoint>(filterCfg));
-
+  
+  cfg.maxPtScattering = m_maxPtScattering;
   cfg.rMax = m_rMax;
   cfg.deltaRMinTopSP = m_deltaRMinTopSP;
   cfg.deltaRMaxTopSP = m_deltaRMaxTopSP;

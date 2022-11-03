@@ -37,6 +37,10 @@ class PHActsKDTreeSeeding : public SubsysReco
   
   void useTruthClusters(bool truth) { m_useTruthClusters = truth; }
   void set_cluster_version(int ver) { m_clusterVersion = ver; }
+  void uncFactor(float unc) { m_uncfactor = unc; } 
+  void sigmaScattering(float sig) { m_sigmaScattering = sig; }
+  void maxPtScattering(float pt) { m_maxPtScattering = pt; }
+
  private:
 
   Acts::SeedFinderOrthogonalConfig<SpacePoint> configureSeedFinder();
@@ -75,6 +79,8 @@ class PHActsKDTreeSeeding : public SubsysReco
   float m_zMin = -300. * Acts::UnitConstants::mm;
   float m_zMax = 300. * Acts::UnitConstants::mm;
 
+  float m_maxPtScattering = 10.;
+  
   /// max number of seeds a single middle sp can belong to
   float m_maxSeedsPerSpM = 1;
   float m_cotThetaMax = 2.9; 

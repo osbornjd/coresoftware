@@ -77,6 +77,10 @@ class PHActsSiliconSeeding : public SubsysReco
   {m_cotThetaMax = cotThetaMax;}
   void gridFactor(const float gridFactor)
   {m_gridFactor = gridFactor;}
+  void sigmaScattering(const float sigma)
+  { m_sigmaScattering = sigma; }
+  void maxPtScattering (const float pt)
+  { m_maxPtScattering = pt; }
 
   /// A function to run the seeder with large (true)
   /// or small (false) grid spacing
@@ -147,6 +151,8 @@ class PHActsSiliconSeeding : public SubsysReco
   /// MVTX can only have the middle layer be the middle hit
   int m_maxSeedsPerSpM = 1;
 
+  float m_sigmaScattering = 5.;
+  float m_maxPtScattering = 10 * Acts::UnitConstants::GeV;
   /// Limiting location of measurements (e.g. detector constraints)
   /// We limit to the MVTX
   float m_rMax = 200. * Acts::UnitConstants::mm;
