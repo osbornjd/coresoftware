@@ -126,6 +126,18 @@ int PHSiliconTpcTrackMatching::process_event(PHCompositeNode*)
       if(Verbosity() > 1) std::cout << "  combined seed id " << _svtx_seed_map->size()-1 << " si id " << si_id << " tpc id " << tpcid  << std::endl;
     }
 
+  for(unsigned int iter = 0; iter < _track_map->size(); ++iter)
+    {
+      /// Add the tpc only seed
+      if(tpc_matches.find(iter) == tpc_matches.end())
+	{
+	  auto svtxseed = std::make_unique<SvtxTrackSeed_v1>();
+	  svtxseed->set_silicon_seed_index(std::numeric_limits<unsigned int>::max());
+	  svtxseed->set_tpc_seed_index(iter);
+	  _svtx_seed_map->insert(svtxseed.get());
+	}
+    }
+
   /*
   // Future development: use the z-mismatch between the silicon and TPC tracklets to assign the crossing in case INTT clusters are missing
   // this will reuse some of the commented out methods at the end of this file

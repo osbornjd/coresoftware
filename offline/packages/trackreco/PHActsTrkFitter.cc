@@ -239,10 +239,8 @@ void PHActsTrkFitter::loopTracks(Acts::Logging::Level logLevel)
       std::cout << " seed map size " << m_seedMap->size() << std::endl;
     }
 
-  for(auto trackiter = m_seedMap->begin(); trackiter != m_seedMap->end();
-      ++trackiter)
+  for(auto track : *m_seedMap)
     {
-      TrackSeed *track = *trackiter;
       if(!track)
 	{ continue; }
       
@@ -257,46 +255,53 @@ void PHActsTrkFitter::loopTracks(Acts::Logging::Level logLevel)
       if(siid == std::numeric_limits<unsigned int>::max()) 
 	{
 	  if(Verbosity() > 1) std::cout << "SvtxSeedTrack has no silicon match, skip it" << std::endl;
-	  continue;
-	}
-
-      // get the crossing number
-      auto siseed = m_siliconSeeds->get(siid);
-      auto crossing = siseed->get_crossing();
-
-      // if the crossing was not determined, skip this case completely
-      if(crossing == SHRT_MAX) 
-	{
-	  // Skip this in the pp case. For AuAu it should not happen
-	  if(Verbosity() > 1) std::cout << "Crossing not determined, skipping track" << std::endl;
-	  continue;
+	  //continue;
 	}
 
       auto tpcseed = m_tpcSeeds->get(tpcid);
 
       /// Need to also check that the tpc seed wasn't removed by the ghost finder
       if(!tpcseed)
-	{ std::cout << "no tpc seed"<<std::endl; continue; }
+	{
+	  if(Verbosity() > 1) std::cout << "no tpc seed"<<std::endl; 
+	  continue; 
+	}
 
       if(Verbosity() > 0) 
 	{
-	  std::cout << " silicon seed position is (x,y,z) = " << siseed->get_x() << "  " << siseed->get_y() << "  " << siseed->get_z() << std::endl;
+	  //std::cout << " silicon seed position is (x,y,z) = " << siseed->get_x() << "  " << siseed->get_y() << "  " << siseed->get_z() << std::endl;
 	  std::cout << " tpc seed position is (x,y,z) = " << tpcseed->get_x() << "  " << tpcseed->get_y() << "  " << tpcseed->get_z() << std::endl;
 	}
+
       PHTimer trackTimer("TrackTimer");
       trackTimer.stop();
       trackTimer.restart();
       ActsExamples::MeasurementContainer measurements;
-  
-      auto sourceLinks = getSourceLinks(siseed, measurements, crossing);
-      const auto tpcSourceLinks = getSourceLinks(tpcseed, measurements, crossing);
-      sourceLinks.insert( sourceLinks.end(), tpcSourceLinks.begin(), tpcSourceLinks.end() );
+     
+      auto sourceLinks = getSourceLinks(tpcseed, measurements, 0);
+      SourceLinkVec extraSLs;
+      
+      auto siseed = m_siliconSeeds->get(siid);
+      if(siseed)
+	{
+	  auto crossing = siseed->get_crossing();
+   
+	  extraSLs = getSourceLinks(siseed, measurements, crossing);
+	}
+      
+      sourceLinks.insert(sourceLinks.end(), extraSLs.begin(), extraSLs.end());
 
       // position comes from the silicon seed
-      Acts::Vector3 position(0,0,0);
-      position(0) = siseed->get_x() * Acts::UnitConstants::cm;
-      position(1) = siseed->get_y() * Acts::UnitConstants::cm;
-      position(2) = siseed->get_z() * Acts::UnitConstants::cm;
+      Acts::Vector3 position(tpcseed->get_x() * Acts::UnitConstants::cm,
+			     tpcseed->get_y() * Acts::UnitConstants::cm,
+			     tpcseed->get_z() * Acts::UnitConstants::cm);
+      if(siseed)
+	{
+	  position(0) = siseed->get_x() * Acts::UnitConstants::cm;
+	  position(1) = siseed->get_y() * Acts::UnitConstants::cm;
+	  position(2) = siseed->get_z() * Acts::UnitConstants::cm;
+	}
+      
       if( !is_valid( position ) ) continue;
 
       if(sourceLinks.empty()) { continue; }
@@ -396,6 +401,9 @@ void PHActsTrkFitter::loopTracks(Acts::Logging::Level logLevel)
 	  
         SvtxTrack_v4 newTrack;
         newTrack.set_tpc_seed(tpcseed);
+	int crossing = 0;
+	if(siseed)
+	  crossing = siseed->get_crossing();
         newTrack.set_crossing(crossing);
         newTrack.set_silicon_seed(siseed);
         

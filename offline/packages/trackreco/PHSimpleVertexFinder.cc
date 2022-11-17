@@ -352,7 +352,7 @@ void PHSimpleVertexFinder::findDcaTwoTracks(SvtxTrack *tr1, SvtxTrack *tr2)
   Eigen::Vector3d PCA1(0,0,0);
   Eigen::Vector3d PCA2(0,0,0);  
   double dca = dcaTwoLines(a1, b1, a2,  b2, PCA1, PCA2);
-
+  std::cout << "dca and pcas " << dca << ", " << PCA1.x() << ", " << PCA1.y() << std::endl;
   // check dca cut is satisfied, and that PCA is close to beam line
   if( fabs(dca) < _dcacut && (fabs(PCA1.x()) < _beamline_xy_cut && fabs(PCA1.y()) < _beamline_xy_cut) )
     {
