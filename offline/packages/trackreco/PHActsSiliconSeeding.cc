@@ -722,10 +722,14 @@ Acts::SeedFinderConfig<SpacePoint> PHActsSiliconSeeding::configureSeeder()
   config.cotThetaMax = m_cotThetaMax;
   config.minPt = m_minSeedPt;
   config.bFieldInZ = m_bField;
-
+  config.maxPtScattering = m_maxPtScattering;
+  config.sigmaError = m_sigmaError;
   /// Average radiation length traversed per seed
   config.radLengthPerSeed = 0.05;
-
+  
+  config.zAlign = m_zalign;
+  config.rAlign = m_ralign;
+  config.toleranceParam = m_tolerance;
   /// Maximum impact parameter must be smaller than rMin
   config.impactMax = m_impactMax;
 
