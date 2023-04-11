@@ -140,8 +140,6 @@ int PHActsTrackProjection::projectTracks(const int caloLayer)
   return Fun4AllReturnCodes::EVENT_OK;
 }
 
-
-
 void PHActsTrackProjection::updateSvtxTrack(
     const ActsPropagator::BoundTrackParamPair& parameters,
     SvtxTrack* svtxTrack,
