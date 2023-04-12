@@ -49,6 +49,7 @@ PHActsSiliconSeeding::PHActsSiliconSeeding(const std::string& name)
 int PHActsSiliconSeeding::Init(PHCompositeNode */*topNode*/)
 {
   m_seedFinderCfg = configureSeeder();
+    
   m_gridCfg = configureSPGrid();
   Acts::SeedFilterConfig sfCfg = configureSeedFilter();
 
@@ -165,15 +166,17 @@ int PHActsSiliconSeeding::End(PHCompositeNode */*topNode*/)
 
 GridSeeds PHActsSiliconSeeding::runSeeder(std::vector<const SpacePoint*>& spVec)
 {
-  
+ 
   Acts::SeedFinder<SpacePoint> seedFinder(m_seedFinderCfg);
   
   /// Covariance converter functor needed by seed finder
   auto covConverter = 
-    [=](const SpacePoint& sp, float, float, float)
+    [=](const SpacePoint& sp, float zAlign, float rAlign, float sigmaError)
     -> std::pair<Acts::Vector3, Acts::Vector2> { 
        Acts::Vector3 position{sp.x(), sp.y(), sp.z()};
-       Acts::Vector2 cov{sp.m_varianceR, sp.m_varianceZ};
+       Acts::Vector2 cov;
+       cov[0] = (sp.m_varianceR + rAlign*rAlign) * sigmaError;
+       cov[1] = (sp.m_varianceZ + zAlign*zAlign) * sigmaError;
        return std::make_pair(position, cov);
   };
 
@@ -206,16 +209,16 @@ GridSeeds PHActsSiliconSeeding::runSeeder(std::vector<const SpacePoint*>& spVec)
   SeedContainer seeds;
   seeds.clear();
   decltype(seedFinder)::SeedingState state;
-
+  int iterr = 0;
   for(; !(groupIt == endGroup); ++groupIt)
     {
-    
+      std::cout << "iter is " << iterr << std::endl;
       seedFinder.createSeedsForGroup(state, std::back_inserter(seeds),
 				     groupIt.bottom(),
 				     groupIt.middle(),
 				     groupIt.top(),
 				     rMiddleSPRange);
-
+      iterr++;
     }
   
   seedVector.push_back(seeds);
@@ -722,17 +725,18 @@ Acts::SeedFinderConfig<SpacePoint> PHActsSiliconSeeding::configureSeeder()
   config.cotThetaMax = m_cotThetaMax;
   config.minPt = m_minSeedPt;
   config.bFieldInZ = m_bField;
-  config.maxPtScattering = m_maxPtScattering;
-  config.sigmaError = m_sigmaError;
+  
   /// Average radiation length traversed per seed
   config.radLengthPerSeed = 0.05;
   
   config.zAlign = m_zalign;
   config.rAlign = m_ralign;
   config.toleranceParam = m_tolerance;
+  config.maxPtScattering = m_maxPtScattering;
+  config.sigmaError = m_sigmaError;
+
   /// Maximum impact parameter must be smaller than rMin
   config.impactMax = m_impactMax;
-
   return config;
 }
 
