@@ -209,16 +209,14 @@ GridSeeds PHActsSiliconSeeding::runSeeder(std::vector<const SpacePoint*>& spVec)
   SeedContainer seeds;
   seeds.clear();
   decltype(seedFinder)::SeedingState state;
-  int iterr = 0;
+ 
   for(; !(groupIt == endGroup); ++groupIt)
     {
-      std::cout << "iter is " << iterr << std::endl;
       seedFinder.createSeedsForGroup(state, std::back_inserter(seeds),
 				     groupIt.bottom(),
 				     groupIt.middle(),
 				     groupIt.top(),
 				     rMiddleSPRange);
-      iterr++;
     }
   
   seedVector.push_back(seeds);
@@ -737,6 +735,8 @@ Acts::SeedFinderConfig<SpacePoint> PHActsSiliconSeeding::configureSeeder()
 
   /// Maximum impact parameter must be smaller than rMin
   config.impactMax = m_impactMax;
+
+  config.helixcut = m_helixcut;
   return config;
 }
 

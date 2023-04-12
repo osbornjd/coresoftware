@@ -95,6 +95,9 @@ class PHActsSiliconSeeding : public SubsysReco
   { m_ralign = r; }
   void tolerance(const float tolerance)
   { m_tolerance = tolerance; }
+  void helixcut(const float cut)
+  { m_helixcut = cut; }
+  
   /// A function to run the seeder with large (true)
   /// or small (false) grid spacing
   void largeGridSpacing(const bool spacing);
@@ -164,6 +167,7 @@ class PHActsSiliconSeeding : public SubsysReco
   /// MVTX can only have the middle layer be the middle hit
   int m_maxSeedsPerSpM = 1;
 
+  float m_helixcut = 1;
   float m_tolerance = 1.1 * Acts::UnitConstants::mm;
   float m_ralign = 0;
   float m_zalign = 0;
