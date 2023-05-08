@@ -29,7 +29,8 @@
 #include <phool/getClass.h>
 
 #include <TF1.h>
-
+#include <TFile.h>
+#include <TH2.h>
 #include <climits>                            // for UINT_MAX
 #include <iostream>                            // for operator<<, basic_ostream
 #include <cmath>                              // for fabs, sqrt
@@ -59,6 +60,10 @@ int HelicalFitter::InitRun(PHCompositeNode *topNode)
 {
   UpdateParametersWithMacro();
 
+  thefile = new TFile("helicalfitter.root","recreate");
+  h_xresiduals = new TH2F("xresiduals",";x residual;layer",1000,-1,1,60,0,60);
+  h_zresiduals = new TH2F("zresiduals",";z residual;layer",1000,-1,1,60,0,60);
+  
    int ret = GetNodes(topNode);
   if (ret != Fun4AllReturnCodes::EVENT_OK) return ret;
 
@@ -185,6 +190,9 @@ int HelicalFitter::process_event(PHCompositeNode*)
 	  Acts::Vector2 residual(xloc - fitpoint_local(0), zloc - fitpoint_local(1)); 
 
 	  unsigned int layer = TrkrDefs::getLayer(cluskey_vec[ivec]);	  
+
+	  h_xresiduals->Fill(residual(0)*10., layer);
+	  h_zresiduals->Fill(residual(1)*10., layer);
 	  float phi =  atan2(global(1), global(0));
 	  float beta =  atan2(global(2), sqrt(pow(global(0),2) + pow(global(1),2)));
 	    
@@ -413,6 +421,10 @@ std::pair<Acts::Vector3, Acts::Vector3> HelicalFitter::get_helix_tangent(const s
   
 int HelicalFitter::End(PHCompositeNode* )
 {
+  thefile->cd();
+  h_xresiduals->Write();
+  h_zresiduals->Write();
+  thefile->Close();
   // closes output file in destructor
   delete _mille;
 

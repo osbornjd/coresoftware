@@ -23,6 +23,9 @@ class TF1;
 class TpcDistortionCorrectionContainer;
 class Mille;
 class SvtxTrackSeed;
+class TH1;
+class TH2;
+class TFile;
 
 enum siliconGrp {snsr, stv, brrl};
 enum tpcGrp {htst, sctr, tp};
@@ -75,7 +78,9 @@ class HelicalFitter : public SubsysReco, public PHParameterInterface
   unsigned int addSiliconClusters(std::vector<float>& fitpars, std::vector<Acts::Vector3>& global_vec,  std::vector<TrkrDefs::cluskey>& cluskey_vec);
 
  private:
-
+  TFile *thefile = nullptr;
+  TH2 *h_xresiduals = nullptr;
+  TH2 *h_zresiduals = nullptr;
   Mille* _mille;
 
   int GetNodes(PHCompositeNode* topNode);
