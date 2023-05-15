@@ -320,7 +320,7 @@ void MakeMilleFiles::addTrackToMilleFile(SvtxAlignmentStateMap::StateVec stateve
       {
         if (Verbosity() > 3)
         {
-          std::cout << "ckey " << ckey << " and layer " << layer << " buffers:" << std::endl;
+          std::cout << "ckey " << ckey << " and layer " << layer << " and hitsetkey " << (uint32_t) TrkrDefs::getHitSetKeyFromClusKey(ckey) << " buffers:" << std::endl;
           AlignmentDefs::printBuffers(i, residual, clus_sigma, lcl_derivative, glbl_derivative, glbl_label);
         }
         float errinf = 1.0;
