@@ -282,7 +282,7 @@ int HelicalFitter::process_event(PHCompositeNode*)
 	  // provides output that can be grep'ed to make plots of input to mille
 	  if(Verbosity() > 1)
 	    {
-	      if(layer < 7)
+	      //if(layer < 7)
 		{
 		  // radius = fitpars[0],  X0 = fitpars[1],  Y0 = fitpars[2], zslope = fitpars[3], Z0  = fitpars[4] 
 		  std::cout << "Local residualsX: layer " << layer << " phi " << phi * 180 / M_PI << " beta " << beta * 180.90 / M_PI
@@ -319,7 +319,7 @@ int HelicalFitter::process_event(PHCompositeNode*)
 	  // provides output that can be grep'ed to make plots of input to mille
 	  if(Verbosity() > 1)
 	    {
-	      if(layer < 7)
+	      //if(layer < 7)
 		{
 		  std::cout << "Local residualsY: layer " << layer << " phi " << phi * 180 / M_PI << " beta " << beta * 180.90 / M_PI
 			    << " dzloc " << residual(1) << " error " << clus_sigma(1) << " inflation_factor " << errinf
@@ -351,7 +351,7 @@ int HelicalFitter::process_event(PHCompositeNode*)
 	      _mille->mille(AlignmentDefs::NLC, lcl_derivativeY, AlignmentDefs::NGL, glbl_derivativeY, glbl_label, residual(1), errinf*clus_sigma(1));
 	    }
 	}
-
+      tottracks++;
       // close out this track
       _mille->end();
       
@@ -468,7 +468,7 @@ std::pair<Acts::Vector3, Acts::Vector3> HelicalFitter::get_helix_tangent(const s
   
 int HelicalFitter::End(PHCompositeNode* )
 {
-
+  std::cout << "Tot tracks is " << tottracks<<std::endl;
   _file->cd();
   _residuallayerx->Write();
   _residuallayerz->Write();

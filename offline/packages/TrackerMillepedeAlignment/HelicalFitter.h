@@ -149,7 +149,7 @@ class HelicalFitter : public SubsysReco, public PHParameterInterface
 
   float dca_cut = 0.1;  // 1 mm
   float _error_inflation[4] = {1,1,1,1};
-
+  int tottracks = 0;
   std::string _field;
   int _fieldDir = -1;
   std::map<unsigned int, float> _layerMisalignment;

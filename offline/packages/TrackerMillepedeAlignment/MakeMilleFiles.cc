@@ -125,7 +125,7 @@ int MakeMilleFiles::process_event(PHCompositeNode* /*topNode*/)
     // Maybe set a lower pT limit - low pT tracks are not very sensitive to alignment
 
     addTrackToMilleFile(statevec);
-
+    tottracks++;
     /// Finish this track
     _mille->end();
   }
@@ -141,7 +141,7 @@ int MakeMilleFiles::process_event(PHCompositeNode* /*topNode*/)
 int MakeMilleFiles::End(PHCompositeNode*)
 {
   delete _mille;
-
+  std::cout << "Tot tracks added " << tottracks << std::endl;
   return Fun4AllReturnCodes::EVENT_OK;
 }
 
@@ -236,8 +236,8 @@ void MakeMilleFiles::addTrackToMilleFile(SvtxAlignmentStateMap::StateVec stateve
       auto para_errors = _ClusErrPara.get_clusterv5_modified_error(clusterv5, clusRadius, ckey);
       double phierror = sqrt(para_errors.first);
       double zerror = sqrt(para_errors.second);
-      clus_sigma(1) = zerror;
-      clus_sigma(0) = phierror;
+      clus_sigma(1) = zerror * Acts::UnitConstants::cm;
+      clus_sigma(0) = phierror * Acts::UnitConstants::cm;
     }
 
     if (std::isnan(clus_sigma(0)) ||
