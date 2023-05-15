@@ -29,7 +29,8 @@
 #include <phool/getClass.h>
 
 #include <TF1.h>
-
+#include <TFile.h>
+#include <TH2.h>
 #include <climits>                            // for UINT_MAX
 #include <iostream>                            // for operator<<, basic_ostream
 #include <cmath>                              // for fabs, sqrt
@@ -76,6 +77,16 @@ int HelicalFitter::InitRun(PHCompositeNode *topNode)
   std::ofstream steering_file(steering_outfilename);
   steering_file << data_outfilename << std::endl;
   steering_file.close();
+
+  _file = new TFile(TString(Name() + "_hf.root"),"recreate");
+  _residuallayerx = new TH2F("residuallayerx",";x residual [mm]; layer",
+			     1000,-1,1,60,0,60);
+  _residuallayerz = new TH2F("residuallayerz",";z residual [mm]; layer",
+			     1000,-1,1,60,0,60);
+  _residuallayerxpull = new TH2F("residuallayerxpull",";x residual pull; layer",
+				 1000,-10, 10,60,0,60);
+  _residuallayerzpull = new TH2F("residuallayerzpull",";z residual pull; layer",
+				 1000,-10, 10,60,0,60);
 
   // print grouping setup to log file:
   std::cout << "MakeMilleFiles::InitRun: Surface groupings are silicon " << si_grp << " tpc " << tpc_grp << " mms " << mms_grp << std::endl; 
@@ -187,7 +198,12 @@ int HelicalFitter::process_event(PHCompositeNode*)
 	  unsigned int layer = TrkrDefs::getLayer(cluskey_vec[ivec]);	  
 	  float phi =  atan2(global(1), global(0));
 	  float beta =  atan2(global(2), sqrt(pow(global(0),2) + pow(global(1),2)));
-	    
+	  _residuallayerx->Fill(residual(0) * 10. , layer);
+	  _residuallayerz->Fill(residual(1)*10., layer);
+	  _residuallayerxpull->Fill(residual(0) / cluster->getRPhiError(),
+				    layer);
+	  _residuallayerzpull->Fill(residual(1) / cluster->getZError(), layer);
+
 	  if(Verbosity() > 1) {
 	  Acts::Vector3 loc_check =  surf->transform(_tGeometry->geometry().getGeoContext()).inverse() * (global *  Acts::UnitConstants::cm);
 	  loc_check /= Acts::UnitConstants::cm;
@@ -294,6 +310,9 @@ int HelicalFitter::process_event(PHCompositeNode*)
     
 	  if( !isnan(residual(0)) && clus_sigma(0) < 1.0)  // discards crazy clusters
 	    { 
+	      std::cout << "ckey " << cluskey << " and layer " << layer << " and hitsetkey " << (uint32_t)TrkrDefs::getHitSetKeyFromClusKey(cluskey) << " buffers:" << std::endl;
+          AlignmentDefs::printBuffers(0, residual, clus_sigma, lcl_derivativeX, glbl_derivativeX, glbl_label);
+
 	      _mille->mille(AlignmentDefs::NLC, lcl_derivativeX, AlignmentDefs::NGL, glbl_derivativeX, glbl_label, residual(0), errinf*clus_sigma(0));
 	    }
 	  
@@ -327,6 +346,8 @@ int HelicalFitter::process_event(PHCompositeNode*)
 
 	  if(!isnan(residual(1)) && clus_sigma(1) < 1.0 && trkrid != TrkrDefs::inttId)
 	    {
+	      std::cout << "ckey " << cluskey << " and layer " << layer << " buffers:" << std::endl;
+          AlignmentDefs::printBuffers(1, residual, clus_sigma, lcl_derivativeY, glbl_derivativeY, glbl_label);
 	      _mille->mille(AlignmentDefs::NLC, lcl_derivativeY, AlignmentDefs::NGL, glbl_derivativeY, glbl_label, residual(1), errinf*clus_sigma(1));
 	    }
 	}
@@ -447,6 +468,14 @@ std::pair<Acts::Vector3, Acts::Vector3> HelicalFitter::get_helix_tangent(const s
   
 int HelicalFitter::End(PHCompositeNode* )
 {
+
+  _file->cd();
+  _residuallayerx->Write();
+  _residuallayerz->Write();
+  _residuallayerxpull->Write();
+  _residuallayerzpull->Write();
+  _file->Close();
+
   // closes output file in destructor
   delete _mille;
 

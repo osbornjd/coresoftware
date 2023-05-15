@@ -25,7 +25,9 @@ class TF1;
 class TpcDistortionCorrectionContainer;
 class Mille;
 class SvtxTrackSeed;
-
+class TFile;
+class TH1;
+class TH2;
 class HelicalFitter : public SubsysReco, public PHParameterInterface
 {
  public:
@@ -80,7 +82,8 @@ class HelicalFitter : public SubsysReco, public PHParameterInterface
  private:
 
   Mille* _mille;
-
+  TFile *_file;
+  TH2 *_residuallayerx, *_residuallayerz, *_residuallayerxpull, *_residuallayerzpull;
   int GetNodes(PHCompositeNode* topNode);
 
   void getTrackletClusterList(TrackSeed *tracklet, std::vector<TrkrDefs::cluskey>& cluskey_vec);
@@ -145,6 +148,7 @@ class HelicalFitter : public SubsysReco, public PHParameterInterface
   bool fitfulltrack = false;
 
   float dca_cut = 0.1;  // 1 mm
+  float _error_inflation[4] = {1,1,1,1};
 
   std::string _field;
   int _fieldDir = -1;
