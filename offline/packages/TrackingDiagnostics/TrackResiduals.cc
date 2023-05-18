@@ -80,6 +80,7 @@ int TrackResiduals::InitRun(PHCompositeNode*)
 }
 void TrackResiduals::clearClusterStateVectors()
 {
+
   m_statelxglobderivdx.clear();
   m_statelxglobderivdy.clear();
   m_statelxglobderivdz.clear();
@@ -105,6 +106,8 @@ void TrackResiduals::clearClusterStateVectors()
   m_statelzlocderivphi.clear();
   m_statelzlocderivtheta.clear();
   m_statelzlocderivqop.clear();
+
+  m_clushitsetkey.clear();
 
   m_cluslx.clear();
   m_cluslz.clear();
@@ -244,6 +247,7 @@ int TrackResiduals::process_event(PHCompositeNode* topNode)
       //! have cluster and state, fill vectors
       m_cluslx.push_back(cluster->getLocalX());
       float clusz = cluster->getLocalY();
+
       if (TrkrDefs::getTrkrId(ckey) == TrkrDefs::TrkrId::tpcId)
       {
         clusz = convertTimeToZ(geometry, ckey, cluster);
@@ -256,6 +260,7 @@ int TrackResiduals::process_event(PHCompositeNode* topNode)
       m_clusgz.push_back(clusglob.z());
       m_cluslayer.push_back(TrkrDefs::getLayer(ckey));
       m_clussize.push_back(cluster->getPhiSize() + cluster->getZSize());
+      m_clushitsetkey.push_back(TrkrDefs::getHitSetKeyFromClusKey(ckey));
 
       if (Verbosity() > 1)
       {
@@ -406,6 +411,7 @@ void TrackResiduals::createBranches()
   m_tree->Branch("clusgz", &m_clusgz);
   m_tree->Branch("cluslayer", &m_cluslayer);
   m_tree->Branch("clussize", &m_clussize);
+  m_tree->Branch("clushitsetkey",&m_clushitsetkey);
 
   m_tree->Branch("statelx", &m_statelx);
   m_tree->Branch("statelz", &m_statelz);

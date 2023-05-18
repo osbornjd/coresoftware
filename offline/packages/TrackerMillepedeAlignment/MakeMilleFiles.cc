@@ -8,13 +8,12 @@
 #include <trackbase/TrkrCluster.h>
 #include <trackbase/TrkrClusterContainer.h>
 #include <trackbase/TrkrDefs.h>
+#include <trackbase/TpcDefs.h>  // for side
 
 #include <trackbase_historic/ActsTransformations.h>
 #include <trackbase_historic/SvtxAlignmentState.h>
 #include <trackbase_historic/SvtxTrack.h>
 #include <trackbase_historic/SvtxTrackMap.h>
-
-#include <trackbase/TpcDefs.h>  // for side
 
 #include <g4detectors/PHG4TpcCylinderGeom.h>
 #include <g4detectors/PHG4TpcCylinderGeomContainer.h>
@@ -126,7 +125,7 @@ int MakeMilleFiles::process_event(PHCompositeNode* /*topNode*/)
     // Maybe set a lower pT limit - low pT tracks are not very sensitive to alignment
 
     addTrackToMilleFile(statevec);
-
+    tottracks++;
     /// Finish this track
     _mille->end();
   }
@@ -142,7 +141,7 @@ int MakeMilleFiles::process_event(PHCompositeNode* /*topNode*/)
 int MakeMilleFiles::End(PHCompositeNode*)
 {
   delete _mille;
-
+  std::cout << "Tot tracks added " << tottracks << std::endl;
   return Fun4AllReturnCodes::EVENT_OK;
 }
 
@@ -281,6 +280,15 @@ void MakeMilleFiles::addTrackToMilleFile(SvtxAlignmentStateMap::StateVec stateve
         {
           glbl_derivative[j] = 0.0;
         }
+	if(TrkrDefs::getTrkrId(ckey) == TrkrDefs::tpcId)
+	  {
+	    auto sector = TpcDefs::getSectorId(ckey);
+	    auto side = TpcDefs::getSide(ckey);
+	    if(is_tpc_sector_fixed(layer, sector, side))
+	      {
+		glbl_derivative[j] = 0.0;
+	      }
+	  }
       }
 
       float lcl_derivative[SvtxAlignmentState::NLOC];
@@ -312,7 +320,7 @@ void MakeMilleFiles::addTrackToMilleFile(SvtxAlignmentStateMap::StateVec stateve
       {
         if (Verbosity() > 3)
         {
-          std::cout << "ckey " << ckey << " and layer " << layer << " buffers:" << std::endl;
+          std::cout << "ckey " << ckey << " and layer " << layer << " and hitsetkey " << (uint32_t) TrkrDefs::getHitSetKeyFromClusKey(ckey) << " buffers:" << std::endl;
           AlignmentDefs::printBuffers(i, residual, clus_sigma, lcl_derivative, glbl_derivative, glbl_label);
         }
         float errinf = 1.0;
@@ -367,3 +375,14 @@ void MakeMilleFiles::set_layer_param_fixed(unsigned int layer, unsigned int para
   std::pair<unsigned int, unsigned int> pair = std::make_pair(layer, param);
   fixed_layer_params.insert(pair);
 }
+bool MakeMilleFiles::is_tpc_sector_fixed(unsigned int layer, unsigned int sector, unsigned int side)
+ {
+   bool ret = false;
+   unsigned int region = AlignmentDefs::getTpcRegion(layer);
+   unsigned int subsector = region * 24 + side * 12 + sector;
+   auto it = fixed_sectors.find(subsector);
+   if(it != fixed_sectors.end()) 
+     ret = true;
+  
+   return ret;
+ }
