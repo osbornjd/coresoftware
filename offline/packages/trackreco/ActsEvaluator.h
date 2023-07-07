@@ -59,7 +59,7 @@ class ActsEvaluator
                      const ActsTrackFittingAlgorithm::MeasurementContainer& measurements);
   void End();
   void setEvalCKF(bool evalCKF) { m_evalCKF = evalCKF; }
-  void verbosity(int verb) { m_verbosity = verb; }
+  void verbosity(int verb) { m_verbosity = verb+5; }
   void next_event(PHCompositeNode* topNode);
 
   /// Function to evaluate Trajectories fit results from the KF
@@ -110,7 +110,8 @@ class ActsEvaluator
   TTree* m_trackTree{nullptr};
 
   /// Acts tree values
-  int m_eventNr{0};
+  /// Start -1 so that it incremets to 0 on the first event
+  int m_eventNr{-1};
   int m_trajNr{0};
   int m_trackNr{0};
 
@@ -166,6 +167,7 @@ class ActsEvaluator
   std::vector<float> m_pull_x_hit;  /// hit pull x
   std::vector<float> m_pull_y_hit;  /// hit pull y
   std::vector<int> m_dim_hit;       /// dimension of measurement
+  std::vector<int> m_state_type;    /// type of state as ided by Acts
 
   bool m_hasFittedParams{false};  /// if the track has fitted parameter
   float m_eLOC0_fit{NAN};         /// fitted parameter eLOC_0
@@ -229,6 +231,8 @@ class ActsEvaluator
   std::vector<float> m_pz_prt;           /// predicted momentum pz
   std::vector<float> m_eta_prt;          /// predicted momentum eta
   std::vector<float> m_pT_prt;           /// predicted momentum pT
+  std::vector<float> m_residual_prt;
+  std::vector<float> m_chi2_prt;
 
   int m_nFiltered{0};                    /// number of states with filtered parameter
   std::vector<bool> m_flt;               /// filtered status
@@ -265,6 +269,8 @@ class ActsEvaluator
   std::vector<float> m_eta_flt;          /// filtered momentum eta
   std::vector<float> m_pT_flt;           /// filtered momentum pT
   std::vector<float> m_chi2;             /// chisq from filtering
+  std::vector<float> m_residual_flt;
+  std::vector<float> m_chi2_flt;
 
   int m_nSmoothed{0};                    /// number of states with smoothed parameter
   std::vector<bool> m_smt;               /// smoothed status
@@ -300,6 +306,8 @@ class ActsEvaluator
   std::vector<float> m_pz_smt;           /// smoothed momentum pz
   std::vector<float> m_eta_smt;          /// smoothed momentum eta
   std::vector<float> m_pT_smt;           /// smoothed momentum pT
+  std::vector<float> m_residual_smt;
+  std::vector<float> m_chi2_smt;
 
   float m_protoTrackPx{NAN};   /// Proto track px
   float m_protoTrackPy{NAN};   /// Proto track py

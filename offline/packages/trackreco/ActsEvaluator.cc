@@ -150,11 +150,13 @@ void ActsEvaluator::evaluateTrackFit(const Trajectory& traj,
   if (m_verbosity > 1)
   {
     std::cout << "Analyzing SvtxTrack " << iTrack << std::endl;
-
-    std::cout << "TruthParticle : " << g4particle->get_px()
-              << ", " << g4particle->get_py() << ", "
-              << g4particle->get_pz() << ", " << g4particle->get_e()
-              << std::endl;
+    if(g4particle)
+      {
+	std::cout << "TruthParticle : " << g4particle->get_px()
+		  << ", " << g4particle->get_py() << ", "
+		  << g4particle->get_pz() << ", " << g4particle->get_e()
+		  << std::endl;
+      }
   }
 
   m_trackNr = iTrack;
@@ -228,18 +230,36 @@ void ActsEvaluator::visitTrackStates(const Acts::MultiTrajectory<Acts::VectorMul
 {
   if (m_verbosity > 2)
   {
-    std::cout << "Begin visit track states" << std::endl;
+    std::cout << "Begin visit track states at track tip " <<trackTip << std::endl;
   }
 
   traj.visitBackwards(trackTip, [&](const auto& state)
                       {
-    /// Only fill the track states with non-outlier measurement
-    auto typeFlags = state.typeFlags();
-    if (not typeFlags.test(Acts::TrackStateFlag::MeasurementFlag))
-    {
-      return true;
-    }
 
+    auto typeFlags = state.typeFlags();
+    bool fitflag = false;
+    if(!state.hasUncalibrated())
+      {
+	return true;
+      }
+    Acts::TrackStateFlag theflag;
+    for(auto flag : {Acts::TrackStateFlag::MeasurementFlag,
+	  Acts::TrackStateFlag::OutlierFlag,
+	  Acts::TrackStateFlag::HoleFlag,
+	  Acts::TrackStateFlag::SharedHitFlag})
+      {
+	if(typeFlags.test(flag))
+	  {
+	    fitflag = true;
+	    theflag = flag;
+	  }
+      }
+    if(!fitflag)
+      {
+	return true; 
+      }
+    
+    m_state_type.push_back(theflag);
     const auto& surface = state.referenceSurface();
 
     /// Get the geometry ID
@@ -254,11 +274,15 @@ void ActsEvaluator::visitTrackStates(const Acts::MultiTrajectory<Acts::VectorMul
 		<< " : " << geoID.layer() << " : " 
 		<< geoID.sensitive() << std::endl;
       }
-    const auto& sourceLink = static_cast<const SourceLink&>(state.uncalibrated());
-    const auto& cluskey = sourceLink.cluskey();
-        
-    Acts::Vector2 local = Acts::Vector2::Zero();
+    
    
+    const auto& sourceLink = static_cast<const SourceLink&>(state.uncalibrated());
+    std::cout << "could get meas"<<std::endl;
+    const auto& cluskey = sourceLink.cluskey();
+    std::cout <<"ckey"<<std::endl;
+    Acts::Vector2 local = Acts::Vector2::Zero();
+    auto index = sourceLink.index();
+    std::cout << "measurement size " << measurements.size() << " and index to access " << (unsigned int) index << std::endl;
     /// get the local measurement that acts used
     std::visit([&](const auto& meas) {
 	local(0) = meas.parameters()[0];
@@ -286,7 +310,7 @@ void ActsEvaluator::visitTrackStates(const Acts::MultiTrajectory<Acts::VectorMul
     /// Get the truth hit corresponding to this trackState
     /// We go backwards from hitID -> TrkrDefs::cluskey to g4hit with
     /// the map created in PHActsSourceLinks
-    float gt = -9999;
+    float gt = NAN;
     Acts::Vector3 globalTruthPos = getGlobalTruthHit(cluskey, gt);
     float gx = globalTruthPos(0);
     float gy = globalTruthPos(1);
@@ -329,8 +353,8 @@ void ActsEvaluator::visitTrackStates(const Acts::MultiTrajectory<Acts::VectorMul
       }
     else
       {
-	truthLOC0 = -9999.;
-	truthLOC1 = -9999.;
+	truthLOC0 = NAN;
+	truthLOC1 = NAN;
       }
 
     truthPHI = phi(globalTruthUnitDir);
@@ -355,6 +379,43 @@ void ActsEvaluator::visitTrackStates(const Acts::MultiTrajectory<Acts::VectorMul
       
       auto parameters = state.predicted();
       auto covariance = state.predictedCovariance();
+      if(state.hasCalibrated())
+	{
+	  auto fullCalibrated = state
+	    .template calibrated<Acts::MultiTrajectoryTraits::MeasurementSizeMax>().data();
+	  auto fullCalibratedCovariance = state
+	    .template calibratedCovariance<Acts::MultiTrajectoryTraits::MeasurementSizeMax>().data();
+	  
+	  double chi2 = Acts::visit_measurement(state.calibratedSize(), [&](auto N) -> double {
+	      constexpr size_t kMeasurementSize = decltype(N)::value;
+	      typename Acts::TrackStateTraits<kMeasurementSize, true>::Measurement calibrated{
+		fullCalibrated};
+	      
+	      typename Acts::TrackStateTraits<kMeasurementSize, true>::MeasurementCovariance
+		calibratedCovariance{fullCalibratedCovariance};
+	      
+	      using ParametersVector = Acts::ActsVector<kMeasurementSize>;
+	      const auto H = state.projector().template topLeftCorner<kMeasurementSize, Acts::eBoundSize>().eval();
+	      ParametersVector res;
+	      res = calibrated - H * parameters;
+	      chi2 = (res.transpose() * ((calibratedCovariance + H * covariance * H.transpose())).inverse() * res).eval()(0, 0);
+	      
+	      return chi2;
+	    });
+	  auto distance = Acts::visit_measurement(state.calibratedSize(), [&](auto N) {
+	      constexpr size_t kMeasurementSize = decltype(N)::value;
+	      auto residuals =
+	      state.template calibrated<kMeasurementSize>() -
+	      state.projector()
+	      .template topLeftCorner<kMeasurementSize, Acts::eBoundSize>() *
+	      state.predicted();
+	      auto cdistance = residuals.norm();
+	      return cdistance;
+	    });
+	
+	  m_residual_prt.push_back(distance);
+	  m_chi2_prt.push_back(chi2);
+	}
 
       /// Local hit residual info
       auto H = state.effectiveProjector();
@@ -450,45 +511,47 @@ void ActsEvaluator::visitTrackStates(const Acts::MultiTrajectory<Acts::VectorMul
     else
     {
       /// Push bad values if no predicted parameter
-      m_res_x_hit.push_back(-9999);
-      m_res_y_hit.push_back(-9999);
-      m_err_x_hit.push_back(-9999);
-      m_err_y_hit.push_back(-9999);
-      m_pull_x_hit.push_back(-9999);
-      m_pull_y_hit.push_back(-9999);
-      m_dim_hit.push_back(-9999);
-      m_eLOC0_prt.push_back(-9999);
-      m_eLOC1_prt.push_back(-9999);
-      m_ePHI_prt.push_back(-9999);
-      m_eTHETA_prt.push_back(-9999);
-      m_eQOP_prt.push_back(-9999);
-      m_eT_prt.push_back(-9999);
-      m_res_eLOC0_prt.push_back(-9999);
-      m_res_eLOC1_prt.push_back(-9999);
-      m_res_ePHI_prt.push_back(-9999);
-      m_res_eTHETA_prt.push_back(-9999);
-      m_res_eQOP_prt.push_back(-9999);
-      m_res_eT_prt.push_back(-9999);
-      m_err_eLOC0_prt.push_back(-9999);
-      m_err_eLOC1_prt.push_back(-9999);
-      m_err_ePHI_prt.push_back(-9999);
-      m_err_eTHETA_prt.push_back(-9999);
-      m_err_eQOP_prt.push_back(-9999);
-      m_err_eT_prt.push_back(-9999);
-      m_pull_eLOC0_prt.push_back(-9999);
-      m_pull_eLOC1_prt.push_back(-9999);
-      m_pull_ePHI_prt.push_back(-9999);
-      m_pull_eTHETA_prt.push_back(-9999);
-      m_pull_eQOP_prt.push_back(-9999);
-      m_pull_eT_prt.push_back(-9999);
-      m_x_prt.push_back(-9999);
-      m_y_prt.push_back(-9999);
-      m_z_prt.push_back(-9999);
-      m_px_prt.push_back(-9999);
-      m_py_prt.push_back(-9999);
-      m_pz_prt.push_back(-9999);
-      m_pT_prt.push_back(-9999);
-      m_eta_prt.push_back(-9999);
+      m_residual_prt.push_back(NAN);
+      m_chi2_prt.push_back(NAN);
+      m_res_x_hit.push_back(NAN);
+      m_res_y_hit.push_back(NAN);
+      m_err_x_hit.push_back(NAN);
+      m_err_y_hit.push_back(NAN);
+      m_pull_x_hit.push_back(NAN);
+      m_pull_y_hit.push_back(NAN);
+      m_dim_hit.push_back(-999999);
+      m_eLOC0_prt.push_back(NAN);
+      m_eLOC1_prt.push_back(NAN);
+      m_ePHI_prt.push_back(NAN);
+      m_eTHETA_prt.push_back(NAN);
+      m_eQOP_prt.push_back(NAN);
+      m_eT_prt.push_back(NAN);
+      m_res_eLOC0_prt.push_back(NAN);
+      m_res_eLOC1_prt.push_back(NAN);
+      m_res_ePHI_prt.push_back(NAN);
+      m_res_eTHETA_prt.push_back(NAN);
+      m_res_eQOP_prt.push_back(NAN);
+      m_res_eT_prt.push_back(NAN);
+      m_err_eLOC0_prt.push_back(NAN);
+      m_err_eLOC1_prt.push_back(NAN);
+      m_err_ePHI_prt.push_back(NAN);
+      m_err_eTHETA_prt.push_back(NAN);
+      m_err_eQOP_prt.push_back(NAN);
+      m_err_eT_prt.push_back(NAN);
+      m_pull_eLOC0_prt.push_back(NAN);
+      m_pull_eLOC1_prt.push_back(NAN);
+      m_pull_ePHI_prt.push_back(NAN);
+      m_pull_eTHETA_prt.push_back(NAN);
+      m_pull_eQOP_prt.push_back(NAN);
+      m_pull_eT_prt.push_back(NAN);
+      m_x_prt.push_back(NAN);
+      m_y_prt.push_back(NAN);
+      m_z_prt.push_back(NAN);
+      m_px_prt.push_back(NAN);
+      m_py_prt.push_back(NAN);
+      m_pz_prt.push_back(NAN);
+      m_pT_prt.push_back(NAN);
+      m_eta_prt.push_back(NAN);
     }
 
     bool filtered = false;
@@ -499,6 +562,44 @@ void ActsEvaluator::visitTrackStates(const Acts::MultiTrajectory<Acts::VectorMul
 
       auto parameter = state.filtered();
       auto covariance = state.filteredCovariance();
+
+      if(state.hasCalibrated())
+	{
+	  auto fullCalibrated = state
+	    .template calibrated<Acts::MultiTrajectoryTraits::MeasurementSizeMax>().data();
+	  auto fullCalibratedCovariance = state
+	    .template calibratedCovariance<Acts::MultiTrajectoryTraits::MeasurementSizeMax>().data();
+	  
+	  double chi2 = Acts::visit_measurement(state.calibratedSize(), [&](auto N) -> double {
+	      constexpr size_t kMeasurementSize = decltype(N)::value;
+	      typename Acts::TrackStateTraits<kMeasurementSize, true>::Measurement calibrated{
+		fullCalibrated};
+	      
+	      typename Acts::TrackStateTraits<kMeasurementSize, true>::MeasurementCovariance
+		calibratedCovariance{fullCalibratedCovariance};
+	      
+	      using ParametersVector = Acts::ActsVector<kMeasurementSize>;
+	      const auto H = state.projector().template topLeftCorner<kMeasurementSize, Acts::eBoundSize>().eval();
+	      ParametersVector res;
+	      res = calibrated - H * parameter;
+	      chi2 = (res.transpose() * ((calibratedCovariance + H * covariance * H.transpose())).inverse() * res).eval()(0, 0);
+	      
+	      return chi2;
+	    });
+	  auto distance = Acts::visit_measurement(state.calibratedSize(), [&](auto N) {
+	      constexpr size_t kMeasurementSize = decltype(N)::value;
+	      auto residuals =
+	      state.template calibrated<kMeasurementSize>() -
+	      state.projector()
+	      .template topLeftCorner<kMeasurementSize, Acts::eBoundSize>() *
+	      state.predicted();
+	      auto cdistance = residuals.norm();
+	      return cdistance;
+	    });
+	
+	  m_residual_flt.push_back(distance);
+	  m_chi2_flt.push_back(chi2);
+	}
 
       m_eLOC0_flt.push_back(parameter[Acts::eBoundLoc0]);
       m_eLOC1_flt.push_back(parameter[Acts::eBoundLoc1]);
@@ -573,38 +674,40 @@ void ActsEvaluator::visitTrackStates(const Acts::MultiTrajectory<Acts::VectorMul
     else
     {
       /// Push bad values if no filtered parameter
-      m_eLOC0_flt.push_back(-9999);
-      m_eLOC1_flt.push_back(-9999);
-      m_ePHI_flt.push_back(-9999);
-      m_eTHETA_flt.push_back(-9999);
-      m_eQOP_flt.push_back(-9999);
-      m_eT_flt.push_back(-9999);
-      m_res_eLOC0_flt.push_back(-9999);
-      m_res_eLOC1_flt.push_back(-9999);
-      m_res_ePHI_flt.push_back(-9999);
-      m_res_eTHETA_flt.push_back(-9999);
-      m_res_eQOP_flt.push_back(-9999);
-      m_res_eT_flt.push_back(-9999);
-      m_err_eLOC0_flt.push_back(-9999);
-      m_err_eLOC1_flt.push_back(-9999);
-      m_err_ePHI_flt.push_back(-9999);
-      m_err_eTHETA_flt.push_back(-9999);
-      m_err_eQOP_flt.push_back(-9999);
-      m_err_eT_flt.push_back(-9999);
-      m_pull_eLOC0_flt.push_back(-9999);
-      m_pull_eLOC1_flt.push_back(-9999);
-      m_pull_ePHI_flt.push_back(-9999);
-      m_pull_eTHETA_flt.push_back(-9999);
-      m_pull_eQOP_flt.push_back(-9999);
-      m_pull_eT_flt.push_back(-9999);
-      m_x_flt.push_back(-9999);
-      m_y_flt.push_back(-9999);
-      m_z_flt.push_back(-9999);
-      m_py_flt.push_back(-9999);
-      m_pz_flt.push_back(-9999);
-      m_pT_flt.push_back(-9999);
-      m_eta_flt.push_back(-9999);
-      m_chi2.push_back(-9999);
+      m_residual_flt.push_back(NAN);
+      m_chi2_flt.push_back(NAN);
+      m_eLOC0_flt.push_back(NAN);
+      m_eLOC1_flt.push_back(NAN);
+      m_ePHI_flt.push_back(NAN);
+      m_eTHETA_flt.push_back(NAN);
+      m_eQOP_flt.push_back(NAN);
+      m_eT_flt.push_back(NAN);
+      m_res_eLOC0_flt.push_back(NAN);
+      m_res_eLOC1_flt.push_back(NAN);
+      m_res_ePHI_flt.push_back(NAN);
+      m_res_eTHETA_flt.push_back(NAN);
+      m_res_eQOP_flt.push_back(NAN);
+      m_res_eT_flt.push_back(NAN);
+      m_err_eLOC0_flt.push_back(NAN);
+      m_err_eLOC1_flt.push_back(NAN);
+      m_err_ePHI_flt.push_back(NAN);
+      m_err_eTHETA_flt.push_back(NAN);
+      m_err_eQOP_flt.push_back(NAN);
+      m_err_eT_flt.push_back(NAN);
+      m_pull_eLOC0_flt.push_back(NAN);
+      m_pull_eLOC1_flt.push_back(NAN);
+      m_pull_ePHI_flt.push_back(NAN);
+      m_pull_eTHETA_flt.push_back(NAN);
+      m_pull_eQOP_flt.push_back(NAN);
+      m_pull_eT_flt.push_back(NAN);
+      m_x_flt.push_back(NAN);
+      m_y_flt.push_back(NAN);
+      m_z_flt.push_back(NAN);
+      m_py_flt.push_back(NAN);
+      m_pz_flt.push_back(NAN);
+      m_pT_flt.push_back(NAN);
+      m_eta_flt.push_back(NAN);
+      m_chi2.push_back(NAN);
     }
   
     bool smoothed = false;
@@ -615,6 +718,45 @@ void ActsEvaluator::visitTrackStates(const Acts::MultiTrajectory<Acts::VectorMul
 
       auto parameter = state.smoothed();
       auto covariance = state.smoothedCovariance();
+
+      if(state.hasCalibrated())
+	{
+	  auto fullCalibrated = state
+	    .template calibrated<Acts::MultiTrajectoryTraits::MeasurementSizeMax>().data();
+	  auto fullCalibratedCovariance = state
+	    .template calibratedCovariance<Acts::MultiTrajectoryTraits::MeasurementSizeMax>().data();
+	  
+	  double chi2 = Acts::visit_measurement(state.calibratedSize(), [&](auto N) -> double {
+	      constexpr size_t kMeasurementSize = decltype(N)::value;
+	      typename Acts::TrackStateTraits<kMeasurementSize, true>::Measurement calibrated{
+		fullCalibrated};
+	      
+	      typename Acts::TrackStateTraits<kMeasurementSize, true>::MeasurementCovariance
+		calibratedCovariance{fullCalibratedCovariance};
+	      
+	      using ParametersVector = Acts::ActsVector<kMeasurementSize>;
+	      const auto H = state.projector().template topLeftCorner<kMeasurementSize, Acts::eBoundSize>().eval();
+	      ParametersVector res;
+	      res = calibrated - H * parameter;
+	      chi2 = (res.transpose() * ((calibratedCovariance + H * covariance * H.transpose())).inverse() * res).eval()(0, 0);
+	      
+	      return chi2;
+	    });
+	  auto distance = Acts::visit_measurement(state.calibratedSize(), [&](auto N) {
+	      constexpr size_t kMeasurementSize = decltype(N)::value;
+	      auto residuals =
+	      state.template calibrated<kMeasurementSize>() -
+	      state.projector()
+	      .template topLeftCorner<kMeasurementSize, Acts::eBoundSize>() *
+	      state.predicted();
+	      auto cdistance = residuals.norm();
+	      return cdistance;
+	    });
+	
+	  m_residual_smt.push_back(distance);
+	  m_chi2_smt.push_back(chi2);
+	}
+
 
       m_eLOC0_smt.push_back(parameter[Acts::eBoundLoc0]);
       m_eLOC1_smt.push_back(parameter[Acts::eBoundLoc1]);
@@ -688,38 +830,40 @@ void ActsEvaluator::visitTrackStates(const Acts::MultiTrajectory<Acts::VectorMul
     else
     {
       /// Push bad values if no smoothed parameter
-      m_eLOC0_smt.push_back(-9999);
-      m_eLOC1_smt.push_back(-9999);
-      m_ePHI_smt.push_back(-9999);
-      m_eTHETA_smt.push_back(-9999);
-      m_eQOP_smt.push_back(-9999);
-      m_eT_smt.push_back(-9999);
-      m_res_eLOC0_smt.push_back(-9999);
-      m_res_eLOC1_smt.push_back(-9999);
-      m_res_ePHI_smt.push_back(-9999);
-      m_res_eTHETA_smt.push_back(-9999);
-      m_res_eQOP_smt.push_back(-9999);
-      m_res_eT_smt.push_back(-9999);
-      m_err_eLOC0_smt.push_back(-9999);
-      m_err_eLOC1_smt.push_back(-9999);
-      m_err_ePHI_smt.push_back(-9999);
-      m_err_eTHETA_smt.push_back(-9999);
-      m_err_eQOP_smt.push_back(-9999);
-      m_err_eT_smt.push_back(-9999);
-      m_pull_eLOC0_smt.push_back(-9999);
-      m_pull_eLOC1_smt.push_back(-9999);
-      m_pull_ePHI_smt.push_back(-9999);
-      m_pull_eTHETA_smt.push_back(-9999);
-      m_pull_eQOP_smt.push_back(-9999);
-      m_pull_eT_smt.push_back(-9999);
-      m_x_smt.push_back(-9999);
-      m_y_smt.push_back(-9999);
-      m_z_smt.push_back(-9999);
-      m_px_smt.push_back(-9999);
-      m_py_smt.push_back(-9999);
-      m_pz_smt.push_back(-9999);
-      m_pT_smt.push_back(-9999);
-      m_eta_smt.push_back(-9999);
+      m_residual_smt.push_back(NAN);
+      m_chi2_smt.push_back(NAN);
+      m_eLOC0_smt.push_back(NAN);
+      m_eLOC1_smt.push_back(NAN);
+      m_ePHI_smt.push_back(NAN);
+      m_eTHETA_smt.push_back(NAN);
+      m_eQOP_smt.push_back(NAN);
+      m_eT_smt.push_back(NAN);
+      m_res_eLOC0_smt.push_back(NAN);
+      m_res_eLOC1_smt.push_back(NAN);
+      m_res_ePHI_smt.push_back(NAN);
+      m_res_eTHETA_smt.push_back(NAN);
+      m_res_eQOP_smt.push_back(NAN);
+      m_res_eT_smt.push_back(NAN);
+      m_err_eLOC0_smt.push_back(NAN);
+      m_err_eLOC1_smt.push_back(NAN);
+      m_err_ePHI_smt.push_back(NAN);
+      m_err_eTHETA_smt.push_back(NAN);
+      m_err_eQOP_smt.push_back(NAN);
+      m_err_eT_smt.push_back(NAN);
+      m_pull_eLOC0_smt.push_back(NAN);
+      m_pull_eLOC1_smt.push_back(NAN);
+      m_pull_ePHI_smt.push_back(NAN);
+      m_pull_eTHETA_smt.push_back(NAN);
+      m_pull_eQOP_smt.push_back(NAN);
+      m_pull_eT_smt.push_back(NAN);
+      m_x_smt.push_back(NAN);
+      m_y_smt.push_back(NAN);
+      m_z_smt.push_back(NAN);
+      m_px_smt.push_back(NAN);
+      m_py_smt.push_back(NAN);
+      m_pz_smt.push_back(NAN);
+      m_pT_smt.push_back(NAN);
+      m_eta_smt.push_back(NAN);
     }
 
     /// Save whether or not states had various KF steps
@@ -743,10 +887,10 @@ Acts::Vector3 ActsEvaluator::getGlobalTruthHit(TrkrDefs::cluskey cluskey,
 
   const auto [truth_ckey, truth_cluster] = clustereval->max_truth_cluster_by_energy(cluskey);
 
-  float gx = -9999;
-  float gy = -9999;
-  float gz = -9999;
-  float gt = -9999;
+  float gx = NAN;
+  float gy = NAN;
+  float gz = NAN;
+  float gt = NAN;
 
   if (truth_cluster)
   {
@@ -819,6 +963,10 @@ void ActsEvaluator::fillProtoTrack(const TrackSeed* seed)
     {
       continue;
     }
+    if(m_verbosity > 3)
+      {
+	svtxseed->identify();
+      }
     for (auto clusIter = svtxseed->begin_cluster_keys();
          clusIter != svtxseed->end_cluster_keys();
          ++clusIter)
@@ -852,7 +1000,7 @@ void ActsEvaluator::fillProtoTrack(const TrackSeed* seed)
       m_SL_ly.push_back(loc(1));
 
       /// Get corresponding truth hit position
-      float gt = -9999;
+      float gt = NAN;
 
       Acts::Vector3 globalTruthPos = getGlobalTruthHit(key, gt);
 
@@ -943,25 +1091,25 @@ void ActsEvaluator::fillFittedTrackParams(const Trajectory traj,
   }
 
   /// Otherwise mark it as a bad fit
-  m_eLOC0_fit = -9999;
-  m_eLOC1_fit = -9999;
-  m_ePHI_fit = -9999;
-  m_eTHETA_fit = -9999;
-  m_eQOP_fit = -9999;
-  m_eT_fit = -9999;
-  m_charge_fit = -9999;
-  m_err_eLOC0_fit = -9999;
-  m_err_eLOC1_fit = -9999;
-  m_err_ePHI_fit = -9999;
-  m_err_eTHETA_fit = -9999;
-  m_err_eQOP_fit = -9999;
-  m_err_eT_fit = -9999;
-  m_px_fit = -9999;
-  m_py_fit = -9999;
-  m_pz_fit = -9999;
-  m_x_fit = -9999;
-  m_y_fit = -9999;
-  m_z_fit = -9999;
+  m_eLOC0_fit = NAN;
+  m_eLOC1_fit = NAN;
+  m_ePHI_fit = NAN;
+  m_eTHETA_fit = NAN;
+  m_eQOP_fit = NAN;
+  m_eT_fit = NAN;
+  m_charge_fit = -99999;
+  m_err_eLOC0_fit = NAN;
+  m_err_eLOC1_fit = NAN;
+  m_err_ePHI_fit = NAN;
+  m_err_eTHETA_fit = NAN;
+  m_err_eQOP_fit = NAN;
+  m_err_eT_fit = NAN;
+  m_px_fit = NAN;
+  m_py_fit = NAN;
+  m_pz_fit = NAN;
+  m_x_fit = NAN;
+  m_y_fit = NAN;
+  m_z_fit = NAN;
 
   if (m_verbosity > 2)
   {
@@ -999,18 +1147,18 @@ void ActsEvaluator::fillG4Particle(PHG4Particle* part)
   }
 
   /// If particle doesn't exist, just fill with -999
-  m_t_barcode = -9999;
-  m_t_charge = -9999;
-  m_t_vx = -9999;
-  m_t_vy = -9999;
-  m_t_vz = -9999;
-  m_t_px = -9999;
-  m_t_py = -9999;
-  m_t_pz = -9999;
-  m_t_theta = -9999;
-  m_t_phi = -9999;
-  m_t_pT = -9999;
-  m_t_eta = -9999;
+  m_t_barcode = -99999;
+  m_t_charge = -99999;
+  m_t_vx = NAN;
+  m_t_vy = NAN;
+  m_t_vz = NAN;
+  m_t_px = NAN;
+  m_t_py = NAN;
+  m_t_pz = NAN;
+  m_t_theta = NAN;
+  m_t_phi = NAN;
+  m_t_pT = NAN;
+  m_t_eta = NAN;
 
   return;
 }
@@ -1107,6 +1255,7 @@ void ActsEvaluator::clearTrackVariables()
   m_pull_x_hit.clear();
   m_pull_y_hit.clear();
   m_dim_hit.clear();
+  m_state_type.clear();
 
   m_prt.clear();
   m_eLOC0_prt.clear();
@@ -1141,7 +1290,9 @@ void ActsEvaluator::clearTrackVariables()
   m_pz_prt.clear();
   m_eta_prt.clear();
   m_pT_prt.clear();
-
+  m_residual_prt.clear();
+  m_chi2_prt.clear();
+  
   m_flt.clear();
   m_eLOC0_flt.clear();
   m_eLOC1_flt.clear();
@@ -1176,6 +1327,8 @@ void ActsEvaluator::clearTrackVariables()
   m_eta_flt.clear();
   m_pT_flt.clear();
   m_chi2.clear();
+  m_residual_flt.clear();
+  m_chi2_flt.clear();
 
   m_smt.clear();
   m_eLOC0_smt.clear();
@@ -1210,6 +1363,8 @@ void ActsEvaluator::clearTrackVariables()
   m_pz_smt.clear();
   m_eta_smt.clear();
   m_pT_smt.clear();
+  m_residual_smt.clear();
+  m_chi2_smt.clear();
 
   m_SLx.clear();
   m_SLy.clear();
@@ -1222,17 +1377,17 @@ void ActsEvaluator::clearTrackVariables()
   m_t_SL_gy.clear();
   m_t_SL_gz.clear();
 
-  m_protoTrackPx = -9999.;
-  m_protoTrackPy = -9999.;
-  m_protoTrackPz = -9999.;
-  m_protoTrackX = -9999.;
-  m_protoTrackY = -9999.;
-  m_protoTrackZ = -9999.;
-  m_protoD0Cov = -9999.;
-  m_protoZ0Cov = -9999.;
-  m_protoPhiCov = -9999.;
-  m_protoThetaCov = -9999.;
-  m_protoQopCov = -9999.;
+  m_protoTrackPx = NAN;
+  m_protoTrackPy = NAN;
+  m_protoTrackPz = NAN;
+  m_protoTrackX = NAN;
+  m_protoTrackY = NAN;
+  m_protoTrackZ = NAN;
+  m_protoD0Cov = NAN;
+  m_protoZ0Cov = NAN;
+  m_protoPhiCov = NAN;
+  m_protoThetaCov = NAN;
+  m_protoQopCov = NAN;
 
   return;
 }
@@ -1344,6 +1499,7 @@ void ActsEvaluator::initializeTree()
   m_trackTree->Branch("pull_x_hit", &m_pull_x_hit);
   m_trackTree->Branch("pull_y_hit", &m_pull_y_hit);
   m_trackTree->Branch("dim_hit", &m_dim_hit);
+  m_trackTree->Branch("state_type",&m_state_type);
 
   m_trackTree->Branch("nPredicted", &m_nPredicted);
   m_trackTree->Branch("predicted", &m_prt);
@@ -1379,6 +1535,8 @@ void ActsEvaluator::initializeTree()
   m_trackTree->Branch("pz_prt", &m_pz_prt);
   m_trackTree->Branch("eta_prt", &m_eta_prt);
   m_trackTree->Branch("pT_prt", &m_pT_prt);
+  m_trackTree->Branch("residual_prt", &m_residual_prt);
+  m_trackTree->Branch("chi2_prt", &m_chi2_prt);
 
   m_trackTree->Branch("nFiltered", &m_nFiltered);
   m_trackTree->Branch("filtered", &m_flt);
@@ -1415,6 +1573,8 @@ void ActsEvaluator::initializeTree()
   m_trackTree->Branch("eta_flt", &m_eta_flt);
   m_trackTree->Branch("pT_flt", &m_pT_flt);
   m_trackTree->Branch("chi2", &m_chi2);
+  m_trackTree->Branch("residual_prt", &m_residual_flt);
+  m_trackTree->Branch("chi2_prt", &m_chi2_flt);
 
   m_trackTree->Branch("nSmoothed", &m_nSmoothed);
   m_trackTree->Branch("smoothed", &m_smt);
@@ -1450,4 +1610,6 @@ void ActsEvaluator::initializeTree()
   m_trackTree->Branch("pz_smt", &m_pz_smt);
   m_trackTree->Branch("eta_smt", &m_eta_smt);
   m_trackTree->Branch("pT_smt", &m_pT_smt);
+  m_trackTree->Branch("residual_prt", &m_residual_smt);
+  m_trackTree->Branch("chi2_prt", &m_chi2_smt);
 }
