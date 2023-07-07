@@ -357,8 +357,14 @@ void TrackResiduals::fillClusterBranches(TrkrDefs::cluskey ckey, SvtxTrack* trac
       break;
     }
   }
-
+  
   SvtxTrackState* state = matched_state->second;
+
+  /// If no state was found within a layer, Acts did not create one
+  if(fabs(drmin) > 2)
+    {
+      state = nullptr;
+    }
 
   //! have cluster and state, fill vectors
   m_cluslx.push_back(cluster->getLocalX());
@@ -391,7 +397,14 @@ void TrackResiduals::fillClusterBranches(TrkrDefs::cluskey ckey, SvtxTrack* trac
   }
 
   auto surf = geometry->maps().getSurface(ckey, cluster);
-  Acts::Vector3 stateglob(state->get_x(), state->get_y(), state->get_z());
+  Acts::Vector3 stateglob(NAN,NAN,NAN);
+  if(state)
+    {
+      stateglob(0) = state->get_x();
+      stateglob(1) = state->get_y();
+      stateglob(2) = state->get_z();
+    }
+
   Acts::Vector2 stateloc;
   auto misaligncenter = surf->center(geometry->geometry().getGeoContext());
   auto misalignnorm = -1*surf->normal(geometry->geometry().getGeoContext());
@@ -466,8 +479,11 @@ void TrackResiduals::fillClusterBranches(TrkrDefs::cluskey ckey, SvtxTrack* trac
     stateloc(1) = loct(1);
   }
 
-  const Acts::BoundSymMatrix actscov =
-      transformer.rotateSvtxTrackCovToActs(state);
+Acts::BoundSymMatrix actscov;
+if(state)
+  {
+    actscov = transformer.rotateSvtxTrackCovToActs(state);
+  
 
   m_statelx.push_back(stateloc(0));
   m_statelz.push_back(stateloc(1));
@@ -480,6 +496,21 @@ void TrackResiduals::fillClusterBranches(TrkrDefs::cluskey ckey, SvtxTrack* trac
   m_statepy.push_back(state->get_py());
   m_statepz.push_back(state->get_pz());
   m_statepl.push_back(state->get_pathlength());
+  }
+ else
+   {
+     m_statelx.push_back(NAN);
+     m_statelz.push_back(NAN);
+     m_stateelx.push_back(NAN);
+     m_stateelz.push_back(NAN);
+     m_stategx.push_back(NAN);
+     m_stategy.push_back(NAN);
+     m_stategz.push_back(NAN);
+     m_statepx.push_back(NAN);
+     m_statepy.push_back(NAN);
+     m_statepz.push_back(NAN);
+     m_statepl.push_back(NAN);
+   }
 }
 void TrackResiduals::createBranches()
 {
