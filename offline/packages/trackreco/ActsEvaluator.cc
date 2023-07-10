@@ -410,10 +410,12 @@ void ActsEvaluator::visitTrackStates(const Acts::MultiTrajectory<Acts::VectorMul
 	      .template topLeftCorner<kMeasurementSize, Acts::eBoundSize>() *
 	      state.predicted();
 	      auto cdistance = residuals.norm();
+	      m_cslxresidual_prt.push_back(residuals(0));
+	      m_cslzresidual_prt.push_back(residuals(1));
 	      return cdistance;
 	    });
 	
-	  m_residual_prt.push_back(distance);
+	  m_csresidual_prt.push_back(distance);
 	  m_chi2_prt.push_back(chi2);
 	}
 
@@ -511,7 +513,10 @@ void ActsEvaluator::visitTrackStates(const Acts::MultiTrajectory<Acts::VectorMul
     else
     {
       /// Push bad values if no predicted parameter
-      m_residual_prt.push_back(NAN);
+      
+      m_cslxresidual_prt.push_back(NAN);
+      m_cslzresidual_prt.push_back(NAN);
+      m_csresidual_prt.push_back(NAN);
       m_chi2_prt.push_back(NAN);
       m_res_x_hit.push_back(NAN);
       m_res_y_hit.push_back(NAN);
@@ -594,10 +599,12 @@ void ActsEvaluator::visitTrackStates(const Acts::MultiTrajectory<Acts::VectorMul
 	      .template topLeftCorner<kMeasurementSize, Acts::eBoundSize>() *
 	      state.predicted();
 	      auto cdistance = residuals.norm();
+	      m_cslxresidual_flt.push_back(residuals(0));
+	      m_cslzresidual_flt.push_back(residuals(1));
 	      return cdistance;
 	    });
 	
-	  m_residual_flt.push_back(distance);
+	  m_csresidual_flt.push_back(distance);
 	  m_chi2_flt.push_back(chi2);
 	}
 
@@ -674,7 +681,10 @@ void ActsEvaluator::visitTrackStates(const Acts::MultiTrajectory<Acts::VectorMul
     else
     {
       /// Push bad values if no filtered parameter
-      m_residual_flt.push_back(NAN);
+      
+      m_cslxresidual_flt.push_back(NAN);
+      m_cslzresidual_flt.push_back(NAN);
+      m_csresidual_flt.push_back(NAN);
       m_chi2_flt.push_back(NAN);
       m_eLOC0_flt.push_back(NAN);
       m_eLOC1_flt.push_back(NAN);
@@ -750,10 +760,12 @@ void ActsEvaluator::visitTrackStates(const Acts::MultiTrajectory<Acts::VectorMul
 	      .template topLeftCorner<kMeasurementSize, Acts::eBoundSize>() *
 	      state.predicted();
 	      auto cdistance = residuals.norm();
+	      m_cslxresidual_smt.push_back(residuals(0));
+	      m_cslzresidual_smt.push_back(residuals(1));
 	      return cdistance;
 	    });
 	
-	  m_residual_smt.push_back(distance);
+	  m_csresidual_smt.push_back(distance);
 	  m_chi2_smt.push_back(chi2);
 	}
 
@@ -830,7 +842,9 @@ void ActsEvaluator::visitTrackStates(const Acts::MultiTrajectory<Acts::VectorMul
     else
     {
       /// Push bad values if no smoothed parameter
-      m_residual_smt.push_back(NAN);
+      m_cslxresidual_prt.push_back(NAN);
+      m_cslzresidual_prt.push_back(NAN);
+      m_csresidual_smt.push_back(NAN);
       m_chi2_smt.push_back(NAN);
       m_eLOC0_smt.push_back(NAN);
       m_eLOC1_smt.push_back(NAN);
@@ -1290,9 +1304,11 @@ void ActsEvaluator::clearTrackVariables()
   m_pz_prt.clear();
   m_eta_prt.clear();
   m_pT_prt.clear();
-  m_residual_prt.clear();
+  m_csresidual_prt.clear();
   m_chi2_prt.clear();
-  
+  m_cslxresidual_prt.clear();
+  m_cslzresidual_prt.clear();
+
   m_flt.clear();
   m_eLOC0_flt.clear();
   m_eLOC1_flt.clear();
@@ -1327,8 +1343,10 @@ void ActsEvaluator::clearTrackVariables()
   m_eta_flt.clear();
   m_pT_flt.clear();
   m_chi2.clear();
-  m_residual_flt.clear();
+  m_csresidual_flt.clear();
   m_chi2_flt.clear();
+  m_cslxresidual_flt.clear();
+  m_cslzresidual_flt.clear();
 
   m_smt.clear();
   m_eLOC0_smt.clear();
@@ -1363,8 +1381,10 @@ void ActsEvaluator::clearTrackVariables()
   m_pz_smt.clear();
   m_eta_smt.clear();
   m_pT_smt.clear();
-  m_residual_smt.clear();
+  m_csresidual_smt.clear();
   m_chi2_smt.clear();
+  m_cslxresidual_smt.clear();
+  m_cslzresidual_smt.clear();
 
   m_SLx.clear();
   m_SLy.clear();
@@ -1535,7 +1555,9 @@ void ActsEvaluator::initializeTree()
   m_trackTree->Branch("pz_prt", &m_pz_prt);
   m_trackTree->Branch("eta_prt", &m_eta_prt);
   m_trackTree->Branch("pT_prt", &m_pT_prt);
-  m_trackTree->Branch("residual_prt", &m_residual_prt);
+  m_trackTree->Branch("csresidual_prt", &m_csresidual_prt);
+  m_trackTree->Branch("cslxresidual_prt", &m_cslxresidual_prt);
+  m_trackTree->Branch("cslzresidual_prt", &m_cslzresidual_prt);
   m_trackTree->Branch("chi2_prt", &m_chi2_prt);
 
   m_trackTree->Branch("nFiltered", &m_nFiltered);
@@ -1573,8 +1595,10 @@ void ActsEvaluator::initializeTree()
   m_trackTree->Branch("eta_flt", &m_eta_flt);
   m_trackTree->Branch("pT_flt", &m_pT_flt);
   m_trackTree->Branch("chi2", &m_chi2);
-  m_trackTree->Branch("residual_prt", &m_residual_flt);
-  m_trackTree->Branch("chi2_prt", &m_chi2_flt);
+  m_trackTree->Branch("csresidual_flt", &m_csresidual_flt);
+  m_trackTree->Branch("chi2_flt", &m_chi2_flt);
+  m_trackTree->Branch("cslxresidual_flt", &m_cslxresidual_flt);
+  m_trackTree->Branch("cslzresidual_flt", &m_cslzresidual_flt);
 
   m_trackTree->Branch("nSmoothed", &m_nSmoothed);
   m_trackTree->Branch("smoothed", &m_smt);
@@ -1610,6 +1634,8 @@ void ActsEvaluator::initializeTree()
   m_trackTree->Branch("pz_smt", &m_pz_smt);
   m_trackTree->Branch("eta_smt", &m_eta_smt);
   m_trackTree->Branch("pT_smt", &m_pT_smt);
-  m_trackTree->Branch("residual_prt", &m_residual_smt);
-  m_trackTree->Branch("chi2_prt", &m_chi2_smt);
+  m_trackTree->Branch("csresidual_smt", &m_csresidual_smt);
+  m_trackTree->Branch("chi2_smt", &m_chi2_smt);
+  m_trackTree->Branch("cslxresidual_smt", &m_cslxresidual_smt);
+  m_trackTree->Branch("cslzresidual_smt", &m_cslzresidual_smt);
 }

@@ -231,8 +231,10 @@ class ActsEvaluator
   std::vector<float> m_pz_prt;           /// predicted momentum pz
   std::vector<float> m_eta_prt;          /// predicted momentum eta
   std::vector<float> m_pT_prt;           /// predicted momentum pT
-  std::vector<float> m_residual_prt;
-  std::vector<float> m_chi2_prt;
+  std::vector<float> m_csresidual_prt;   /// Cluster-pred state residual
+  std::vector<float> m_cslxresidual_prt;   /// Cluster-pred state lx residual
+  std::vector<float> m_cslzresidual_prt;   /// Cluster-pred state lz residual
+  std::vector<float> m_chi2_prt;         /// Cluster-pred state chi2
 
   int m_nFiltered{0};                    /// number of states with filtered parameter
   std::vector<bool> m_flt;               /// filtered status
@@ -269,8 +271,10 @@ class ActsEvaluator
   std::vector<float> m_eta_flt;          /// filtered momentum eta
   std::vector<float> m_pT_flt;           /// filtered momentum pT
   std::vector<float> m_chi2;             /// chisq from filtering
-  std::vector<float> m_residual_flt;
-  std::vector<float> m_chi2_flt;
+  std::vector<float> m_csresidual_flt;   /// Cluster-filter state residual
+  std::vector<float> m_cslxresidual_flt;   /// Cluster-filter state lx residual
+  std::vector<float> m_cslzresidual_flt;   /// Cluster-filter state lz residual
+  std::vector<float> m_chi2_flt;         /// Cluster-filter state chi2
 
   int m_nSmoothed{0};                    /// number of states with smoothed parameter
   std::vector<bool> m_smt;               /// smoothed status
@@ -306,8 +310,10 @@ class ActsEvaluator
   std::vector<float> m_pz_smt;           /// smoothed momentum pz
   std::vector<float> m_eta_smt;          /// smoothed momentum eta
   std::vector<float> m_pT_smt;           /// smoothed momentum pT
-  std::vector<float> m_residual_smt;
-  std::vector<float> m_chi2_smt;
+  std::vector<float> m_csresidual_smt;   /// Cluster-smoothed state residual
+  std::vector<float> m_cslxresidual_smt;   /// Cluster-smoothed state lx residual
+  std::vector<float> m_cslzresidual_smt;   /// Cluster-smoothed state lz residual
+  std::vector<float> m_chi2_smt;         /// Cluster-smoothed state chi2
 
   float m_protoTrackPx{NAN};   /// Proto track px
   float m_protoTrackPy{NAN};   /// Proto track py
