@@ -367,7 +367,7 @@ void PHActsTrkFitter::loopTracks(Acts::Logging::Level logLevel)
       auto actsFourPos = Acts::Vector4(position(0), position(1),
 				       position(2),
 				       10 * Acts::UnitConstants::ns);
-      Acts::BoundSymMatrix cov = setDefaultCovariance();
+      Acts::BoundSymMatrix cov = setDefaultCovariance(siseed);
  
       int charge = tpcseed->get_charge();
       if(m_fieldMap.find("3d") != std::string::npos)
@@ -1048,7 +1048,7 @@ void PHActsTrkFitter::updateSvtxTrack(Trajectory traj, SvtxTrack* track)
   
 }
 
-Acts::BoundSymMatrix PHActsTrkFitter::setDefaultCovariance() const
+Acts::BoundSymMatrix PHActsTrkFitter::setDefaultCovariance(TrackSeed *silseed) const
 {
   Acts::BoundSymMatrix cov = Acts::BoundSymMatrix::Zero();
    
@@ -1078,14 +1078,24 @@ Acts::BoundSymMatrix PHActsTrkFitter::setDefaultCovariance() const
       double sigmaPhi = 1 * Acts::UnitConstants::degree;
       double sigmaTheta = 1 * Acts::UnitConstants::degree;
       double sigmaT = 1. * Acts::UnitConstants::ns;
-     
+      double sigmaQop = 0.01;
+      /// Expand the search windows for TPC only tracks
+      if(silseed == nullptr)
+	{
+	  std::cout << "nullptr check"<<std::endl;
+	  sigmaD0 = 500 * Acts::UnitConstants::um;
+	  sigmaZ0 = 500 * Acts::UnitConstants::um;
+	  sigmaTheta = 3 * Acts::UnitConstants::degree;
+	  sigmaPhi = 3 * Acts::UnitConstants::degree;
+	  sigmaQop = 0.1;
+	}
       cov(Acts::eBoundLoc0, Acts::eBoundLoc0) = sigmaD0 * sigmaD0;
       cov(Acts::eBoundLoc1, Acts::eBoundLoc1) = sigmaZ0 * sigmaZ0;
       cov(Acts::eBoundTime, Acts::eBoundTime) = sigmaT * sigmaT;
       cov(Acts::eBoundPhi, Acts::eBoundPhi) = sigmaPhi * sigmaPhi;
       cov(Acts::eBoundTheta, Acts::eBoundTheta) = sigmaTheta * sigmaTheta;
       /// Acts takes this value very seriously - tuned to be in a "sweet spot"
-      cov(Acts::eBoundQOverP, Acts::eBoundQOverP) = 0.0001;
+      cov(Acts::eBoundQOverP, Acts::eBoundQOverP) = sigmaQop * sigmaQop;
 
     }
 

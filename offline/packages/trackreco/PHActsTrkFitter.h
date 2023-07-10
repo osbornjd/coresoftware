@@ -149,7 +149,7 @@ class PHActsTrkFitter : public SubsysReco
 			 SvtxTrack* track,
 			 const ActsTrackFittingAlgorithm::MeasurementContainer& measurements);
 
-  Acts::BoundSymMatrix setDefaultCovariance() const;
+  Acts::BoundSymMatrix setDefaultCovariance(TrackSeed* silseed) const;
   void printTrackSeed(const ActsTrackFittingAlgorithm::TrackParameters& seed) const;
 
   /// Event counter
