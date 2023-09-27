@@ -107,7 +107,7 @@ class PHActsSiliconSeeding : public SubsysReco
   void SetIteration(int iter){_n_iteration = iter;}
 
  private:
-
+  void printConfigs(Acts::SeedFilterConfig& sfconfig);
   int getNodes(PHCompositeNode *topNode);
   int createNodes(PHCompositeNode *topNode);
 
