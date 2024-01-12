@@ -113,13 +113,30 @@ int SvtxTrack_v4::isValid() const
 const SvtxTrackState* SvtxTrack_v4::get_state(float pathlength) const
 {
   const auto iter = _states.find(pathlength);
-  return (iter == _states.end()) ? nullptr:iter->second;
+  const auto iterl = _states.lower_bound(pathlength);
+  if (iter != _states.end())
+  {
+    return iter->second;
+  }
+  else if (iter == _states.end() && iterl != _states.end())
+  {
+    return iterl->second;
+  }
+  return nullptr;
 }
 
 SvtxTrackState* SvtxTrack_v4::get_state(float pathlength)
 {
   const auto iter = _states.find(pathlength);
-  return (iter == _states.end()) ? nullptr:iter->second;
+  const auto iterl = _states.lower_bound(pathlength);
+  if (iter != _states.end()) {
+    return iter->second;
+  }
+  else if(iter == _states.end() && iterl != _states.end())
+  {
+    return iterl->second;
+  }
+  return nullptr;
 }
 
 SvtxTrackState* SvtxTrack_v4::insert_state(const SvtxTrackState* state)
