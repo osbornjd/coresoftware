@@ -17,6 +17,9 @@
 #include <trackbase/TrkrCluster.h>
 #include <trackbase/TrkrClusterContainer.h>
 #include <trackbase/TrkrClusterHitAssoc.h>
+#include <trackbase/TrkrHitSetContainer.h>
+#include <trackbase/TrkrHitSet.h>
+#include <trackbase/TrkrHit.h>
 #include <trackbase/TrkrDefs.h>
 
 #include <qautils/QAHistManagerDef.h>
@@ -85,6 +88,13 @@ int TpcClusterQA::process_event(PHCompositeNode *topNode)
     return Fun4AllReturnCodes::ABORTEVENT;
   }
 
+  auto hitmap = findNode::getClass<TrkrHitSetContainer>(topNode,"TRKR_HITSET");
+  if(!hitmap)
+    {
+      std::cout << PHWHERE << "No hitmap found, bailing" << std::endl;
+      return Fun4AllReturnCodes::ABORTEVENT;
+    }
+
   auto tGeometry = findNode::getClass<ActsGeometry>(topNode, "ActsGeometry");
   if (!tGeometry)
   {
@@ -127,6 +137,33 @@ int TpcClusterQA::process_event(PHCompositeNode *topNode)
   auto fill = [](TH1 *h, float val)
   { if (h) h->Fill(val); };
 
+  
+ TrkrHitSetContainer::ConstRange all_hitsets = hitmap->getHitSets();
+ for (TrkrHitSetContainer::ConstIterator hitsetiter = all_hitsets.first;
+      hitsetiter != all_hitsets.second;
+      ++hitsetiter)
+   {
+    auto hitsetkey = hitsetiter->first;
+    TrkrHitSet* hitset = hitsetiter->second;
+    if(TrkrDefs::getTrkrId(hitsetkey) != TrkrDefs::TrkrId::tpcId)
+      {
+	continue;
+      }
+    auto sector = TpcDefs::getSectorId(hitsetkey);
+    auto side = TpcDefs::getSide(hitsetkey);
+    auto hitrangei = hitset->getHits();
+    for (TrkrHitSet::ConstIterator hitr = hitrangei.first;
+         hitr != hitrangei.second;
+         ++hitr)
+    {
+      auto hitkey = hitr->first;
+      auto hit = hitr->second;
+      auto adc = hit->getAdc();
+      auto hitpad = TpcDefs::getPad(hitkey);
+      auto hittbin = TpcDefs::getTBin(hitkey);
+    }
+
+   }
   float nclusperevent[24] = {0};
   for (auto &hsk : clusterContainer->getHitSetKeys(TrkrDefs::TrkrId::tpcId))
   {
