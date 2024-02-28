@@ -707,8 +707,8 @@ void TrackResiduals::fillHitTree(TrkrHitSetContainer* hitmap,
 
         float AdcClockPeriod = geoLayer->get_zstep();
         m_zdriftlength = m_hittbin * geometry->get_drift_velocity() * AdcClockPeriod;
-	double NZBinsSide = 249;  // physical z bins per TPC side
-	double tdriftmax = AdcClockPeriod * NZBinsSide;
+        double NZBinsSide = 249;  // physical z bins per TPC side
+        double tdriftmax = AdcClockPeriod * NZBinsSide;
         m_hitgz = (tdriftmax * geometry->get_drift_velocity()) - m_zdriftlength;
         if (m_side == 0)
         {
@@ -734,6 +734,7 @@ void TrackResiduals::fillHitTree(TrkrHitSetContainer* hitmap,
         m_hittbin = std::numeric_limits<int>::quiet_NaN();
 
         m_zdriftlength = std::numeric_limits<float>::quiet_NaN();
+        break;
       }
       default:
         break;
@@ -796,11 +797,11 @@ void TrackResiduals::fillClusterBranches(TrkrDefs::cluskey ckey, SvtxTrack* trac
   if (TrkrDefs::getTrkrId(ckey) == TrkrDefs::TrkrId::tpcId)
   {
     float rawclusz = convertTimeToZ(geometry, ckey, cluster);
-    
+
     int crossing = track->get_crossing();
     unsigned int side = TpcDefs::getSide(ckey);
     clusz = m_clusterCrossingCorrection.correctZ(rawclusz, side, crossing);
-    if(!m_ppmode)
+    if (!m_ppmode)
     {
       clusz = rawclusz;
     }
@@ -1075,7 +1076,7 @@ void TrackResiduals::createBranches()
   m_hittree->Branch("chip", &m_chipid, "m_chipid/I");
   m_hittree->Branch("strobe", &m_strobeid, "m_strobeid/I");
   m_hittree->Branch("ladderz", &m_ladderzid, "m_ladderzid/I");
-  m_hittree->Branch("ladderphi", m_ladderphiid, "m_ladderphiid/I");
+  m_hittree->Branch("ladderphi", &m_ladderphiid, "m_ladderphiid/I");
   m_hittree->Branch("timebucket", &m_timebucket, "m_timebucket/I");
   m_hittree->Branch("pad", &m_hitpad, "m_hitpad/I");
   m_hittree->Branch("tbin", &m_hittbin, "m_hittbin/I");
@@ -1114,7 +1115,7 @@ void TrackResiduals::createBranches()
   m_clustree->Branch("chip", &m_chipid, "m_chipid/I");
   m_clustree->Branch("strobe", &m_strobeid, "m_strobeid/I");
   m_clustree->Branch("ladderz", &m_ladderzid, "m_ladderzid/I");
-  m_clustree->Branch("ladderphi", m_ladderphiid, "m_ladderphiid/I");
+  m_clustree->Branch("ladderphi", &m_ladderphiid, "m_ladderphiid/I");
   m_clustree->Branch("timebucket", &m_timebucket, "m_timebucket/I");
   m_clustree->Branch("segtype", &m_segtype, "m_segtype/I");
   m_clustree->Branch("tile", &m_tileid, "m_tileid/I");
@@ -1169,8 +1170,8 @@ void TrackResiduals::createBranches()
   m_tree->Branch("clusgz", &m_clusgz);
   m_tree->Branch("cluslayer", &m_cluslayer);
   m_tree->Branch("clussize", &m_clussize);
-  m_tree->Branch("clusphisize",&m_clusphisize);
-  m_tree->Branch("cluszsize",&m_cluszsize);
+  m_tree->Branch("clusphisize", &m_clusphisize);
+  m_tree->Branch("cluszsize", &m_cluszsize);
   m_tree->Branch("clushitsetkey", &m_clushitsetkey);
   m_tree->Branch("idealsurfcenterx", &m_idealsurfcenterx);
   m_tree->Branch("idealsurfcentery", &m_idealsurfcentery);
