@@ -313,13 +313,17 @@ void PHActsTrkFitter::loopTracks(Acts::Logging::Level logLevel)
 
     /// A track seed is made for every tpc seed. Not every tpc seed
     /// has a silicon match, we skip those cases completely in pp running
-    if (m_pp_mode && siid == std::numeric_limits<unsigned int>::max())
-    {
-      continue;
-    }
+    //if (m_pp_mode && siid == std::numeric_limits<unsigned int>::max())
+    // {
+    //continue;
+    //}
 
     // get the INTT crossing number
     auto siseed = m_siliconSeeds->get(siid);
+    if(!siseed)
+      {
+	continue;
+      }
     short crossing = SHRT_MAX;
     if (siseed)
     {
@@ -358,7 +362,7 @@ void PHActsTrkFitter::loopTracks(Acts::Logging::Level logLevel)
     if (!tpcseed)
     {
       std::cout << "no tpc seed" << std::endl;
-      continue;
+      //continue;
     }
 
     if (Verbosity() > 0)
@@ -441,6 +445,8 @@ void PHActsTrkFitter::loopTracks(Acts::Logging::Level logLevel)
               _dcc_module_edge, _dcc_static, _dcc_average, _dcc_fluctuation,
               this_crossing);
         }
+	if(tpcseed)
+	  {
         const auto tpcSourceLinks = makeSourceLinks.getSourceLinksClusterMover(
             tpcseed,
             measurements,
@@ -449,7 +455,8 @@ void PHActsTrkFitter::loopTracks(Acts::Logging::Level logLevel)
             _dcc_module_edge, _dcc_static, _dcc_average, _dcc_fluctuation,
             this_crossing);
 
-        sourceLinks.insert(sourceLinks.end(), tpcSourceLinks.begin(), tpcSourceLinks.end());
+        //sourceLinks.insert(sourceLinks.end(), tpcSourceLinks.begin(), tpcSourceLinks.end());
+	  }
       }
       else
       {
@@ -465,6 +472,8 @@ void PHActsTrkFitter::loopTracks(Acts::Logging::Level logLevel)
               m_transient_id_set,
               this_crossing);
         }
+	if(tpcseed)
+	  {
         const auto tpcSourceLinks = makeSourceLinks.getSourceLinks(
             tpcseed,
             measurements,
@@ -474,7 +483,8 @@ void PHActsTrkFitter::loopTracks(Acts::Logging::Level logLevel)
             m_alignmentTransformationMapTransient,
             m_transient_id_set,
             this_crossing);
-        sourceLinks.insert(sourceLinks.end(), tpcSourceLinks.begin(), tpcSourceLinks.end());
+        //sourceLinks.insert(sourceLinks.end(), tpcSourceLinks.begin(), tpcSourceLinks.end());
+	  }
       }
 
       // copy transient map for this track into transient geoContext
@@ -542,9 +552,18 @@ void PHActsTrkFitter::loopTracks(Acts::Logging::Level logLevel)
       }
       else
       {
+	if(tpcseed)
+	  {
         px = tpcseed->get_px();
         py = tpcseed->get_py();
         pz = tpcseed->get_pz();
+	  }
+	else if(siseed)
+	  {
+	    px = siseed->get_px();
+	    py = siseed->get_py();
+	    pz = siseed->get_pz();
+	  }
       }
 
       Acts::Vector3 momentum(px, py, pz);
@@ -565,8 +584,15 @@ void PHActsTrkFitter::loopTracks(Acts::Logging::Level logLevel)
                                        10 * Acts::UnitConstants::ns);
       Acts::BoundSquareMatrix cov = setDefaultCovariance();
 
-      int charge = tpcseed->get_charge();
-
+      int charge = 0;
+      if(tpcseed)
+	{
+	  charge = tpcseed->get_charge();
+	}
+      else if(siseed)
+	{
+	  charge = siseed->get_charge();
+	}
       /// Reset the track seed with the dummy covariance
       auto seed = ActsTrackFittingAlgorithm::TrackParameters::create(
                       pSurface,
