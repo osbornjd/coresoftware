@@ -38,6 +38,8 @@ SingleTpcPoolInput::~SingleTpcPoolInput()
 
 void SingleTpcPoolInput::FillPool(const uint64_t minBCO)
 {
+  std::cout << "Call fill pool with " << minBCO << std::endl;
+  bool firsttime = true;
   if (AllDone())  // no more files and all events read
   {
     return;
@@ -99,6 +101,12 @@ void SingleTpcPoolInput::FillPool(const uint64_t minBCO)
           if (is_lvl1)
           {
             uint64_t bco = plist[i]->lValue(j, "BCO");
+            auto diff = minBCO > bco ? minBCO - bco : bco - minBCO;
+            if(firsttime || diff % 1000000 < 1000)
+            {
+            std::cout << "bco and minbco " << bco << ", " << minBCO << std::endl;
+            firsttime = false;
+            }
             if (bco < minBCO)
             {
               continue;
@@ -116,6 +124,7 @@ void SingleTpcPoolInput::FillPool(const uint64_t minBCO)
       }
       continue;
     }
+    std::cout << "ready to go " << std::endl;
     for (int i = 0; i < npackets; i++)
     {
       // keep pointer to local packet
