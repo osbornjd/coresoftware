@@ -10,13 +10,16 @@
 //#define PHCOSMICSFILTER_H
 
 #include <fun4all/SubsysReco.h>
+#include <mvtx/CylinderGeom_Mvtx.h>
+#include <trackbase/MvtxDefs.h>
 #include <trackbase/TrkrCluster.h>
 #include <trackbase/TrkrClusterContainer.h>
+#include <trackbase/TrkrHitSet.h>
+#include <trackbase/TrkrHitSetContainer.h>
 #include <trackbase_historic/TrackSeed.h>
 #include <trackbase_historic/TrackSeedContainer.h>
 #include <trackbase_historic/TrackSeedContainer_v1.h>
 #include <trackbase_historic/TrackSeed_v2.h>
-
 // Helix Hough + Eigen includes (hidden from rootcint)
 #if !defined(__CINT__) || defined(__CLING__)
 
@@ -170,13 +173,21 @@ int PHStreakFinder::GetNodes(PHCompositeNode* topNode)
               << std::endl;
     return Fun4AllReturnCodes::ABORTEVENT;
   }
-  _cluster_map = findNode::getClass<LaserClusterContainerv1>(topNode, "LASER_CLUSTER");
+
+  _cluster_map = findNode::getClass<TrkrHitSetContainer>(topNode, "TRKR_HITSET");
   if (!_cluster_map)
   {
     std::cout << PHWHERE << "No cluster container on node tree, bailing."
               << std::endl;
     return Fun4AllReturnCodes::ABORTEVENT;
   }
+
+   mvtxGeom = findNode::getClass<PHG4CylinderGeomContainer>(topNode, "CYLINDERGEOM_MVTX");
+if(!mvtxGeom)
+{
+  std::cout << PHWHERE << "No mvtx geom" << std::endl;
+  return Fun4AllReturnCodes::ABORTEVENT;
+}
   return Fun4AllReturnCodes::EVENT_OK;
 }
 
@@ -334,12 +345,34 @@ int PHStreakFinder::process_event(PHCompositeNode* topNode)
   //Fill rtree
   bgi::rtree<pointKey, bgi::quadratic<16> > rtree;
 
-  auto range = _cluster_map->getClusters();
-  for( auto clusIter = range.first; clusIter != range.second; ++clusIter ){
-    LaserCluster *cluster = clusIter->second;
-    _ntp_clu->Fill(_nevent,cluster->getX() , cluster->getY(), cluster->getZ());
-    rtree.insert(std::make_pair(point(cluster->getX() , cluster->getY(), cluster->getZ()),std::distance(range.first,clusIter) ));
-      
+  auto range = _cluster_map->getHitSets();
+  int nhit = 0;
+  for (auto clusIter = range.first; clusIter != range.second; ++clusIter)
+  {
+    auto hitset = clusIter->second;
+    auto layer =  TrkrDefs::getLayer(clusIter->first);
+
+    auto hitrangei = hitset->getHits();
+    for (TrkrHitSet::ConstIterator hitr = hitrangei.first;
+         hitr != hitrangei.second;
+         ++hitr)
+    {
+      auto hitkey = hitr->first;
+      auto row = MvtxDefs::getRow(hitkey);
+      auto col = MvtxDefs::getCol(hitkey);
+      auto layergeom = dynamic_cast<CylinderGeom_Mvtx*>(mvtxGeom->GetLayerGeom(layer));
+      auto local_coords = layergeom->get_local_coords_from_pixel(row, col);
+      TVector2 local;
+      local.SetX(local_coords.X());
+      local.SetY(local_coords.Z());
+      auto surf = tGeometry->maps().getSiliconSurface(clusIter->first);
+      auto glob = layergeom->get_world_from_local_coords(surf, tGeometry, local);
+
+
+      _ntp_clu->Fill(_nevent, glob.X(), glob.Y(), glob.Z());
+      rtree.insert(std::make_pair(point(glob.X(), glob.Y(), glob.Z()), nhit));
+      nhit++;
+    }
   }
 
   //Get all clusters from rtree, fit stubs around clusters, fill stub tree
@@ -349,7 +382,7 @@ int PHStreakFinder::process_event(PHCompositeNode* topNode)
     for(float iy = -80;iy<80;iy+=4){ 
       float ir = sqrt(ix*ix+iy*iy);
       if(ir<30||ir>78){
-	continue;
+	//	continue;
       }
       vector<pointKey> allclusters;
       

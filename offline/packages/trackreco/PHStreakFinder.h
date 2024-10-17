@@ -126,7 +126,8 @@ class TFile;
 class TRKR_CLUSTER;
 class SvtxHitMap;
 class TrackSeedContainer;
-
+class TrkrHitSetContainer;
+class PHG4CylinderGeomContainer;
 
 namespace bg = boost::geometry;
 namespace bgi = boost::geometry::index;
@@ -171,7 +172,7 @@ class PHStreakFinder : public SubsysReco
    /*static*/ //vector<TrkrCluster*> clusterpoints;
 
   // node pointers
-  LaserClusterContainer *_cluster_map = nullptr;
+  TrkrHitSetContainer *_cluster_map = nullptr;
   //nodes to get norm vector
 
   double phiadd(double phi1, double phi2);
@@ -186,10 +187,10 @@ class PHStreakFinder : public SubsysReco
   int createNodes(PHCompositeNode *topNode);
   std::string m_trackMapName = "TpcTrackSeedContainer";
   TrackSeedContainer *m_seedContainer = nullptr;
-
-  //int _nlayers_all;
-  //unsigned int _nlayers_seeding;
-  //std::vector<int> _seeding_layer;
+  PHG4CylinderGeomContainer *mvtxGeom = nullptr;
+  // int _nlayers_all;
+  // unsigned int _nlayers_seeding;
+  // std::vector<int> _seeding_layer;
   std::string _filename;
   unsigned int _nevent = 0;
   bool _write_ntp = false;
