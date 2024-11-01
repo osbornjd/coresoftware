@@ -132,6 +132,7 @@ void SingleMvtxPoolInput::FillPool(const uint64_t minBCO)
           //          auto hbfSize = plist[i]->iValue(feeId, "NR_HBF");
           auto num_strobes = pool->iValue(feeId, "NR_STROBES");
           auto num_L1Trgs = pool->iValue(feeId, "NR_PHYS_TRG");
+          std::cout << "numl1 trigs " << num_L1Trgs<<std::endl;
           for (int iL1 = 0; iL1 < num_L1Trgs; ++iL1)
           {
             auto l1Trg_bco = pool->lValue(feeId, iL1, "L1_IR_BCO");
@@ -140,6 +141,8 @@ void SingleMvtxPoolInput::FillPool(const uint64_t minBCO)
             gtmL1BcoSet.emplace(l1Trg_bco);
           }
           m_FeeStrobeMap[feeId] += num_strobes;
+          std::cout << "num strobes " << num_strobes << std::endl;
+          int numcontinues = 0;
           for (int i_strb{0}; i_strb < num_strobes; ++i_strb)
           {
             auto strb_detField = pool->iValue(feeId, i_strb, "TRG_DET_FIELD");
@@ -150,6 +153,7 @@ void SingleMvtxPoolInput::FillPool(const uint64_t minBCO)
             m_FEEBclkMap[feeId] = strb_bco;
             if (strb_bco < minBCO)
             {
+              numcontinues++;
               continue;
             }
 
@@ -184,6 +188,7 @@ void SingleMvtxPoolInput::FillPool(const uint64_t minBCO)
               StreamingInputManager()->AddMvtxFeeIdInfo(strb_bco, feeId, strb_detField);
             }
           }
+          std::cout << "number of continues " << numcontinues << std::endl;
         }
       }
     }
