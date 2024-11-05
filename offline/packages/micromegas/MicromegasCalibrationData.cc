@@ -118,7 +118,8 @@ void MicromegasCalibrationData::set_rms( int fee, int channel, double value )
 void MicromegasCalibrationData::write( const std::string& filename ) const
 {
   std::cout << "MicromegasCalibrationData::write - filename: " << filename << std::endl;
-  if( m_raw_calibration_map.empty() ) return;
+  if( m_raw_calibration_map.empty() ) { return;
+}
 
   // use generic CDBTree to load
   CDBTTree cdbttree( filename );

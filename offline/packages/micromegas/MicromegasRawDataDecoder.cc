@@ -130,7 +130,8 @@ int MicromegasRawDataDecoder::process_event(PHCompositeNode* topNode)
       const int type = packet->iValue(iwf, "TYPE");
 
       // ignore heartbeat waveforms
-      if( type == MicromegasDefs::HEARTBEAT_T ) continue;
+      if( type == MicromegasDefs::HEARTBEAT_T ) { continue;
+}
 
       const auto channel = packet->iValue(iwf, "CHANNEL");
       const int samples = packet->iValue(iwf, "SAMPLES");

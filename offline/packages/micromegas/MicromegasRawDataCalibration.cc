@@ -74,7 +74,8 @@ int MicromegasRawDataCalibration::process_event(PHCompositeNode *topNode)
     {
 
       const int type = packet->iValue(i, "TYPE");
-      if( type == MicromegasDefs::HEARTBEAT_T ) continue;
+      if( type == MicromegasDefs::HEARTBEAT_T ) { continue;
+}
 
       // get fee id, apply mapping to current fiber set, for backward compatibility
       const auto channel = packet->iValue( i, "CHANNEL" );
@@ -100,7 +101,8 @@ int MicromegasRawDataCalibration::process_event(PHCompositeNode *topNode)
         profile = new TProfile( Form( "h_adc_channel_%i", fee_id ), "ADC vs channel;channel;adc", MicromegasDefs::m_nchannels_fee, 0, MicromegasDefs::m_nchannels_fee );
         profile->SetErrorOption( "s" );
         m_profile_map.insert(  piter, std::make_pair( fee_id, profile ) );
-      } else profile = piter->second;
+      } else { profile = piter->second;
+}
 
       // fill
       for( int is = std::max( m_sample_min,0 ); is < std::min( m_sample_max,samples ); ++ is )
