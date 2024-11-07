@@ -324,10 +324,7 @@ void SingleMvtxPoolInput::CleanupUsedPackets(const uint64_t bclk)
 
   for (auto iter : toclearbclk)
   {
-    for(const auto& hit : m_MvtxRawHitMap[iter])
-    {
-      delete hit;
-    }
+
     m_BclkStack.erase(iter);
     m_MvtxRawHitMap[iter].clear();
     m_MvtxRawHitMap.erase(iter);
