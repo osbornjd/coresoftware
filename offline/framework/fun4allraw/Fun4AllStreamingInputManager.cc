@@ -910,6 +910,8 @@ int Fun4AllStreamingInputManager::FillMvtx()
     for (auto iter : m_MvtxInputVector)
     {
       iter->CleanupUsedPackets(m_MvtxRawHitMap.begin()->first);
+
+      iter->clearFeeGTML1BCOMap(m_MvtxRawHitMap.begin()->first);
     }
     timer2.stop();
     std::cout << "cleanup used packets " << timer2.elapsed() << std::endl;
@@ -1000,9 +1002,7 @@ int Fun4AllStreamingInputManager::FillMvtx()
       }
       feecounter++;
     }
-    // we just want to erase anything that is well before the current GL1
-    // so make an arbitrary cut of 40000.
-    p->clearFeeGTML1BCOMap(m_RefBCO - 40000);
+
   }
   int allfeestagged = 0;
   for (auto &[pid, feeset] : taggedPacketsFEEs)
@@ -1253,6 +1253,8 @@ int Fun4AllStreamingInputManager::FillTpc()
     for (auto iter : m_TpcInputVector)
     {
       iter->CleanupUsedPackets(m_TpcRawHitMap.begin()->first);
+      iter->clearPacketBClkStackMap(m_TpcRawHitMap.begin()->first);
+
     }
     m_TpcRawHitMap.begin()->second.TpcRawHitVector.clear();
     m_TpcRawHitMap.erase(m_TpcRawHitMap.begin());
@@ -1312,7 +1314,6 @@ int Fun4AllStreamingInputManager::FillTpc()
       iter->CleanupUsedPackets(m_TpcRawHitMap.begin()->first);
         // we just want to erase anything that is well away from the current GL1
   
-      iter->clearPacketBClkStackMap(m_RefBCO -m_tpc_negative_bco);
     }
     m_TpcRawHitMap.begin()->second.TpcRawHitVector.clear();
     m_TpcRawHitMap.erase(m_TpcRawHitMap.begin());
