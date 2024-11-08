@@ -10,7 +10,6 @@
 #include <ffarawobjects/MvtxRawHitv1.h>
 
 #include <frog/FROG.h>
-#include <phool/PHTimer.h>
 #include <phool/PHCompositeNode.h>
 #include <phool/PHNodeIterator.h>  // for PHNodeIterator
 #include <phool/getClass.h>
@@ -51,7 +50,6 @@ void SingleMvtxPoolInput::FillPool(const uint64_t minBCO)
   {
     return;
   }
-
   while (GetEventiterator() == nullptr)  // at startup this is a null pointer
   {
     if (!OpenNextFile())
@@ -60,9 +58,7 @@ void SingleMvtxPoolInput::FillPool(const uint64_t minBCO)
       return;
     }
   }
-  PHTimer whilelooptimer("whilelooptimer");
-  whilelooptimer.stop();
-  whilelooptimer.restart();
+
   //  std::set<uint64_t> saved_beamclocks;
   while (GetSomeMoreEvents())
   {
@@ -98,9 +94,6 @@ void SingleMvtxPoolInput::FillPool(const uint64_t minBCO)
     {
       exit(1);
     }
-    PHTimer timer("pooltimer");
-    timer.stop();
-    timer.restart();
     for (int i = 0; i < npackets; i++)
     {
       // Ignoring packet not from MVTX detector
@@ -120,9 +113,6 @@ void SingleMvtxPoolInput::FillPool(const uint64_t minBCO)
       poolmap[plist[i]->getIdentifier()]->addPacket(plist[i]);
       delete plist[i];
     }
-    timer.stop();
-    std::cout << "poolmap creation timer " << timer.elapsed() << std::endl;
-    timer.restart();
     for (auto &iter : poolmap)
     {
       mvtx_pool *pool = iter.second;
@@ -142,10 +132,6 @@ void SingleMvtxPoolInput::FillPool(const uint64_t minBCO)
           //          auto hbfSize = plist[i]->iValue(feeId, "NR_HBF");
           auto num_strobes = pool->iValue(feeId, "NR_STROBES");
           auto num_L1Trgs = pool->iValue(feeId, "NR_PHYS_TRG");
-          //std::cout << "numl1 trigs " << num_L1Trgs<<std::endl;
-          PHTimer l1trgtimer("l1trgtimer");
-          l1trgtimer.stop();
-          l1trgtimer.restart();
           for (int iL1 = 0; iL1 < num_L1Trgs; ++iL1)
           {
             auto l1Trg_bco = pool->lValue(feeId, iL1, "L1_IR_BCO");
@@ -154,29 +140,16 @@ void SingleMvtxPoolInput::FillPool(const uint64_t minBCO)
             gtmL1BcoSet.emplace(l1Trg_bco);
           }
           m_FeeStrobeMap[feeId] += num_strobes;
-          l1trgtimer.stop();
-          std::cout << "l1trg timer " << l1trgtimer.elapsed() << std::endl;
-          std::cout << "num strobes " << num_strobes << std::endl;
-          int numcontinues = 0;
-          PHTimer strobetimer("strobetimer");
-          strobetimer.stop();
-          strobetimer.restart();
-          std::cout << "NUM strobes " << num_strobes<<std::endl;
           for (int i_strb{0}; i_strb < num_strobes; ++i_strb)
           {
-            PHTimer itimer("itiemr");
-            itimer.stop();
-            itimer.restart();
             auto strb_detField = pool->iValue(feeId, i_strb, "TRG_DET_FIELD");
             uint64_t strb_bco = pool->lValue(feeId, i_strb, "TRG_IR_BCO");
             auto strb_bc = pool->iValue(feeId, i_strb, "TRG_IR_BC");
             auto num_hits = pool->iValue(feeId, i_strb, "TRG_NR_HITS");
             m_BclkStack.insert(strb_bco);
             m_FEEBclkMap[feeId] = strb_bco;
-            itimer.stop();
             if (strb_bco < minBCO)
             {
-              numcontinues++;
               continue;
             }
 
@@ -188,13 +161,9 @@ void SingleMvtxPoolInput::FillPool(const uint64_t minBCO)
               std::cout << ", n_hits: " << num_hits << std::endl;
             }
             auto hits = pool->get_hits(feeId, i_strb);
-            int nhits = 0;
-            PHTimer hittimer("hittimer");
-            hittimer.stop();
-            hittimer.restart();
             for (auto &&hit : hits)
             {
-              auto newhit = std::make_unique<MvtxRawHitv1>();
+              MvtxRawHit *newhit = new MvtxRawHitv1();
               newhit->set_bco(strb_bco);
               newhit->set_strobe_bc(strb_bc);
               newhit->set_chip_bc(hit->bunchcounter);
@@ -206,32 +175,18 @@ void SingleMvtxPoolInput::FillPool(const uint64_t minBCO)
               newhit->set_col(hit->col_pos);
               if (StreamingInputManager())
               {
-            
-                StreamingInputManager()->AddMvtxRawHit(strb_bco, newhit.get());
+                StreamingInputManager()->AddMvtxRawHit(strb_bco, newhit);
               }
-              m_MvtxRawHitMap[strb_bco].push_back(newhit.release());
-              nhits++;
+              m_MvtxRawHitMap[strb_bco].push_back(newhit);
             }
-            hittimer.stop();
-            //std::cout << "total hits processed " << nhits << std::endl;
-            //std::cout << "hittimer " << hittimer.elapsed() << std::endl;
-            hittimer.restart();
             if (StreamingInputManager())
             {
               StreamingInputManager()->AddMvtxFeeIdInfo(strb_bco, feeId, strb_detField);
             }
-            hittimer.stop();
-            //std::cout << "feeidinfo timer " << hittimer.elapsed() << std::endl;
           }
-          strobetimer.stop();
-          std::cout << "strobe loop " << strobetimer.elapsed() << std::endl;
-          //std::cout << "number of continues " << numcontinues << std::endl;
         }
       }
     }
-    timer.stop();
-    std::cout << "fill raw hits timer " << timer.elapsed()<<std::endl;
-    timer.restart();
     // Assign L1 trg to Strobe windows data.
     for (auto &lv1Bco : gtmL1BcoSet)
     {
@@ -257,10 +212,7 @@ void SingleMvtxPoolInput::FillPool(const uint64_t minBCO)
       }
     }
     gtmL1BcoSet.clear();
-    timer.stop();
-    std::cout << "gtml1bcoset time " << timer.elapsed()<<std::endl;
   }
-  whilelooptimer.stop();
 }
 
 void SingleMvtxPoolInput::Print(const std::string &what) const
@@ -324,7 +276,6 @@ void SingleMvtxPoolInput::CleanupUsedPackets(const uint64_t bclk)
 
   for (auto iter : toclearbclk)
   {
-
     m_BclkStack.erase(iter);
     m_MvtxRawHitMap[iter].clear();
     m_MvtxRawHitMap.erase(iter);
@@ -378,9 +329,6 @@ void SingleMvtxPoolInput::ClearCurrentEvent()
 
 bool SingleMvtxPoolInput::GetSomeMoreEvents()
 {
-  PHTimer timer("timer");
-  timer.stop();
-  timer.restart();
   if (AllDone())
   {
     return false;
@@ -422,7 +370,6 @@ bool SingleMvtxPoolInput::GetSomeMoreEvents()
   {
     m_FEEBclkMap.erase(iter);
   }
-  timer.stop();
   return false;
 
   //  if (CheckPoolDepth(m_MvtxRawHitMap.begin()->first))
@@ -504,7 +451,7 @@ void SingleMvtxPoolInput::ConfigureStreamingInputManager()
     m_BcoRange = std::ceil(strobeLength / 0.1065);
     m_NegativeBco = std::ceil(strobeLength / 0.1065);
   }
-  if(Verbosity() ==0)
+  if(Verbosity() > 1)
   {
     std::cout << "Mvtx strobe length " << strobeLength << std::endl;
     std::cout << "Mvtx BCO range and negative bco range set based on strobe length " << m_BcoRange << ", " << m_NegativeBco << std::endl;
