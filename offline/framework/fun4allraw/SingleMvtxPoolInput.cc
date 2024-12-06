@@ -134,10 +134,15 @@ void SingleMvtxPoolInput::FillPool(const uint64_t minBCO)
           auto num_L1Trgs = pool->iValue(feeId, "NR_PHYS_TRG");
           for (int iL1 = 0; iL1 < num_L1Trgs; ++iL1)
           {
-            auto l1Trg_bco = pool->lValue(feeId, iL1, "L1_IR_BCO");
+            uint64_t l1Trg_bco = pool->lValue(feeId, iL1, "L1_IR_BCO");
             //            auto l1Trg_bc  = plist[i]->iValue(feeId, iL1, "L1_IR_BC");
-            m_FeeGTML1BCOMap[feeId].insert(l1Trg_bco);
+           
             gtmL1BcoSet.emplace(l1Trg_bco);
+            if(l1Trg_bco < minBCO - m_NegativeBco)
+            {
+              continue;
+            }
+            m_FeeGTML1BCOMap[feeId].insert(l1Trg_bco);
           }
           m_FeeStrobeMap[feeId] += num_strobes;
           for (int i_strb{0}; i_strb < num_strobes; ++i_strb)

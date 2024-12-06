@@ -195,7 +195,7 @@ void SingleInttPoolInput::FillPool(const uint64_t minBCO)
           for (int k = 0; k < nbcos; k++)
           {
             uint64_t bco = pool->lValue(fee, k, "BCOVAL");
-            if(bco < minBCO)
+            if(bco < minBCO - m_NegativeBco)
             {
               continue;
             }
