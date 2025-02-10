@@ -113,7 +113,7 @@ int PHActsTrkFitter::InitRun(PHCompositeNode* topNode)
     m_ConstField = true;
   }
 
-  auto level = Acts::Logging::FATAL;
+  auto level = Acts::Logging::VERBOSE;
   if (Verbosity() > 5)
   {
     level = Acts::Logging::VERBOSE;
@@ -226,7 +226,7 @@ int PHActsTrkFitter::process_event(PHCompositeNode* topNode)
   }
 
   // put this in the output file
-  if (Verbosity() > 0)
+  if (Verbosity() == 0)
   {
     std::cout << "The Acts track fitter had " << m_nBadFits
               << " fits return an error" << std::endl;
@@ -714,13 +714,22 @@ void PHActsTrkFitter::loopTracks(Acts::Logging::Level logLevel)
       else if (!m_fitSiliconMMs)
       {
         /// Track fit failed, get rid of the track from the map
-        m_nBadFits++;
-        if (Verbosity() > 1)
+        if (Verbosity() > 0)
         {
-          std::cout << "Track fit failed for track " << m_seedMap->find(track)
-                    << " with Acts error message "
-                    << result.error() << ", " << result.error().message()
-                    << std::endl;
+          if(tpcseed && siseed)
+          {
+            if(tpcseed->size_cluster_keys() > 25 && siseed->size_cluster_keys() > 4)
+            {
+              m_nBadFits++;
+
+              std::cout << "Track fit failed for track " << m_seedMap->find(track)
+                << " and tpc and si id " << tpcid << ", " << siid
+                        << " with Acts error message "
+                        << result.error() << ", " << result.error().message()
+                        << std::endl;
+            }
+          }
+        
         }
       }  // end fit failed case
     }    // end ivary loop
