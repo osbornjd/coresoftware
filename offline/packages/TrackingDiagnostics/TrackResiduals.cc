@@ -373,7 +373,7 @@ void TrackResiduals::fillFailedSeedTree(PHCompositeNode* topNode, std::set<unsig
     }
     m_trackid = svtxseedmap->find(seed);
     auto tpcseedindex = seed->get_tpc_seed_index();
-    if (tpc_seed_ids.find(tpcseedindex) != tpc_seed_ids.end())
+    if (tpc_seed_ids.find(m_trackid) != tpc_seed_ids.end())
     {
       continue;
     }
@@ -1853,7 +1853,6 @@ void TrackResiduals::fillResidualTreeKF(PHCompositeNode* topNode)
       continue;
     }
     m_trackid = track->get_id();
-
     m_crossing = track->get_crossing();
     m_crossing_estimate = SHRT_MAX;
     m_px = track->get_px();
@@ -1922,11 +1921,11 @@ void TrackResiduals::fillResidualTreeKF(PHCompositeNode* topNode)
     m_dcaxy = dcapair.first.first;
     m_dcaz = dcapair.second.first;
 
+    tpc_seed_ids.insert(m_trackid);
     auto tpcseed = track->get_tpc_seed();
     if (tpcseed)
     {
       m_tpcid = tpcseedmap->find(tpcseed);
-      tpc_seed_ids.insert(tpcseedmap->find(tpcseed));
     }
     auto silseed = track->get_silicon_seed();
     if (silseed)

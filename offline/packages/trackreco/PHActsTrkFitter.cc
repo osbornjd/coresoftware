@@ -701,7 +701,7 @@ void PHActsTrkFitter::loopTracks(Acts::Logging::Level logLevel)
           }  // end insert track for SC calib fit
           else
           {
-            unsigned int trid = m_trackMap->size();
+            unsigned int trid = m_seedMap->find(track);
             newTrack.set_id(trid);
 
             if (getTrackFitResult(result, track, &newTrack, tracks, measurements))
