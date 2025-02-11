@@ -389,6 +389,7 @@ void TrackResiduals::fillFailedSeedTree(PHCompositeNode* topNode, std::set<unsig
       m_silseedy = si_pos.y();
       m_silseedz = si_pos.z();
       crossing = silseed->get_crossing();
+      m_silseedcharge = silseed->get_qOverR() > 0 ? 1 : -1;
     }
     else
     {
@@ -1573,6 +1574,7 @@ void TrackResiduals::createBranches()
   m_failedfits->Branch("silseedx", &m_silseedx, "m_silseedx/F");
   m_failedfits->Branch("silseedy", &m_silseedy, "m_silseedy/F");
   m_failedfits->Branch("silseedz", &m_silseedz, "m_silseedz/F");
+  m_failedfits->Branch("silseedcharge", &m_silseedcharge, "m_silseedcharge/I");
   m_failedfits->Branch("tpcseedx", &m_tpcseedx, "m_tpcseedx/F");
   m_failedfits->Branch("tpcseedy", &m_tpcseedy, "m_tpcseedy/F");
   m_failedfits->Branch("tpcseedz", &m_tpcseedz, "m_tpcseedz/F");
