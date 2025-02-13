@@ -703,7 +703,7 @@ void PHActsTrkFitter::loopTracks(Acts::Logging::Level logLevel)
           {
             unsigned int trid = m_seedMap->find(track);
             newTrack.set_id(trid);
-
+            std::cout << "Track fit succeeded " << trid << std::endl;
             if (getTrackFitResult(result, track, &newTrack, tracks, measurements))
             {
               m_trackMap->insertWithKey(&newTrack, trid);
