@@ -113,7 +113,7 @@ int PHActsTrkFitter::InitRun(PHCompositeNode* topNode)
     m_ConstField = true;
   }
 
-  auto level = Acts::Logging::VERBOSE;
+  auto level = Acts::Logging::FATAL;
   if (Verbosity() > 5)
   {
     level = Acts::Logging::VERBOSE;
@@ -714,7 +714,7 @@ void PHActsTrkFitter::loopTracks(Acts::Logging::Level logLevel)
       else if (!m_fitSiliconMMs)
       {
         /// Track fit failed, get rid of the track from the map
-        if (Verbosity() > 0)
+        if (Verbosity() == 0)
         {
           if(tpcseed && siseed)
           {
