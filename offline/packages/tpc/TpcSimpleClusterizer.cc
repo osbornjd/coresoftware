@@ -160,7 +160,7 @@ namespace
       }
 
       // update phi sums
-      double phi_center = my_data.layergeom->get_phicenter(iphi);
+      double phi_center = my_data.layergeom->get_phicenter(iphi, my_data.side);
       phi_sum += phi_center * adc;
       phi2_sum += square(phi_center) * adc;
 
@@ -534,7 +534,7 @@ int TpcSimpleClusterizer::process_event(PHCompositeNode *topNode)
 
   if (pthread_mutex_init(&mythreadlock, nullptr) != 0)
   {
-    printf("\n mutex init failed\n");
+    std::cout << std::endl << " mutex init failed" << std::endl;
     return 1;
   }
 

@@ -5,10 +5,10 @@
 //  Purpose: iterator to navigate a node tree
 //  Author: Matthias Messer
 
-//#include "PHCompositeNode.h"
+// #include "PHCompositeNode.h"
 #include "PHPointerList.h"
 
-#include <string> 
+#include <string>
 
 class PHCompositeNode;
 class PHNode;
@@ -18,8 +18,8 @@ class PHNodeIterator
 {
  public:
   explicit PHNodeIterator(PHCompositeNode*);
-  virtual ~PHNodeIterator() {}
-  PHNodeIterator();
+  virtual ~PHNodeIterator() = default;
+  PHNodeIterator() = default;
 
  public:
   void print();
@@ -33,7 +33,7 @@ class PHNodeIterator
   PHCompositeNode* get_currentNode() const { return currentNode; }
 
  protected:
-  PHCompositeNode* currentNode;
+  PHCompositeNode* currentNode {nullptr};
   PHPointerList<PHNode> subNodeList;
 };
 

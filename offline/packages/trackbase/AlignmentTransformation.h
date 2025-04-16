@@ -103,6 +103,10 @@ class AlignmentTransformation
 
   void verbosity() { localVerbosity = 1; }
   void misalignmentFactor(uint8_t layer, const double factor);
+  double misalignmentFactor(uint8_t layer)
+  {
+    return transformMap->getMisalignmentFactor(layer);
+  }
   void useInttSurveyGeometry(bool sur) { use_intt_survey_geometry = sur; }
 
  private:
@@ -121,7 +125,6 @@ class AlignmentTransformation
 
   int localVerbosity = 0;
 
-  bool use_global_millepede_translations = true;
   bool use_intt_survey_geometry = false;
 
   Acts::Transform3 newMakeTransform(const Surface& surf, Eigen::Vector3d& millepedeTranslation, Eigen::Vector3d& sensorAngles, Eigen::Vector3d& sensorAnglesGlobal, bool survey);

@@ -1,6 +1,6 @@
 AUTOMAKE_OPTIONS = foreign
 
-AM_CXXFLAGS = `geant4-config --cflags`
+AM_CXXFLAGS = `geant4-config --cflags | sed 's/-I/-isystem/g'`
 
 lib_LTLIBRARIES = \
   libg4mvtx.la
@@ -21,19 +21,21 @@ libg4mvtx_la_LIBADD = \
   -lphg4hit \
   -lphool \
   -lg4detectors \
-  -ltrack_io \
+  -ltrack \
   -lg4tracking_io \
   -lmvtx \
   -lmvtx_io
 
 pkginclude_HEADERS = \
   PHG4MvtxDefs.h \
+  PHG4MvtxMisalignment.h \
   PHG4MvtxHitReco.h \
   PHG4MvtxSubsystem.h \
   PHG4EICMvtxSubsystem.h \
   PHG4MvtxDigitizer.h
 
 libg4mvtx_la_SOURCES = \
+  PHG4MvtxMisalignment.cc \
   PHG4MvtxHitReco.cc \
   PHG4MvtxDetector.cc \
   PHG4EICMvtxDetector.cc \

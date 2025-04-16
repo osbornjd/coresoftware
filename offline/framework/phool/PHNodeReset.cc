@@ -12,7 +12,10 @@
 
 void PHNodeReset::perform(PHNode* node)
 {
-  if (node->getResetFlag() != true) return;
+  if (!node->getResetFlag())
+  {
+    return;
+  }
   if (verbosity > 0)
   {
     std::cout << "PHNodeReset: Resetting " << node->getName() << std::endl;
@@ -21,6 +24,7 @@ void PHNodeReset::perform(PHNode* node)
   {
     if (node->getObjectType() == "PHObject")
     {
+      // NOLINTNEXTLINE(cppcoreguidelines-pro-type-static-cast-downcast)
       (static_cast<PHDataNode<PHObject>*>(node))->getData()->Reset();
     }
   }

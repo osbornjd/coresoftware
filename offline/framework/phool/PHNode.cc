@@ -6,11 +6,7 @@
 
 #include <TSystem.h>
 
-// boost stacktrace header causes a shadow warning
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wshadow"
 #include <boost/stacktrace.hpp>
-#pragma GCC diagnostic pop
 
 #include <iostream>
 
@@ -20,13 +16,13 @@ PHNode::PHNode(const std::string& n)
 }
 
 PHNode::PHNode(const std::string& n, const std::string& typ)
-  :  objecttype(typ)
+  : objecttype(typ)
 {
   int badnode = 0;
   if (n.find('.') != std::string::npos)
   {
     std::cout << PHWHERE << " No nodenames containing decimal point possible: "
-         << n << std::endl;
+              << n << std::endl;
     badnode = 1;
   }
   if (n.empty())

@@ -17,19 +17,20 @@ pkginclude_HEADERS = \
   GlobalQA.h
 
 libglobalQA_la_SOURCES = \
-  GlobalQA.cc 
+  GlobalQA.cc
 
 libglobalQA_la_LIBADD = \
   -lcalo_io \
-  -lCLHEP \
+  -lcdbobjects \
+  -lffamodules \
+  -lffarawobjects \
   -lfun4all \
   -lglobalvertex_io \
   -lmbd_io \
-  -lzdcinfo_io \
   -lphool \
+  -lqautils \
   -lSubsysReco \
-  -lffarawobjects \
-  -lqautils
+  -lzdcinfo_io
 
 ################################################
 # linking tests
@@ -46,10 +47,6 @@ testexternals.C:
 	echo "{" >> $@
 	echo "  return 0;" >> $@
 	echo "}" >> $@
-
-# Rule for generating table CINT dictionaries.
-%_Dict.cc: %.h %LinkDef.h
-	rootcint -f $@ @CINTDEFS@ -c $(DEFAULT_INCLUDES) $(AM_CPPFLAGS) $^
 
 clean-local:
 	rm -f $(BUILT_SOURCES)

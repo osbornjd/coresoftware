@@ -1,23 +1,31 @@
 //____________________________________________________________________________..
 
 #include "JetKinematicCheck.h"
-#include <TH1D.h>
-#include <TH2D.h>
-#include <TH3D.h>
-#include <TLegend.h>
-#include <TPad.h>
+
+#include <calotrigger/TriggerAnalyzer.h>
+
 #include <fun4all/Fun4AllHistoManager.h>
 #include <fun4all/Fun4AllReturnCodes.h>
+
 #include <jetbase/JetContainer.h>
 #include <jetbase/Jetv2.h>
+
 #include <phool/PHCompositeNode.h>
 #include <phool/getClass.h>
-#include <algorithm>
-#include <cmath>
-#include <string>
-#include <vector>
+
+#include <TH1.h>
+#include <TH2.h>
+#include <TH3.h>
+#include <TLegend.h>
+#include <TPad.h>
 
 #include <boost/format.hpp>
+
+#include <algorithm>
+#include <cmath>
+#include <cstdlib>
+#include <string>
+#include <vector>
 //____________________________________________________________________________..
 
 JetKinematicCheck::JetKinematicCheck(const std::string &moduleName,
@@ -31,11 +39,6 @@ JetKinematicCheck::JetKinematicCheck(const std::string &moduleName,
   , m_recoJetNameR03(recojetnameR03)
   , m_recoJetNameR04(recojetnameR04)
   , m_recoJetNameR05(recojetnameR05)
-  , m_histTag("AllTrig")
-  , m_etaRange(-1.1, 1.1)
-  , m_ptRange(10, 100)
-  , m_doTrgSelect(false)
-  , m_trgToSelect(JetQADefs::GL1::MBDNSJet1)
 {
   if (Verbosity() > 1)
   {
@@ -50,11 +53,14 @@ JetKinematicCheck::~JetKinematicCheck()
   {
     std::cout << "JetKinematicCheck::~JetKinematicCheck() Calling dtor" << std::endl;
   }
+  delete m_analyzer;
 }
 
 //____________________________________________________________________________..
 int JetKinematicCheck::Init(PHCompositeNode * /*unused*/)
 {
+  delete m_analyzer;
+  m_analyzer = new TriggerAnalyzer();
   hm = QAHistManagerDef::getHistoManager();
   assert(hm);
 
@@ -95,7 +101,10 @@ int JetKinematicCheck::Init(PHCompositeNode * /*unused*/)
   for (auto &vecHistName : vecHistNames)
   {
     vecHistName.insert(0, "h_" + smallModuleName + "_");
-    if (!m_histTag.empty()) vecHistName.append("_" + m_histTag);
+    if (!m_histTag.empty())
+    {
+      vecHistName.append("_" + m_histTag);
+    }
   }
 
   // initialize histograms
@@ -215,7 +224,8 @@ int JetKinematicCheck::process_event(PHCompositeNode *topNode)
   // if needed, check if selected trigger fired
   if (m_doTrgSelect)
   {
-    bool hasTrigger = JetQADefs::DidTriggerFire(m_trgToSelect, topNode);
+    m_analyzer->decodeTriggers(topNode);
+    bool hasTrigger = JetQADefs::DidTriggerFire(m_trgToSelect, m_analyzer);
     if (!hasTrigger)
     {
       return Fun4AllReturnCodes::EVENT_OK;
@@ -229,6 +239,18 @@ int JetKinematicCheck::process_event(PHCompositeNode *topNode)
   // Loop over each reco jet radii from array
   for (int i = 0; i < n_radii; i++)
   {
+
+    // update eta range based on resolution parameter
+    std::pair<float, float> etaRangeUse;
+    if (m_restrictEtaRange)
+    {
+      etaRangeUse = {m_etaRange.first + m_radii[i], m_etaRange.second - m_radii[i]};
+    }
+    else
+    {
+      etaRangeUse = {m_etaRange.first, m_etaRange.second};
+    }
+
     std::string recoJetName = m_recoJetName_array[i];
 
     JetContainer *jets = findNode::getClass<JetContainer>(topNode, recoJetName);
@@ -237,13 +259,13 @@ int JetKinematicCheck::process_event(PHCompositeNode *topNode)
       std::cout
           << "JetKinematicCheck::process_event - Error can not find DST Reco JetContainer node "
           << recoJetName << std::endl;
-      return Fun4AllReturnCodes::ABORTRUN;
+      return Fun4AllReturnCodes::EVENT_OK;
     }
 
     // loop over jets
     for (auto jet : *jets)
     {
-      bool eta_cut = (jet->get_eta() >= m_etaRange.first) and (jet->get_eta() <= m_etaRange.second);
+      bool eta_cut = (jet->get_eta() >= etaRangeUse.first) and (jet->get_eta() <= etaRangeUse.second);
       bool pt_cut = (jet->get_pt() >= m_ptRange.first) and (jet->get_pt() <= m_ptRange.second);
       if ((not eta_cut) or (not pt_cut))
       {
@@ -318,8 +340,8 @@ int JetKinematicCheck::End(PHCompositeNode * /*unused*/)
   leg1->SetFillStyle(0);
   leg1->SetBorderSize(0);
   leg1->SetTextSize(0.06);
-  leg1->AddEntry((TObject *) nullptr, boost::str(boost::format("%1% < p_{T} < %2% [GeV/c]")% m_ptRange.first% m_ptRange.second).c_str(),"");
-  leg1->AddEntry((TObject *) nullptr, boost::str(boost::format("%1% < #eta < %2%")% m_etaRange.first % m_etaRange.second).c_str(), "");
+  leg1->AddEntry((TObject *) nullptr, boost::str(boost::format("%1% < p_{T} < %2% [GeV/c]") % m_ptRange.first % m_ptRange.second).c_str(), "");
+  leg1->AddEntry((TObject *) nullptr, boost::str(boost::format("%1% < #eta < %2%") % m_etaRange.first % m_etaRange.second).c_str(), "");
   jet_spectra_r02->SetMarkerStyle(8);
   jet_spectra_r02->SetMarkerColor(1);
   jet_spectra_r02->SetLineColor(1);
@@ -348,7 +370,7 @@ int JetKinematicCheck::End(PHCompositeNode * /*unused*/)
   leg3->SetFillStyle(0);
   leg3->SetBorderSize(0);
   leg3->SetTextSize(0.06);
-  leg3->AddEntry((TObject *) nullptr, boost::str(boost::format("%1% < p_{T} < %2% [GeV/c]")%  m_ptRange.first % m_ptRange.second).c_str(), "");
+  leg3->AddEntry((TObject *) nullptr, boost::str(boost::format("%1% < p_{T} < %2% [GeV/c]") % m_ptRange.first % m_ptRange.second).c_str(), "");
   leg3->AddEntry((TObject *) nullptr, boost::str(boost::format("%1% < #eta < %2%") % m_etaRange.first % m_etaRange.second).c_str(), "");
   jet_spectra_r04->SetMarkerStyle(8);
   jet_spectra_r04->SetMarkerColor(1);
@@ -363,7 +385,7 @@ int JetKinematicCheck::End(PHCompositeNode * /*unused*/)
   leg4->SetFillStyle(0);
   leg4->SetBorderSize(0);
   leg4->SetTextSize(0.06);
-  leg4->AddEntry((TObject *) nullptr, boost::str(boost::format("%1% < p_{T} < %2% [GeV/c]")%  m_ptRange.first % m_ptRange.second).c_str(), "");
+  leg4->AddEntry((TObject *) nullptr, boost::str(boost::format("%1% < p_{T} < %2% [GeV/c]") % m_ptRange.first % m_ptRange.second).c_str(), "");
   leg4->AddEntry((TObject *) nullptr, boost::str(boost::format("%1% < #eta < %2%") % m_etaRange.first % m_etaRange.second).c_str(), "");
   jet_spectra_r05->SetMarkerStyle(8);
   jet_spectra_r05->SetMarkerColor(1);
@@ -401,7 +423,7 @@ int JetKinematicCheck::End(PHCompositeNode * /*unused*/)
   leg7->SetBorderSize(0);
   leg7->SetTextSize(0.06);
   leg7->AddEntry((TObject *) nullptr, boost::str(boost::format("%1% < p_{T} < %2% [GeV/c]") % m_ptRange.first % m_ptRange.second).c_str(), "");
-  leg7->AddEntry((TObject *) nullptr, boost::str(boost::format("%1% < #eta < %2%") % m_etaRange.first %  m_etaRange.second).c_str(), "");
+  leg7->AddEntry((TObject *) nullptr, boost::str(boost::format("%1% < #eta < %2%") % m_etaRange.first % m_etaRange.second).c_str(), "");
   jet_eta_phi_r04->SetStats(false);
   jet_eta_phi_r04->SetTitle("Jet Eta-Phi [R = 0.4]");
   jet_eta_phi_r04->GetListOfFunctions()->Add(leg7);
@@ -412,7 +434,7 @@ int JetKinematicCheck::End(PHCompositeNode * /*unused*/)
   leg8->SetBorderSize(0);
   leg8->SetTextSize(0.06);
   leg8->AddEntry((TObject *) nullptr, boost::str(boost::format("%1% < p_{T} < %2% [GeV/c]") % m_ptRange.first % m_ptRange.second).c_str(), "");
-  leg8->AddEntry((TObject *) nullptr, boost::str(boost::format("%1% < #eta < %2%") % m_etaRange.first %  m_etaRange.second).c_str(), "");
+  leg8->AddEntry((TObject *) nullptr, boost::str(boost::format("%1% < #eta < %2%") % m_etaRange.first % m_etaRange.second).c_str(), "");
   jet_eta_phi_r05->SetStats(false);
   jet_eta_phi_r05->SetTitle("Jet Eta-Phi [R = 0.5]");
   jet_eta_phi_r05->GetListOfFunctions()->Add(leg8);
@@ -478,7 +500,7 @@ int JetKinematicCheck::End(PHCompositeNode * /*unused*/)
   leg13->SetFillStyle(0);
   leg13->SetBorderSize(0);
   leg13->SetTextSize(0.06);
-  leg13->AddEntry((TObject *) nullptr, boost::str(boost::format("%1% < p_{T} < %2% [GeV/c]") % m_ptRange.first%  m_ptRange.second).c_str(), "");
+  leg13->AddEntry((TObject *) nullptr, boost::str(boost::format("%1% < p_{T} < %2% [GeV/c]") % m_ptRange.first % m_ptRange.second).c_str(), "");
   leg13->AddEntry((TObject *) nullptr, boost::str(boost::format("%1% < #eta < %2%") % m_etaRange.first % m_etaRange.second).c_str(), "");
   jet_mass_pt_r04->SetStats(false);
   jet_mass_pt_r04->SetTitle("Jet Mass vs p_{T} [R = 0.4]");
@@ -506,7 +528,7 @@ int JetKinematicCheck::End(PHCompositeNode * /*unused*/)
   leg15->SetFillStyle(0);
   leg15->SetBorderSize(0);
   leg15->SetTextSize(0.06);
-  leg15->AddEntry((TObject *) nullptr, boost::str(boost::format("%1% < p_{T} < %2% [GeV/c]") % m_ptRange.first%  m_ptRange.second).c_str(), "");
+  leg15->AddEntry((TObject *) nullptr, boost::str(boost::format("%1% < p_{T} < %2% [GeV/c]") % m_ptRange.first % m_ptRange.second).c_str(), "");
   leg15->AddEntry((TObject *) nullptr, boost::str(boost::format("%1% < #eta < %2%") % m_etaRange.first % m_etaRange.second).c_str(), "");
   jet_mass_pt_r05->SetStats(false);
   jet_mass_pt_r05->SetTitle("Jet Mass vs p_{T} [R = 0.5]");
@@ -574,7 +596,7 @@ int JetKinematicCheck::End(PHCompositeNode * /*unused*/)
   leg20->SetBorderSize(0);
   leg20->SetTextSize(0.06);
   leg20->AddEntry((TObject *) nullptr, boost::str(boost::format("%1% < p_{T} < %2% [GeV/c]") % m_ptRange.first % m_ptRange.second).c_str(), "");
-  leg20->AddEntry((TObject *) nullptr, boost::str(boost::format("%1% < #eta < %2%") % m_etaRange.first %  m_etaRange.second).c_str(), "");
+  leg20->AddEntry((TObject *) nullptr, boost::str(boost::format("%1% < #eta < %2%") % m_etaRange.first % m_etaRange.second).c_str(), "");
   jet_mass_eta_1D_r03 = (TH1D *) jet_mass_eta_r03->ProfileX();
   jet_mass_eta_1D_r03->SetStats(false);
   jet_mass_eta_1D_r03->SetTitle("Average Jet Mass vs #eta [R = 0.3]");

@@ -9,26 +9,18 @@
 //-----------------------------------------------------------------------------
 #include "PHNodeIterator.h"
 
-#include "PHCompositeNode.h" 
+#include "PHCompositeNode.h"
 #include "PHNode.h"
 #include "PHNodeOperation.h"
 #include "PHPointerListIterator.h"
 #include "phooldefs.h"
 
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wdeprecated-declarations"
 #include <boost/algorithm/string.hpp>
-#pragma GCC diagnostic pop
 
 #include <vector>
 
 PHNodeIterator::PHNodeIterator(PHCompositeNode* node)
   : currentNode(node)
-{
-}
-
-PHNodeIterator::PHNodeIterator()
-  : currentNode(nullptr)
 {
 }
 
@@ -40,6 +32,7 @@ PHNodeIterator::ls()
   PHNode* thisNode;
   while ((thisNode = iter()))
   {
+    std::cout << "node name " <<  thisNode->getName() << std::endl;
     subNodeList.append(thisNode);
   }
   return subNodeList;
@@ -50,8 +43,8 @@ void PHNodeIterator::print()
   currentNode->print();
 }
 
-PHNode*
-PHNodeIterator::findFirst(const std::string& requiredType, const std::string& requiredName)
+// NOLINTNEXTLINE(misc-no-recursion)
+PHNode* PHNodeIterator::findFirst(const std::string& requiredType, const std::string& requiredName)
 {
   PHPointerListIterator<PHNode> iter(currentNode->subNodes);
   PHNode* thisNode;
@@ -61,21 +54,22 @@ PHNodeIterator::findFirst(const std::string& requiredType, const std::string& re
     {
       return thisNode;
     }
-    else
+
+    if (thisNode->getType() == "PHCompositeNode")
     {
-      if (thisNode->getType() == "PHCompositeNode")
+      PHNodeIterator nodeIter(dynamic_cast<PHCompositeNode*>(thisNode));
+      PHNode* nodeFoundInSubTree = nodeIter.findFirst(requiredType, requiredName);
+      if (nodeFoundInSubTree)
       {
-        PHNodeIterator nodeIter(static_cast<PHCompositeNode*>(thisNode));
-        PHNode* nodeFoundInSubTree = nodeIter.findFirst(requiredType.c_str(), requiredName.c_str());
-        if (nodeFoundInSubTree) return nodeFoundInSubTree;
+        return nodeFoundInSubTree;
       }
     }
   }
   return nullptr;
 }
 
-PHNode*
-PHNodeIterator::findFirst(const std::string& requiredName)
+// NOLINTNEXTLINE(misc-no-recursion)
+PHNode* PHNodeIterator::findFirst(const std::string& requiredName)
 {
   PHPointerListIterator<PHNode> iter(currentNode->subNodes);
   PHNode* thisNode;
@@ -85,16 +79,14 @@ PHNodeIterator::findFirst(const std::string& requiredName)
     {
       return thisNode;
     }
-    else
+
+    if (thisNode->getType() == "PHCompositeNode")
     {
-      if (thisNode->getType() == "PHCompositeNode")
+      PHNodeIterator nodeIter(dynamic_cast<PHCompositeNode*>(thisNode));
+      PHNode* nodeFoundInSubTree = nodeIter.findFirst(requiredName);
+      if (nodeFoundInSubTree)
       {
-        PHNodeIterator nodeIter(static_cast<PHCompositeNode*>(thisNode));
-        PHNode* nodeFoundInSubTree = nodeIter.findFirst(requiredName.c_str());
-        if (nodeFoundInSubTree)
-        {
-          return nodeFoundInSubTree;
-        }
+        return nodeFoundInSubTree;
       }
     }
   }
@@ -108,7 +100,7 @@ bool PHNodeIterator::cd(const std::string& pathString)
   {
     while (currentNode->getParent())
     {
-      currentNode = static_cast<PHCompositeNode*>(currentNode->getParent());
+      currentNode = dynamic_cast<PHCompositeNode*>(currentNode->getParent());
     }
   }
   else
@@ -117,15 +109,13 @@ bool PHNodeIterator::cd(const std::string& pathString)
     boost::split(splitpath, pathString, boost::is_any_of(phooldefs::nodetreepathdelim));
     bool pathFound;
     PHNode* subNode;
-    int i = 0;
-    for (const auto & iter : splitpath)
+    for (const auto& iter : splitpath)
     {
-      i++;
       if (iter == "..")
       {
         if (currentNode->getParent())
         {
-          currentNode = static_cast<PHCompositeNode*>(currentNode->getParent());
+          currentNode = dynamic_cast<PHCompositeNode*>(currentNode->getParent());
         }
         else
         {
@@ -140,7 +130,7 @@ bool PHNodeIterator::cd(const std::string& pathString)
         {
           if (subNode->getType() == "PHCompositeNode" && subNode->getName() == iter)
           {
-            currentNode = static_cast<PHCompositeNode*>(subNode);
+            currentNode = dynamic_cast<PHCompositeNode*>(subNode);
             pathFound = true;
           }
         }
@@ -159,6 +149,7 @@ bool PHNodeIterator::addNode(PHNode* newNode)
   return currentNode->addNode(newNode);
 }
 
+// NOLINTNEXTLINE(misc-no-recursion)
 void PHNodeIterator::forEach(PHNodeOperation& operation)
 {
   operation(currentNode);
@@ -168,7 +159,7 @@ void PHNodeIterator::forEach(PHNodeOperation& operation)
   {
     if (thisNode->getType() == "PHCompositeNode")
     {
-      PHNodeIterator subNodeIter(static_cast<PHCompositeNode*>(thisNode));
+      PHNodeIterator subNodeIter(dynamic_cast<PHCompositeNode*>(thisNode));
       subNodeIter.forEach(operation);
     }
     else

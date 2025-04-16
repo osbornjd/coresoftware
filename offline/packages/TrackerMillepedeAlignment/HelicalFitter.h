@@ -5,20 +5,21 @@
 
 #include "AlignmentDefs.h"
 
-#include <tpc/TpcClusterZCrossingCorrection.h>
-#include <tpc/TpcDistortionCorrection.h>
+#include <tpc/TpcGlobalPositionWrapper.h>
 
 #include <trackbase/ActsGeometry.h>
 #include <trackbase/ClusterErrorPara.h>
 #include <trackbase/TrackFitUtils.h>
 
 #include <phparameter/PHParameterInterface.h>
+#include <tpc/TpcClusterZCrossingCorrection.h>
 
 #include <fun4all/SubsysReco.h>
 
 #include <map>
 #include <string>
 
+class TpcClusterZCrossingCorrection;
 class PHCompositeNode;
 class TrackSeedContainer;
 class TrackSeed;
@@ -26,10 +27,10 @@ class TrkrClusterContainer;
 class TF1;
 class TNtuple;
 class TFile;
-class TpcDistortionCorrectionContainer;
 class Mille;
 class SvtxTrackSeed;
 class SvtxTrackMap;
+class SvtxVertexMap;
 class SvtxAlignmentStateMap;
 class SvtxTrack;
 
@@ -37,8 +38,6 @@ class HelicalFitter : public SubsysReco, public PHParameterInterface
 {
  public:
   HelicalFitter(const std::string& name = "HelicalFitter");
-
-  ~HelicalFitter() override;
 
   void SetDefaultParameters() override;
 
@@ -75,7 +74,10 @@ class HelicalFitter : public SubsysReco, public PHParameterInterface
   void set_layer_param_fixed(unsigned int layer, unsigned int param);
   void set_ntuplefile_name(const std::string& file) { ntuple_outfilename = file; }
   void set_vertex_param_fixed(unsigned int param){ fixed_vertex_params.insert(param);}
-
+  void set_straight_line_fit(bool flag) {straight_line_fit = flag; }
+  void set_eta_cut(double eta_cut) {m_eta_cut = eta_cut;}
+  //-1 is regular operation, 0 is east fixed, 1 is west fixed
+  void set_do_mvtx_half(int half) {do_mvtx_half = half; }
   void set_fitted_subsystems(bool si, bool tpc, bool full)
   {
     fitsilicon = si;
@@ -102,9 +104,10 @@ class HelicalFitter : public SubsysReco, public PHParameterInterface
 
   // utility functions for analysis modules
   std::vector<float> fitClusters(std::vector<Acts::Vector3>& global_vec, std::vector<TrkrDefs::cluskey> cluskey_vec);
+
   void getTrackletClusters(TrackSeed* _track, std::vector<Acts::Vector3>& global_vec, std::vector<TrkrDefs::cluskey>& cluskey_vec);
   Acts::Vector3 get_helix_pca(std::vector<float>& fitpars, const Acts::Vector3& global);
-  void correctTpcGlobalPositions(std::vector<Acts::Vector3> global_vec, std::vector<TrkrDefs::cluskey> cluskey_vec);
+  void correctTpcGlobalPositions(std::vector<Acts::Vector3> global_vec, const std::vector<TrkrDefs::cluskey> &cluskey_vec);
   unsigned int addSiliconClusters(std::vector<float>& fitpars, std::vector<Acts::Vector3>& global_vec, std::vector<TrkrDefs::cluskey>& cluskey_vec);
 
   void set_dca_cut(float dca) { dca_cut = dca; }
@@ -124,6 +127,7 @@ class HelicalFitter : public SubsysReco, public PHParameterInterface
   Acts::Vector3 get_helix_surface_intersection(const Surface& surf, std::vector<float>& fitpars, Acts::Vector3 global, Acts::Vector3& pca, Acts::Vector3& tangent);
 
   Acts::Vector3 get_helix_vtx(Acts::Vector3 event_vtx, const std::vector<float>& fitpars);
+  Acts::Vector3 get_line_vtx(Acts::Vector3 event_vtx, const std::vector<float>& fitpars);
 
   float convertTimeToZ(TrkrDefs::cluskey cluster_key, TrkrCluster* cluster);
   void makeTpcGlobalCorrections(TrkrDefs::cluskey cluster_key, short int crossing, Acts::Vector3& global);
@@ -137,10 +141,12 @@ class HelicalFitter : public SubsysReco, public PHParameterInterface
   bool is_vertex_param_fixed(unsigned int param);
 
   void getLocalDerivativesXY(const Surface& surf, const Acts::Vector3& global, const std::vector<float>& fitpars, float lcl_derivativeX[5], float lcl_derivativeY[5], unsigned int layer);
+  void getLocalDerivativesZeroFieldXY(const Surface& surf,  const Acts::Vector3& global, const std::vector<float>& fitpars, float lcl_derivativeX[5], float lcl_derivativeY[5], unsigned int layer);
 
   void getLocalVtxDerivativesXY(SvtxTrack& track, const Acts::Vector3& track_vtx, const std::vector<float>& fitpars, float lcl_derivativeX[5], float lcl_derivativeY[5]);
+  void getLocalVtxDerivativesZeroFieldXY(SvtxTrack& track, const Acts::Vector3& event_vtx, const std::vector<float>& fitpars, float lcl_derivativeX[5], float lcl_derivativeY[5]);
 
-  void getGlobalDerivativesXY(const Surface& surf, Acts::Vector3 global, const Acts::Vector3& fitpoint, const std::vector<float>& fitpars, float glb_derivativeX[6], float glbl_derivativeY[6], unsigned int layer);
+  void getGlobalDerivativesXY(const Surface& surf, const Acts::Vector3& global, const Acts::Vector3& fitpoint, const std::vector<float>& fitpars, float glb_derivativeX[6], float glbl_derivativeY[6], unsigned int layer);
 
   void getGlobalVtxDerivativesXY(SvtxTrack& track, const Acts::Vector3& track_vtx, float glbl_derivativeX[3], float glbl_derivativeY[3]);
 
@@ -150,14 +156,18 @@ class HelicalFitter : public SubsysReco, public PHParameterInterface
   float getVertexResidual(Acts::Vector3 vtx);
 
   void get_dca(SvtxTrack& track, float& dca3dxy, float& dca3dz, float& dca3dxysigma, float& dca3dzsigma, const Acts::Vector3& vertex);
+  void get_dca_zero_field(SvtxTrack& track, float& dca3dxy, float& dca3dz, float& dca3dxysigma, float& dca3dzsigma, const Acts::Vector3& event_vertex);
+
+  std::pair<Acts::Vector3, Acts::Vector3> get_line(const std::vector<float>& fitpars);
+  std::pair<Acts::Vector3, Acts::Vector3> get_line_zero_field(const std::vector<float>& fitpars);
+  std::pair<Acts::Vector3, Acts::Vector3> get_line_tangent(const std::vector<float>& fitpars, Acts::Vector3 global);
+  Acts::Vector3 get_line_surface_intersection(const Surface& surf, std::vector<float>& fitpars);
   Acts::Vector3 globalvtxToLocalvtx(SvtxTrack& track, const Acts::Vector3& event_vertex);
   Acts::Vector3 globalvtxToLocalvtx(SvtxTrack& track, const Acts::Vector3& event_vertex, Acts::Vector3 PCA);
   Acts::Vector3 localvtxToGlobalvtx(SvtxTrack& track, const Acts::Vector3& event_vtx, const Acts::Vector3& PCA);
 
-  TpcClusterZCrossingCorrection m_clusterCrossingCorrection;
-  TpcDistortionCorrectionContainer* _dcc_static{nullptr};
-  TpcDistortionCorrectionContainer* _dcc_average{nullptr};
-  TpcDistortionCorrectionContainer* _dcc_fluctuation{nullptr};
+  //! global position wrapper
+  TpcGlobalPositionWrapper m_globalPositionWrapper;
 
   bool test_output = false;
 
@@ -175,9 +185,6 @@ class HelicalFitter : public SubsysReco, public PHParameterInterface
   AlignmentDefs::tpcGrp tpc_grp = AlignmentDefs::tpcGrp::htst;
   AlignmentDefs::mmsGrp mms_grp = AlignmentDefs::mmsGrp::tl;
 
-  /// tpc distortion correction utility class
-  TpcDistortionCorrection _distortionCorrection;
-
   //  TrackSeedContainer *_svtx_seed_map{nullptr};
   TrackSeedContainer* _track_map_tpc{nullptr};
   TrackSeedContainer* _track_map_silicon{nullptr};
@@ -187,6 +194,8 @@ class HelicalFitter : public SubsysReco, public PHParameterInterface
   std::string data_outfilename{"mille_helical_output_data_file.bin"};
   std::string steering_outfilename{"steer_helical.txt"};
   std::string ntuple_outfilename{"HF_ntuple.root"};
+  
+  TpcClusterZCrossingCorrection m_clusterCrossingCorrection;
 
   bool fitsilicon{true};
   bool fittpc{false};
@@ -194,6 +203,9 @@ class HelicalFitter : public SubsysReco, public PHParameterInterface
 
   float dca_cut{0.19};  // cm
 
+  float m_eta_cut{99999.};
+
+  SvtxVertexMap* m_vertexmap{nullptr};
   SvtxTrackMap* m_trackmap{nullptr};
   SvtxAlignmentStateMap* m_alignmentmap{nullptr};
 
@@ -210,6 +222,9 @@ class HelicalFitter : public SubsysReco, public PHParameterInterface
   TFile* fout{nullptr};
 
   bool use_event_vertex{false};
+  bool use_intt_zfit{false};
+  bool straight_line_fit = false;
+  int do_mvtx_half = -1;
 
   int event{0};
 

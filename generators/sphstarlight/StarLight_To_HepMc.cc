@@ -99,7 +99,7 @@ int main(int argc, char* argv[])
 {
   if (argc != 3)
   {
-    std::cerr << "Usage: " << argv[0] << " <HepMC_output_file>" << std::endl;
+    std::cerr << "Usage: " << argv[0] << "<starlight_file> <HepMC_output_file>" << std::endl;
     return 1;
   }
 
@@ -123,11 +123,11 @@ int main(int argc, char* argv[])
   std::ofstream outputFile(hepmcfname);
   HepMC::IO_GenEvent ascii_io(hepmcfname.c_str(), std::ios::out);
 
-  unsigned int events = 0;
+//  unsigned int events = 0;
 
   while (true)
   {
-    events++;
+//    events++;
 
     HepMC::GenEvent* evt = new HepMC::GenEvent();
     evt->use_units(HepMC::Units::GEV, HepMC::Units::MM);

@@ -2,13 +2,15 @@
 #define TRIGGER_TRIGGERPRIMITIVECONTAINER_H
 
 #include "TriggerDefs.h"
-#include "TriggerPrimitive.h"
 
 #include <phool/PHObject.h>
 
+#include <cstddef>
 #include <iostream>
 #include <map>
-#include <ostream>
+#include <utility>
+
+class TriggerPrimitive;
 
 ///
 class TriggerPrimitiveContainer : public PHObject
@@ -25,10 +27,10 @@ class TriggerPrimitiveContainer : public PHObject
 
   /// Clear Event from memory
   virtual void Reset() override { return; };
-  void identify(std::ostream& os = std::cout) const override;
+  void identify(std::ostream& out = std::cout) const override;
   int isValid() const override { return 1; }
 
-  virtual void setTriggerId(TriggerDefs::TriggerId /*triggerid*/) { return;}
+  virtual void setTriggerId(TriggerDefs::TriggerId /*triggerid*/) { return; }
   virtual void setDetectorId(TriggerDefs::DetectorId /*detectorid*/) { return; }
   virtual void setPrimitiveId(TriggerDefs::PrimitiveId /*primitiveid*/) { return; }
 

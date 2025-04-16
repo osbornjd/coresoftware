@@ -9,8 +9,8 @@
 class PHRandomSeed
 {
  public:
-  PHRandomSeed() {}
-  virtual ~PHRandomSeed() {}
+  PHRandomSeed() = default;
+  virtual ~PHRandomSeed() = default;
   //! conversion operator for `unsigned int seed = PHRandomSeed();`
   operator unsigned int() const
   {
@@ -21,7 +21,7 @@ class PHRandomSeed
   static unsigned int GetSeed();
   static void LoadSeed(const unsigned int iseed);
   static void Verbosity(const int iverb);
-  static int Verbosity() {return verbose;};
+  static int Verbosity() { return verbose; };
 
  protected:
   static void InitSeed();

@@ -1,17 +1,15 @@
 #ifndef TRIGGER_TRIGGERPRIMITIVECONTAINERV1_H
 #define TRIGGER_TRIGGERPRIMITIVECONTAINERV1_H
 
-#include "TriggerPrimitive.h"
 #include "TriggerPrimitiveContainer.h"
-#include "TriggerPrimitivev1.h"
 
-#include <phool/PHObject.h>
+#include "TriggerDefs.h"
 
 #include <iostream>
 #include <map>
-#include <ostream>
-#include <string>
 #include <utility>
+
+class TriggerPrimitive;
 
 ///
 
@@ -29,16 +27,16 @@ class TriggerPrimitiveContainerv1 : public TriggerPrimitiveContainer
 
   TriggerPrimitiveContainerv1(TriggerDefs::TriggerId tid, TriggerDefs::DetectorId did);
   ///
-  ~TriggerPrimitiveContainerv1() override;
+  ~TriggerPrimitiveContainerv1() override = default;
 
   /// Clear Event from memory
   void Reset() override;
-  void identify(std::ostream& os = std::cout) const override;
+  void identify(std::ostream& out = std::cout) const override;
   int isValid() const override;
 
-  void setTriggerId(TriggerDefs::TriggerId triggerid) override { m_triggerid = triggerid ; };
-  void setDetectorId(TriggerDefs::DetectorId detectorid) override { m_detectorid = detectorid ; };
-  void setPrimitiveId(TriggerDefs::PrimitiveId primitiveid) override { m_primitiveid = primitiveid ; };
+  void setTriggerId(TriggerDefs::TriggerId triggerid) override { m_triggerid = triggerid; };
+  void setDetectorId(TriggerDefs::DetectorId detectorid) override { m_detectorid = detectorid; };
+  void setPrimitiveId(TriggerDefs::PrimitiveId primitiveid) override { m_primitiveid = primitiveid; };
 
   TriggerPrimitive* get_primitive_at_key(TriggerDefs::TriggerPrimKey /* index */) override;
 
@@ -57,7 +55,7 @@ class TriggerPrimitiveContainerv1 : public TriggerPrimitiveContainer
   TriggerDefs::DetectorId m_detectorid = TriggerDefs::DetectorId::noneDId;
   TriggerDefs::PrimitiveId m_primitiveid = TriggerDefs::PrimitiveId::nonePId;
 
-  Map _primitives;
+  Map _primitives{};
 
   ClassDefOverride(TriggerPrimitiveContainerv1, 1);
 };

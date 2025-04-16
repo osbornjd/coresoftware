@@ -19,12 +19,16 @@
 
 #include <TString.h>
 
+
 MbdCalib::MbdCalib()
 {
   Reset();
   _mbdgeom = std::make_unique<MbdGeomV1>();
 
 #ifndef ONLINE
+  // clang-tidy suggests to put this into the ctor but then ONLINE
+  // does not compile anymore
+  // NOLINTNEXTLINE(cppcoreguidelines-prefer-member-initializer)
   _rc = recoConsts::instance();
   if ( _rc->FlagExist("MBD_TEMPLATEFIT") )
   {
@@ -99,6 +103,13 @@ int MbdCalib::Download_All()
     }
     Download_TQT0(tq_t0_url);
 
+    std::string t0corr_url = _cdb->getUrl("MBD_T0CORR");
+    if ( Verbosity() > 0 )
+    {
+      std::cout << "t0corr_url " << t0corr_url << std::endl;
+    }
+    Download_T0Corr(t0corr_url);
+
     std::string ped_url = _cdb->getUrl("MBD_PED");
     if (Verbosity() > 0)
     {
@@ -120,6 +131,13 @@ int MbdCalib::Download_All()
     }
     Download_SlewCorr(slew_url);
 
+    std::string pileup_url = _cdb->getUrl("MBD_PILEUP");
+    if (Verbosity() > 0)
+    {
+      std::cout << "pileup_url " << pileup_url << std::endl;
+    }
+    Download_Pileup(pileup_url);
+
     if (do_templatefit)
     {
       std::string shape_url = _cdb->getUrl("MBD_SHAPES");
@@ -134,7 +152,7 @@ int MbdCalib::Download_All()
 #endif
 
   // download local calibs (text versions)
-  if ( bbc_caldir.size() > 0 )
+  if ( !bbc_caldir.empty() )
   {
     std::string sampmax_file = bbc_caldir + "/mbd_sampmax.calib";
     Download_SampMax(sampmax_file);
@@ -148,6 +166,9 @@ int MbdCalib::Download_All()
     std::string tt_t0_file = bbc_caldir + "/mbd_tt_t0.calib";
     Download_TTT0(tt_t0_file);
 
+    std::string t0corr_file = bbc_caldir + "/mbd_t0corr.calib";
+    Download_T0Corr(t0corr_file);
+
     std::string ped_file = bbc_caldir + "/mbd_ped.calib";
     Download_Ped(ped_file);
 
@@ -156,6 +177,9 @@ int MbdCalib::Download_All()
 
     std::string slew_file = bbc_caldir + "/mbd_slewcorr.calib";
     Download_SlewCorr(slew_file);
+
+    std::string pileup_file = bbc_caldir + "/mbd_pileup.calib";
+    Download_Pileup(pileup_file);
 
     if (do_templatefit)
     {
@@ -398,6 +422,104 @@ int MbdCalib::Download_TTT0(const std::string& dbase_location)
   return 1;
 }
 
+
+int MbdCalib::Download_T0Corr(const std::string& dbase_location)
+{
+  // Reset All Values
+  _t0corrmean = 0.;
+  _t0corrmeanerr = 0.;
+  _t0corr_fitmean.fill(std::numeric_limits<float>::quiet_NaN());
+  _t0corr_fitmeanerr.fill(std::numeric_limits<float>::quiet_NaN());
+  _t0corr_fitsigma.fill(std::numeric_limits<float>::quiet_NaN());
+  _t0corr_fitsigmaerr.fill(std::numeric_limits<float>::quiet_NaN());
+  _t0corr_hmean.fill(std::numeric_limits<float>::quiet_NaN());
+  _t0corr_hmeanerr.fill(std::numeric_limits<float>::quiet_NaN());
+  _t0corr_hstddev.fill(std::numeric_limits<float>::quiet_NaN());
+  _t0corr_hstddeverr.fill(std::numeric_limits<float>::quiet_NaN());
+
+  if ( dbase_location.empty() )
+  {
+    return 0;
+  }
+
+  if (Verbosity() > 0)
+  {
+    std::cout << "Opening " << dbase_location << std::endl;
+  }
+  TString dbase_file = dbase_location;
+
+#ifndef ONLINE
+  if (dbase_file.EndsWith(".root"))  // read from database
+  {
+    CDBTTree* cdbttree = new CDBTTree(dbase_location);
+    if ( cdbttree == nullptr )
+    {
+      std::cerr << "T0Corr not found, skipping" << std::endl;
+      _status = -1;
+      return _status;
+    }
+    cdbttree->LoadCalibrations();
+
+    _t0corrmean = cdbttree->GetSingleFloatValue("_t0corrmean");
+    _t0corrmeanerr = cdbttree->GetSingleFloatValue("_t0corrmeanerr");
+    _t0corr_fitmean[0] = cdbttree->GetSingleFloatValue("_t0corr_fitmean0");
+    _t0corr_fitmeanerr[0] = cdbttree->GetSingleFloatValue("_t0corr_fitmeanerr0");
+    _t0corr_fitsigma[0] = cdbttree->GetSingleFloatValue("_t0corr_fitsigma0");
+    _t0corr_fitsigmaerr[0] = cdbttree->GetSingleFloatValue("_t0corr_fitsigmaerr0");
+    _t0corr_fitmean[1] = cdbttree->GetSingleFloatValue("_t0corr_fitmean1");
+    _t0corr_fitmeanerr[1] = cdbttree->GetSingleFloatValue("_t0corr_fitmeanerr1");
+    _t0corr_fitsigma[1] = cdbttree->GetSingleFloatValue("_t0corr_fitsigma1");
+    _t0corr_fitsigmaerr[1] = cdbttree->GetSingleFloatValue("_t0corr_fitsigmaerr1");
+    _t0corr_hmean[0] = cdbttree->GetSingleFloatValue("_t0corr_hmean0");
+    _t0corr_hmeanerr[0] = cdbttree->GetSingleFloatValue("_t0corr_hmeanerr0");
+    _t0corr_hstddev[0] = cdbttree->GetSingleFloatValue("_t0corr_hstddev0");
+    _t0corr_hstddeverr[0] = cdbttree->GetSingleFloatValue("_t0corr_hstddeverr0");
+    _t0corr_hmean[1] = cdbttree->GetSingleFloatValue("_t0corr_hmean1");
+    _t0corr_hmeanerr[1] = cdbttree->GetSingleFloatValue("_t0corr_hmeanerr1");
+    _t0corr_hstddev[1] = cdbttree->GetSingleFloatValue("_t0corr_hstddev1");
+    _t0corr_hstddeverr[1] = cdbttree->GetSingleFloatValue("_t0corr_hstddeverr1");
+
+    if (Verbosity() > 0)
+    {
+      std::cout << "T0Corr\t" << _t0corrmean << std::endl;
+    }
+    delete cdbttree;
+  }
+#endif
+
+  if (dbase_file.EndsWith(".calib"))  // read from text file
+  {
+    std::ifstream infile(dbase_location);
+    if (!infile.is_open())
+    {
+      std::cout << PHWHERE << "unable to open " << dbase_location << std::endl;
+      _status = -3;
+      return _status;
+    }
+
+    infile >> _t0corrmean >> _t0corrmeanerr
+      >> _t0corr_fitmean[0] >> _t0corr_fitmeanerr[0] >> _t0corr_fitsigma[0] >> _t0corr_fitsigmaerr[0]
+      >> _t0corr_fitmean[1] >> _t0corr_fitmeanerr[1] >> _t0corr_fitsigma[1] >> _t0corr_fitsigmaerr[1]
+      >> _t0corr_hmean[0] >> _t0corr_hmeanerr[0] >> _t0corr_hstddev[0] >> _t0corr_hstddeverr[0]
+      >> _t0corr_hmean[1] >> _t0corr_hmeanerr[1] >> _t0corr_hstddev[1] >> _t0corr_hstddeverr[1];
+
+    if (Verbosity() > 0)
+    {
+      std::cout << "T0Corr\t" << _t0corrmean << "\t" << _t0corrmeanerr << std::endl;
+    }
+    infile.close();
+  }
+
+  if ( std::isnan(_t0corrmean) )
+  {
+    std::cout << PHWHERE << ", ERROR, unknown file type, " << dbase_location << std::endl;
+    _status = -1;
+    return _status;
+  }
+
+  return 1;
+}
+
 int MbdCalib::Download_Ped(const std::string& dbase_location)
 {
   // Reset All Values
@@ -584,7 +706,7 @@ int MbdCalib::Download_Shapes(const std::string& dbase_location)
 
       for (int ipt = 0; ipt < _shape_npts[ifeech]; ipt++)
       {
-        int chtemp = 1000 * ipt + ifeech;
+        int chtemp = (1000 * ipt) + ifeech;
 
         float val = cdbttree->GetFloatValue(chtemp, "shape_val");
         _shape_y[ifeech].push_back(val);
@@ -720,7 +842,7 @@ int MbdCalib::Download_Shapes(const std::string& dbase_location)
     infile.close();
   }
 
-  if ( _shape_y[8].size()==0 )
+  if ( _shape_y[8].empty() )
   {
     std::cout << PHWHERE << ", ERROR, unknown file type, " << dbase_location << std::endl;
     _status = -1;
@@ -769,7 +891,7 @@ int MbdCalib::Download_TimeCorr(const std::string& dbase_location)
 
       for (int ipt=0; ipt<_tcorr_npts[ifeech]; ipt++)
       {
-        int chtemp = 1000*ipt + ifeech; // in cdbtree, entry has id = 1000*datapoint + ifeech
+        int chtemp = (1000*ipt) + ifeech; // in cdbtree, entry has id = 1000*datapoint + ifeech
 
         float val = cdbttree->GetFloatValue(chtemp, "tcorr_val");
         _tcorr_y[ifeech].push_back( val );
@@ -845,7 +967,7 @@ int MbdCalib::Download_TimeCorr(const std::string& dbase_location)
     infile.close();
   }
 
-  if ( _tcorr_y[0].size()==0 )
+  if ( _tcorr_y[0].empty() )
   {
     std::cout << PHWHERE << ", ERROR, MBD tcorr not loaded, " << dbase_location << std::endl;
     _status = -1;
@@ -870,7 +992,7 @@ int MbdCalib::Download_TimeCorr(const std::string& dbase_location)
 
       // simple linear interpolation for now
       double slope = (_tcorr_y[ifeech][calib_index+1] - _tcorr_y[ifeech][calib_index])/step;
-      float tcorr_interp = _tcorr_y[ifeech][calib_index] + interp*slope;
+      float tcorr_interp = _tcorr_y[ifeech][calib_index] + (interp*slope);
  
       _tcorr_y_interp[ifeech].push_back( tcorr_interp );
 
@@ -928,7 +1050,7 @@ int MbdCalib::Download_SlewCorr(const std::string& dbase_location)
 
       for (int ipt=0; ipt<_scorr_npts[ifeech]; ipt++)
       {
-        int chtemp = 1000*ipt + ifeech; // in cdbtree, entry has id = 1000*datapoint + ifeech
+        int chtemp = (1000*ipt) + ifeech; // in cdbtree, entry has id = 1000*datapoint + ifeech
 
         float val = cdbttree->GetFloatValue(chtemp, "scorr_val");
         _scorr_y[ifeech].push_back( val );
@@ -1006,7 +1128,7 @@ int MbdCalib::Download_SlewCorr(const std::string& dbase_location)
     infile.close();
   }
 
-  if ( _scorr_y[0].size()==0 )
+  if ( _scorr_y[0].empty() )
   {
     std::cout << PHWHERE << ", ERROR, unknown file type, " << dbase_location << std::endl;
     _status = -1;
@@ -1037,7 +1159,7 @@ int MbdCalib::Download_SlewCorr(const std::string& dbase_location)
 
       // simple linear interpolation for now
       double slope = (_scorr_y[ifeech][calib_index+1] - _scorr_y[ifeech][calib_index])/step;
-      float scorr_interp = _scorr_y[ifeech][calib_index] + interp*slope;
+      float scorr_interp = _scorr_y[ifeech][calib_index] + (interp*slope);
  
       _scorr_y_interp[ifeech].push_back( scorr_interp );
 
@@ -1060,6 +1182,91 @@ int MbdCalib::Download_SlewCorr(const std::string& dbase_location)
   }
 
   //Verbosity(0);
+  return 1;
+}
+
+int MbdCalib::Download_Pileup(const std::string& dbase_location)
+{
+  // Reset All Values
+  Reset_Pileup();
+
+  if (Verbosity() > 0)
+  {
+    std::cout << "Opening " << dbase_location << std::endl;
+  }
+  TString dbase_file = dbase_location;
+
+#ifndef ONLINE
+  if (dbase_file.EndsWith(".root"))  // read from database
+  {
+    CDBTTree* cdbttree = new CDBTTree(dbase_location);
+    if ( cdbttree == nullptr )
+    {
+      std::cerr << "MBD pileup calib not found, skipping" << std::endl;
+      _status = -1;
+      return _status;
+    }
+    cdbttree->LoadCalibrations();
+
+    for (int ifeech = 0; ifeech < MbdDefs::MBD_N_FEECH; ifeech++)
+    {
+      _pileup_p0[ifeech] = cdbttree->GetFloatValue(ifeech, "pileup_p0");
+      _pileup_p0err[ifeech] = cdbttree->GetFloatValue(ifeech, "pileup_p0err");
+      _pileup_p1[ifeech] = cdbttree->GetFloatValue(ifeech, "pileup_p1");
+      _pileup_p1err[ifeech] = cdbttree->GetFloatValue(ifeech, "pileup_p1err");
+      _pileup_p2[ifeech] = cdbttree->GetFloatValue(ifeech, "pileup_p2");
+      _pileup_p2err[ifeech] = cdbttree->GetFloatValue(ifeech, "pileup_p2err");
+      _pileup_chi2ndf[ifeech] = cdbttree->GetFloatValue(ifeech, "pileup_chi2ndf");
+      if (Verbosity() > 0)
+      {
+        if (ifeech < 2 || ifeech >= (MbdDefs::MBD_N_FEECH-2) )
+        {
+          std::cout << ifeech << "\t" << _pileup_p0[ifeech] << std::endl;
+        }
+      }
+    }
+    delete cdbttree;
+  }
+#endif
+
+  if (dbase_file.EndsWith(".calib"))  // read from text file
+  {
+    std::ifstream infile(dbase_location);
+    if (!infile.is_open())
+    {
+      std::cout << PHWHERE << "unable to open " << dbase_location << std::endl;
+      _status = -3;
+      return _status;
+    }
+
+    int feech = -1;
+    while (infile >> feech)
+    {
+      infile >> _pileup_p0[feech] >> _pileup_p0err[feech]
+             >> _pileup_p1[feech] >> _pileup_p1err[feech]
+             >> _pileup_p2[feech] >> _pileup_p2err[feech]
+             >> _pileup_chi2ndf[feech];
+
+      if (Verbosity() > 0)
+      {
+        if (feech < 2 || feech >= MbdDefs::MBD_N_PMT - 2)
+        {
+          std::cout << feech << "\t" << _pileup_p0[feech] << "\t" << _pileup_p0err[feech]
+                             << "\t" << _pileup_p1[feech] << "\t" << _pileup_p1err[feech]
+                             << "\t" << _pileup_p2[feech] << "\t" << _pileup_p2err[feech]
+                             << "\t" << _pileup_chi2ndf[feech] << std::endl;
+        }
+      }
+    }
+  }
+  
+  if ( std::isnan(_pileup_p0[0]) )
+  {
+    std::cout << PHWHERE << ", ERROR, unknown file type, " << dbase_location << std::endl;
+    _status = -1;
+    return _status;
+  }
+
   return 1;
 }
 
@@ -1210,6 +1417,65 @@ int MbdCalib::Write_TQT0(const std::string& dbfile)
 }
 
 #ifndef ONLINE
+int MbdCalib::Write_CDB_T0Corr(const std::string& dbfile)
+{
+  CDBTTree* cdbttree{ nullptr };
+
+  std::cout << "Creating " << dbfile << std::endl;
+  cdbttree = new CDBTTree( dbfile );
+  cdbttree->SetSingleIntValue("version", 1);
+
+  std::cout << "T0Corr" << std::endl;
+
+  // store in a CDBTree
+  cdbttree->SetSingleFloatValue("_t0corrmean", _t0corrmean);
+  cdbttree->SetSingleFloatValue("_t0corrmeanerr", _t0corrmeanerr);
+  cdbttree->SetSingleFloatValue("_t0corr_fitmean0", _t0corr_fitmean[0]);
+  cdbttree->SetSingleFloatValue("_t0corr_fitmeanerr0", _t0corr_fitmeanerr[0]);
+  cdbttree->SetSingleFloatValue("_t0corr_fitsigma0", _t0corr_fitsigma[0]);
+  cdbttree->SetSingleFloatValue("_t0corr_fitsigmaerr0", _t0corr_fitsigmaerr[0]);
+  cdbttree->SetSingleFloatValue("_t0corr_fitmean1", _t0corr_fitmean[1]);
+  cdbttree->SetSingleFloatValue("_t0corr_fitmeanerr1", _t0corr_fitmeanerr[1]);
+  cdbttree->SetSingleFloatValue("_t0corr_fitsigma1", _t0corr_fitsigma[1]);
+  cdbttree->SetSingleFloatValue("_t0corr_fitsigmaerr1", _t0corr_fitsigmaerr[1]);
+  cdbttree->SetSingleFloatValue("_t0corr_hmean0", _t0corr_hmean[0]);
+  cdbttree->SetSingleFloatValue("_t0corr_hmeanerr0", _t0corr_hmeanerr[0]);
+  cdbttree->SetSingleFloatValue("_t0corr_hstddev0", _t0corr_hstddev[0]);
+  cdbttree->SetSingleFloatValue("_t0corr_hstddeverr0", _t0corr_hstddeverr[0]);
+  cdbttree->SetSingleFloatValue("_t0corr_hmean1", _t0corr_hmean[1]);
+  cdbttree->SetSingleFloatValue("_t0corr_hmeanerr1", _t0corr_hmeanerr[1]);
+  cdbttree->SetSingleFloatValue("_t0corr_hstddev1", _t0corr_hstddev[1]);
+  cdbttree->SetSingleFloatValue("_t0corr_hstddeverr1", _t0corr_hstddeverr[1]);
+
+  std::cout << "T0Corr\t" << cdbttree->GetSingleFloatValue("_t0corrmean") << std::endl;
+
+  cdbttree->CommitSingle();
+  //cdbttree->Commit();
+  //cdbttree->Print();
+
+  // for now we create the tree after reading it
+  cdbttree->WriteCDBTTree();
+  delete cdbttree;
+
+  return 1;
+}
+#endif
+
+int MbdCalib::Write_T0Corr(const std::string& dbfile)
+{
+  std::ofstream cal_t0corr_file;
+  cal_t0corr_file.open(dbfile);
+  cal_t0corr_file << _t0corrmean << "\t" << _t0corrmeanerr << std::endl;
+  cal_t0corr_file << _t0corr_fitmean[0] << "\t" << _t0corr_fitmeanerr[0] << "\t" << _t0corr_fitsigma[0] << "\t" << _t0corr_fitsigmaerr[0] << std::endl;
+  cal_t0corr_file << _t0corr_fitmean[1] << "\t" << _t0corr_fitmeanerr[1] << "\t" << _t0corr_fitsigma[1] << "\t" << _t0corr_fitsigmaerr[1] << std::endl;
+  cal_t0corr_file << _t0corr_hmean[0] << "\t" << _t0corr_hmeanerr[0] << "\t" << _t0corr_hstddev[0] << "\t" << _t0corr_hstddeverr[0] << std::endl;
+  cal_t0corr_file << _t0corr_hmean[1] << "\t" << _t0corr_hmeanerr[1] << "\t" << _t0corr_hstddev[1] << "\t" << _t0corr_hstddeverr[1] << std::endl;
+  cal_t0corr_file.close();
+
+  return 1;
+}
+
+#ifndef ONLINE
 int MbdCalib::Write_CDB_Ped(const std::string& dbfile)
 {
   CDBTTree* cdbttree{ nullptr };
@@ -1217,7 +1483,6 @@ int MbdCalib::Write_CDB_Ped(const std::string& dbfile)
   std::cout << "Creating " << dbfile << std::endl;
   cdbttree = new CDBTTree( dbfile );
   cdbttree->SetSingleIntValue("version", 1);
-  cdbttree->CommitSingle();
 
   std::cout << "Ped" << std::endl;
   for (size_t ifeech = 0; ifeech < MbdDefs::MBD_N_FEECH; ifeech++)
@@ -1233,6 +1498,7 @@ int MbdCalib::Write_CDB_Ped(const std::string& dbfile)
       std::cout << ifeech << "\t" << cdbttree->GetFloatValue(ifeech, "pedmean") << std::endl;
     }
   }
+  cdbttree->CommitSingle();
 
   cdbttree->Commit();
   // cdbttree->Print();
@@ -1284,7 +1550,7 @@ int MbdCalib::Write_CDB_Shapes(const std::string& dbfile)
 
     for (int ipt = 0; ipt < _shape_npts[ifeech]; ipt++)
     {
-      int temp_ch = ipt * 1000 + ifeech;
+      int temp_ch = (ipt * 1000) + ifeech;
       cdbttree->SetFloatValue(temp_ch, "shape_val", _shape_y[ifeech][ipt]);
     }
 
@@ -1294,7 +1560,7 @@ int MbdCalib::Write_CDB_Shapes(const std::string& dbfile)
 
     for (int ipt = 0; ipt < _shape_npts[ifeech]; ipt++)
     {
-      int temp_ch = ipt * 1000 + ifeech;
+      int temp_ch = (ipt * 1000) + ifeech;
       cdbttree->SetFloatValue(temp_ch, "sherr_val", _sherr_yerr[ifeech][ipt]);
     }
   }
@@ -1314,7 +1580,7 @@ int MbdCalib::Write_CDB_Shapes(const std::string& dbfile)
       std::cout << ifeech << "\t" << cdbttree->GetIntValue(ifeech, "shape_npts") << std::endl;
       for (int ipt = 0; ipt < 10; ipt++)
       {
-        int temp_ch = ipt * 1000 + (int)ifeech;
+        int temp_ch = (ipt * 1000) + (int)ifeech;
         std::cout << cdbttree->GetFloatValue(temp_ch, "shape_val") << "  ";
       }
       std::cout << std::endl;
@@ -1354,7 +1620,7 @@ int MbdCalib::Write_CDB_TimeCorr(const std::string& dbfile)
 
     for (int ipt=0; ipt<_tcorr_npts[ifeech]; ipt++)
     {
-      int temp_ch = ipt*1000 + (int)ifeech;
+      int temp_ch = (ipt*1000) + ifeech;
       cdbttree->SetFloatValue(temp_ch,"tcorr_val",_tcorr_y[ifeech][ipt]);
     }
   }
@@ -1374,7 +1640,7 @@ int MbdCalib::Write_CDB_TimeCorr(const std::string& dbfile)
       std::cout << ifeech << "\t" <<  cdbttree->GetIntValue(ifeech,"tcorr_npts") << std::endl;
       for (int ipt=0; ipt<10; ipt++)
       {
-        int temp_ch = ipt*1000 + (int)ifeech;
+        int temp_ch = (ipt*1000) + (int)ifeech;
         std::cout << cdbttree->GetFloatValue(temp_ch,"tcorr_val") << "  ";
       }
       std::cout << std::endl;
@@ -1415,7 +1681,7 @@ int MbdCalib::Write_CDB_SlewCorr(const std::string& dbfile)
 
     for (int ipt=0; ipt<_scorr_npts[ifeech]; ipt++)
     {
-      int temp_ch = ipt*1000 + (int)ifeech;
+      int temp_ch = (ipt*1000) + (int)ifeech;
       cdbttree->SetFloatValue(temp_ch,"scorr_val",_scorr_y[ifeech][ipt]);
     }
   }
@@ -1435,7 +1701,7 @@ int MbdCalib::Write_CDB_SlewCorr(const std::string& dbfile)
       std::cout << ifeech << "\t" <<  cdbttree->GetIntValue(ifeech,"scorr_npts") << std::endl;
       for (int ipt=0; ipt<10; ipt++)
       {
-        int temp_ch = ipt*1000 + (int)ifeech;
+        int temp_ch = (ipt*1000) + (int)ifeech;
         std::cout << cdbttree->GetFloatValue(temp_ch,"scorr_val") << "  ";
       }
       std::cout << std::endl;
@@ -1488,6 +1754,77 @@ int MbdCalib::Write_CDB_Gains(const std::string& dbfile)
   return 1;
 }
 #endif
+
+int MbdCalib::Write_Gains(const std::string& dbfile)
+{
+  std::ofstream cal_gains_file;
+  cal_gains_file.open(dbfile);
+  for (int ipmtch = 0; ipmtch < MbdDefs::MBD_N_PMT; ipmtch++)
+  {
+    cal_gains_file << ipmtch << "\t" << _qfit_integ[ipmtch] << "\t" << _qfit_mpv[ipmtch]
+      << "\t" << _qfit_sigma[ipmtch] << "\t" << _qfit_integerr[ipmtch]
+      << "\t" << _qfit_mpverr[ipmtch] << "\t" << _qfit_sigmaerr[ipmtch]
+      << "\t" << _qfit_chi2ndf[ipmtch] << std::endl;
+  }
+  cal_gains_file.close();
+
+  return 1;
+}
+
+#ifndef ONLINE
+int MbdCalib::Write_CDB_Pileup(const std::string& dbfile)
+{
+  CDBTTree* cdbttree{ nullptr };
+
+  std::cout << "Creating " << dbfile << std::endl;
+  cdbttree = new CDBTTree( dbfile );
+  cdbttree->SetSingleIntValue("version", 1);
+  cdbttree->CommitSingle();
+
+  std::cout << "MBD_PILEUP" << std::endl;
+  for (size_t ifeech = 0; ifeech < MbdDefs::MBD_N_FEECH; ifeech++)
+  {
+    // store in a CDBTree
+    cdbttree->SetFloatValue(ifeech, "pileup_p0", _pileup_p0[ifeech]);
+    cdbttree->SetFloatValue(ifeech, "pileup_p0err", _pileup_p0err[ifeech]);
+    cdbttree->SetFloatValue(ifeech, "pileup_p1", _pileup_p1[ifeech]);
+    cdbttree->SetFloatValue(ifeech, "pileup_p1err", _pileup_p1err[ifeech]);
+    cdbttree->SetFloatValue(ifeech, "pileup_p2", _pileup_p2[ifeech]);
+    cdbttree->SetFloatValue(ifeech, "pileup_p2err", _pileup_p2err[ifeech]);
+    cdbttree->SetFloatValue(ifeech, "pileup_chi2ndf", _pileup_chi2ndf[ifeech]);
+
+    if (ifeech < 5 || ifeech >= MbdDefs::MBD_N_PMT - 5)
+    {
+      std::cout << ifeech << "\t" << cdbttree->GetFloatValue(ifeech, "pileup_p0") << std::endl;
+    }
+  }
+
+  cdbttree->Commit();
+  // cdbttree->Print();
+
+  // for now we create the tree after reading it
+  cdbttree->WriteCDBTTree();
+  delete cdbttree;
+
+  return 1;
+}
+#endif
+
+int MbdCalib::Write_Pileup(const std::string& dbfile)
+{
+  std::ofstream cal_pileup_file;
+  cal_pileup_file.open(dbfile);
+  for (int ifeech = 0; ifeech < MbdDefs::MBD_N_FEECH; ifeech++)
+  {
+    cal_pileup_file << ifeech << "\t" << _pileup_p0[ifeech] << "\t" << _pileup_p0err[ifeech]
+      << "\t" << _pileup_p1[ifeech] << "\t" << _pileup_p1err[ifeech]
+      << "\t" << _pileup_p2[ifeech] << "\t" << _pileup_p2err[ifeech]
+      << "\t" << _pileup_chi2ndf[ifeech] << std::endl;
+  }
+  cal_pileup_file.close();
+
+  return 1;
+}
 
 #ifndef ONLINE
 int MbdCalib::Write_CDB_All()
@@ -1556,6 +1893,20 @@ void MbdCalib::Reset_TQT0()
   _tqfit_t0sigmaerr.fill(std::numeric_limits<float>::quiet_NaN());
 }
 
+void MbdCalib::Reset_T0Corr()
+{
+  _t0corrmean = 0.;
+  _t0corrmeanerr = 0.;
+  _t0corr_fitmean.fill(std::numeric_limits<float>::quiet_NaN());
+  _t0corr_fitmeanerr.fill(std::numeric_limits<float>::quiet_NaN());
+  _t0corr_fitsigma.fill(std::numeric_limits<float>::quiet_NaN());
+  _t0corr_fitsigmaerr.fill(std::numeric_limits<float>::quiet_NaN());
+  _t0corr_hmean.fill(std::numeric_limits<float>::quiet_NaN());
+  _t0corr_hmeanerr.fill(std::numeric_limits<float>::quiet_NaN());
+  _t0corr_hstddev.fill(std::numeric_limits<float>::quiet_NaN());
+  _t0corr_hstddeverr.fill(std::numeric_limits<float>::quiet_NaN());
+}
+
 void MbdCalib::Reset_Ped()
 {
   _tqfit_t0mean.fill( 0. );
@@ -1576,12 +1927,26 @@ void MbdCalib::Reset_Gains()
   _qfit_chi2ndf.fill(std::numeric_limits<float>::quiet_NaN());
 }
 
+void MbdCalib::Reset_Pileup()
+{
+  // Set all initial values
+  _pileup_p0.fill(std::numeric_limits<float>::quiet_NaN());
+  _pileup_p1.fill(std::numeric_limits<float>::quiet_NaN());
+  _pileup_p2.fill(std::numeric_limits<float>::quiet_NaN());
+  _pileup_p0err.fill(std::numeric_limits<float>::quiet_NaN());
+  _pileup_p1err.fill(std::numeric_limits<float>::quiet_NaN());
+  _pileup_p2err.fill(std::numeric_limits<float>::quiet_NaN());
+  _qfit_chi2ndf.fill(std::numeric_limits<float>::quiet_NaN());
+}
+
 void MbdCalib::Reset()
 {
   Reset_TTT0();
   Reset_TQT0();
   Reset_Ped();
   Reset_Gains();
+  Reset_T0Corr();
+  Reset_Pileup();
 
   _sampmax.fill(-1);
 }

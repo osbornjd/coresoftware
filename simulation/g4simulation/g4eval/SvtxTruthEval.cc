@@ -23,8 +23,10 @@
 #include <g4detectors/PHG4TpcCylinderGeomContainer.h>
 
 #include <mvtx/CylinderGeom_Mvtx.h>
+#include <mvtx/CylinderGeom_MvtxHelper.h>
 
 #include <intt/CylinderGeomIntt.h>
+#include <intt/CylinderGeomInttHelper.h>
 
 #include <phool/getClass.h>
 #include <phool/phool.h>  // for PHWHERE
@@ -695,7 +697,7 @@ void SvtxTruthEval::LayerClusterG4Hits(const std::set<PHG4Hit*>& truth_hits, std
   return;
 }
 
-void SvtxTruthEval::G4ClusterSize(TrkrDefs::cluskey ckey, unsigned int layer, std::vector<std::vector<double>> contributing_hits_entry, std::vector<std::vector<double>> contributing_hits_exit, float& g4phisize, float& g4zsize)
+void SvtxTruthEval::G4ClusterSize(TrkrDefs::cluskey ckey, unsigned int layer, const std::vector<std::vector<double>> &contributing_hits_entry, const std::vector<std::vector<double>> &contributing_hits_exit, float& g4phisize, float& g4zsize)
 {
   // sort the contributing g4hits in radius
   double inner_radius = 100.;
@@ -734,6 +736,12 @@ void SvtxTruthEval::G4ClusterSize(TrkrDefs::cluskey ckey, unsigned int layer, st
   double outer_phi = atan2(outer_y, outer_x);
   double avge_z = (outer_z + inner_z) / 2.0;
 
+  unsigned int side = 0;
+  if (avge_z < 0)
+  {
+    side = 1;
+  } 
+
   // Now fold these with the expected diffusion and shaping widths
   // assume spread is +/- equals this many sigmas times diffusion and shaping when extending the size
   double sigmas = 2.0;
@@ -764,8 +772,8 @@ void SvtxTruthEval::G4ClusterSize(TrkrDefs::cluskey ckey, unsigned int layer, st
     double g4min_phi = inner_phi - sigmas * std::sqrt(pow(phidiffusion, 2) + pow(added_smear_trans, 2) + pow(gem_spread, 2)) / radius;
 
     // find the bins containing these max and min z edges
-    unsigned int phibinmin = layergeom->get_phibin(g4min_phi);
-    unsigned int phibinmax = layergeom->get_phibin(g4max_phi);
+    unsigned int phibinmin = layergeom->get_phibin(g4min_phi, side);
+    unsigned int phibinmax = layergeom->get_phibin(g4max_phi, side);
     unsigned int phibinwidth = phibinmax - phibinmin + 1;
     g4phisize = (double) phibinwidth * layergeom->get_phistep() * layergeom->get_radius();
 
@@ -818,7 +826,7 @@ void SvtxTruthEval::G4ClusterSize(TrkrDefs::cluskey ckey, unsigned int layer, st
 
     TrkrDefs::hitsetkey hitsetkey = TrkrDefs::getHitSetKeyFromClusKey(ckey);
     auto surf = _tgeometry->maps().getSiliconSurface(hitsetkey);
-    TVector3 local_inner_vec = layergeom->get_local_from_world_coords(surf, _tgeometry, world_inner);
+    TVector3 local_inner_vec = CylinderGeomInttHelper::get_local_from_world_coords(surf, _tgeometry, world_inner);
     double yin = local_inner_vec[1];
     double zin = local_inner_vec[2];
     int strip_y_index, strip_z_index;
@@ -831,7 +839,7 @@ void SvtxTruthEval::G4ClusterSize(TrkrDefs::cluskey ckey, unsigned int layer, st
     layergeom->find_indices_from_world_location(segment_z_bin, segment_phi_bin, world_outer);
     TrkrDefs::hitsetkey ohitsetkey = TrkrDefs::getHitSetKeyFromClusKey(ckey);
     auto osurf = _tgeometry->maps().getSiliconSurface(ohitsetkey);
-    TVector3 local_outer_vec = layergeom->get_local_from_world_coords(osurf, _tgeometry, world_outer_vec);
+    TVector3 local_outer_vec = CylinderGeomInttHelper::get_local_from_world_coords(osurf, _tgeometry, world_outer_vec);
     double yout = local_outer_vec[1];
     double zout = local_outer_vec[2];
     int strip_y_index_out, strip_z_index_out;
@@ -876,14 +884,14 @@ void SvtxTruthEval::G4ClusterSize(TrkrDefs::cluskey ckey, unsigned int layer, st
     layergeom->get_sensor_indices_from_world_coords(world_inner_vec, stave, chip);
     TrkrDefs::hitsetkey ihitsetkey = TrkrDefs::getHitSetKeyFromClusKey(ckey);
     auto isurf = _tgeometry->maps().getSiliconSurface(ihitsetkey);
-    TVector3 local_inner = layergeom->get_local_from_world_coords(isurf, _tgeometry, world_inner);
+    TVector3 local_inner = CylinderGeom_MvtxHelper::get_local_from_world_coords(isurf, _tgeometry, world_inner);
 
     TVector3 world_outer = {outer_x, outer_y, outer_z};
     std::vector<double> world_outer_vec = {world_outer[0], world_outer[1], world_outer[2]};
     layergeom->get_sensor_indices_from_world_coords(world_outer_vec, stave_outer, chip_outer);
     TrkrDefs::hitsetkey ohitsetkey = TrkrDefs::getHitSetKeyFromClusKey(ckey);
     auto osurf = _tgeometry->maps().getSiliconSurface(ohitsetkey);
-    TVector3 local_outer = layergeom->get_local_from_world_coords(osurf, _tgeometry, world_outer);
+    TVector3 local_outer = CylinderGeom_MvtxHelper::get_local_from_world_coords(osurf, _tgeometry, world_outer);
 
     double diff = max_diffusion_radius * 0.6;  // factor of 0.6 gives decent agreement with low occupancy reco clusters
     if (local_outer[0] < local_inner[0])

@@ -1,9 +1,11 @@
-#ifndef CALOANA_H__
-#define CALOANA_H__
+#ifndef CALOEMCPI0TBT_PI0ETABYETA_H
+#define CALOEMCPI0TBT_PI0ETABYETA_H
+
+#include <globalvertex/GlobalVertex.h>
 
 #include <fun4all/SubsysReco.h>
 
-//#include <CLHEP/Vector/ThreeVector.h>  // for Hep3Vector
+// #include <CLHEP/Vector/ThreeVector.h>  // for Hep3Vector
 #include <array>
 #include <string>  // for string
 #include <vector>
@@ -29,7 +31,7 @@ class pi0EtaByEta : public SubsysReco
 {
  public:
   //! constructor
-  pi0EtaByEta(const std::string& name = "pi0EtaByEta", const std::string& fname = "MyNtuple.root");
+  pi0EtaByEta(const std::string& name = "pi0EtaByEta", const std::string& filename = "MyNtuple.root");
 
   //! destructor
   virtual ~pi0EtaByEta();
@@ -51,12 +53,14 @@ class pi0EtaByEta : public SubsysReco
   void Detector(const std::string& name) { detector = name; }
   void set_timing_cut_width(const int t) { _range = t; }
   void set_vertex_cut(const float v) { _vz = v; }
-  void apply_vertex_cut(bool Vtx_cut) { m_vtxCut = Vtx_cut; }
+  void apply_vertex_cut(bool Vtx_cut) { doVtxCut = Vtx_cut; }
 
-  TF1* fitHistogram(TH1* h);
+  static TF1* fitHistogram(TH1* h);
   void fitEtaSlices(const std::string& infile, const std::string& outfile, const std::string& cdbFile);
 
-	void fitEtaPhiTowers(const std::string& infile, const std::string& fitOutFile, const std::string& cdbFile); // for tbt pi0 fit
+  void fitEtaPhiTowers(const std::string& infile, const std::string& fitOutFile, const std::string& cdbFile);  // for tbt pi0 fit
+
+  void Split3DHist(const std::string& infile, const std::string& out_file);
 
   void set_use_pdc(bool state)
   {
@@ -85,12 +89,18 @@ class pi0EtaByEta : public SubsysReco
   }
   void set_calibConvLev(float val)
   {
-    convLev=val;
+    convLev = val;
     return;
   }
-  void set_RunTowByTow(bool state) // to decide if we want to run tbt (default is false)
+  void set_RunTowByTow(bool state)  // to decide if we want to run tbt (default is true)
   {
-    runTowByTow=state;
+    runTowByTow = state;
+    return;
+  }
+
+  void set_RunTBTCompactMode(bool state)  // to decide if we want to run in TBT in compact mode (default is true)
+  {
+    runTBTCompactMode = state;
     return;
   }
 
@@ -102,17 +112,34 @@ class pi0EtaByEta : public SubsysReco
     return;
   }
 
+  void set_GlobalVertexType(GlobalVertex::VTXTYPE type)
+  {
+    m_use_vertextype = true;
+    m_vertex_type = type;
+  }
+
+  void set_requireVertex(bool state)
+  {
+    reqVertex = state;
+    return;
+  }
 
  protected:
   int Getpeaktime(TH1* h);
   std::string detector;
   std::string outfilename;
 
-  bool reqMinBias = true;
+  bool reqMinBias{true};
+  bool reqVertex{false};
 
-  float pt1BaseClusCut = 1.3;
-  float pt2BaseClusCut = 0.7;
-  float NclusDeptFac = 1.4;
+  bool doVtxCut{true};
+  float vtx_z_cut{20};
+  bool m_use_vertextype{false};
+  GlobalVertex::VTXTYPE m_vertex_type{GlobalVertex::UNDEFINED};
+
+  float pt1BaseClusCut{1.3};
+  float pt2BaseClusCut{0.7};
+  float NclusDeptFac{1.4};
 
   std::vector<float> m_energy;
   std::vector<int> m_etabin;
@@ -138,36 +165,34 @@ class pi0EtaByEta : public SubsysReco
   std::vector<int> m_bbc_side;
 
   std::array<TH1*, 96> h_mass_eta_lt{};
-	std::array<std::array<TH1*, 256>, 96> h_mass_tbt_lt{};
+  std::array<std::array<TH1*, 256>, 96> h_mass_tbt_lt{};
 
   int _eventcounter{0};
   int _range{1};
 
   float _vz{0.};
-  float target_pi0_mass{0.152};
+  float target_pi0_mass{0.146};
 
-  bool m_vtxCut{false};
   bool dynMaskClus{false};
   bool doMix{false};
   bool use_pdc{false};
-  bool runTowByTow{false}; // default set not to run tbt
-  
+  bool runTowByTow{true};        // default set not to run tbt
+  bool runTBTCompactMode{true};  // default set to run in compact mode
+
   std::vector<std::vector<std::vector<CLHEP::Hep3Vector>>>* clusMix;
-  TH1* h_nclus_bin{nullptr};
-  const int NBinsClus = 10;
+  const int NBinsClus{10};
   TH1* h_vtx_bin{nullptr};
-  int NBinsVtx = 30;
+  int NBinsVtx{30};
   TH1* h_event{nullptr};
 
   TFile* outfile{nullptr};
   Fun4AllHistoManager* hm{nullptr};
-  
-	TH2* h_emcal_mbd_correlation{nullptr};
+
+  TH2* h_emcal_mbd_correlation{nullptr};
   TH2* h_ohcal_mbd_correlation{nullptr};
   TH2* h_ihcal_mbd_correlation{nullptr};
   TH2* h_emcal_hcal_correlation{nullptr};
   TH2* h_emcal_zdc_correlation{nullptr};
-  std::array<TH1*, 100> h_InvMass_Nclus{};
 
   TH1* h_InvMass{nullptr};
   TH1* h_InvMassMix{nullptr};
@@ -182,7 +207,7 @@ class pi0EtaByEta : public SubsysReco
   TH2* h_hcalin_etaphi_wQA{nullptr};
   TH2* h_hcalout_etaphi_wQA{nullptr};
   TH1* h_totalzdc_e{nullptr};
-  TH3* h_pipT_Nclus_mass{nullptr};
+  TH3* h_ieta_iphi_invmass{nullptr};
 
   TProfile2D* h_cemc_etaphi_time{nullptr};
   TProfile2D* h_hcalin_etaphi_time{nullptr};
@@ -226,9 +251,7 @@ class pi0EtaByEta : public SubsysReco
   TH1* h_nclusters{nullptr};
   TH1* h_emcal_e_eta{nullptr};
 
-  float convLev = 0.005;
-
-
+  float convLev{0.005};
 };
 
 #endif

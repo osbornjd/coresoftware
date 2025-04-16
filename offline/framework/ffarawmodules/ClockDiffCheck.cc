@@ -60,6 +60,7 @@ int ClockDiffCheck::process_event(PHCompositeNode *topNode)
       FillCaloClockDiff(cemccont);
     }
   }
+
   std::vector<unsigned int> badPackets;
   uint64_t refdiff = std::numeric_limits<uint64_t>::max();
   auto itergl1 = m_PacketStuffMap.find(14001);
@@ -191,16 +192,21 @@ int ClockDiffCheck::process_event(PHCompositeNode *topNode)
         {
           for (int j = 0; j < packet->iValue(0, "NRMODULES"); j++)
           {
-            if (packet->iValue(j, "FEMEVTNR") != bestEvt && bestEvt != -1 && packet->getIdentifier() != 6057)  // this packet has jitter on the FEM clocks, so we don't drop it
+            if (packet->iValue(j, "FEMEVTNR") != bestEvt && bestEvt != -1)
             {
-	      static int icnt = 0;
-	      if (icnt < 1000)
-	      {
-		std::cout << "found different FEM clock for packet " << packet->getIdentifier() << std::endl;
-		icnt++;
-	      }
+              static int icnt = 0;
+              if (icnt < 1000)
+              {
+                std::cout << "found different FEM clock for packet " << packet->getIdentifier() << std::endl;
+                icnt++;
+              }
               if (delBadPkts)
               {
+                if (Verbosity() > 1)
+                {
+                  std::cout << "deleting packet " << packet->getIdentifier()
+                            << " with fem clock mismatch" << std::endl;
+                }
                 container->deletePacket(packet);
               }
               break;
@@ -229,7 +235,7 @@ void ClockDiffCheck::FillCaloClockDiff(CaloPacketContainer *pktcont)
         auto &pktiter = m_PacketStuffMap[packetid];
         std::cout << PHWHERE << "packet init " << packetid << std::hex
                   << ", clk: " << std::get<1>(pktiter)
-                  << ", clkdiff: " << std::get<2>(pktiter) << std::dec << ", tag: " << std::get<4>(pktiter)
+                  << ", clkdiff: " << std::get<2>(pktiter) << std::dec << ", valid: " << std::get<4>(pktiter)
                   << std::endl;
       }
     }
@@ -253,10 +259,10 @@ void ClockDiffCheck::FillCaloClockDiff(CaloPacketContainer *pktcont)
       }
       if (Verbosity() > 2)
       {
-        std::cout << PHWHERE << "packet " << packetid << ", clk: " << std::hex << clk
-                  << ", tup: " << std::get<1>(pktiter) << ", diff: " << clkdiff
-                  << ", tup: " << std::get<2>(pktiter) << std::dec << ", tag: " << std::get<4>(pktiter)
-                  << std::endl;
+	std::cout << "packet " << packetid << ", clk: " << std::hex << clk
+		  << ", clk(tup): " << std::get<1>(pktiter) << ", diff: " << clkdiff
+		  << ", diff(tup): " << std::get<2>(pktiter) << std::dec << ", valid: " << std::get<4>(pktiter)
+		  << std::endl;
       }
     }
   }
@@ -295,8 +301,8 @@ void ClockDiffCheck::FillPacketDiff(OfflinePacket *pkt)
     if (Verbosity() > 2)
     {
       std::cout << "packet " << packetid << ", clk: " << std::hex << clk
-                << ", tup: " << std::get<1>(pktiter) << ", diff: " << clkdiff
-                << ", tup: " << std::get<2>(pktiter) << std::dec << ", tag: " << std::get<4>(pktiter)
+                << ", clk(tup): " << std::get<1>(pktiter) << ", diff: " << clkdiff
+                << ", diff(tup): " << std::get<2>(pktiter) << std::dec << ", valid: " << std::get<4>(pktiter)
                 << std::endl;
     }
   }

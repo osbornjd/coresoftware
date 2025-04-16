@@ -15,11 +15,13 @@
 #include <g4detectors/PHG4CylinderGeomContainer.h>
 
 #include <intt/CylinderGeomIntt.h>
+#include <intt/CylinderGeomInttHelper.h>
 
 #include <micromegas/CylinderGeomMicromegas.h>
 #include <micromegas/MicromegasDefs.h>
 
 #include <mvtx/CylinderGeom_Mvtx.h>
+#include <mvtx/CylinderGeom_MvtxHelper.h>
 
 #include <phfield/PHFieldUtility.h>
 
@@ -39,8 +41,6 @@
 #include <phool/getClass.h>
 #include <phool/phool.h>
 
-#include <tpc/TpcDistortionCorrectionContainer.h>
-
 #include <trackbase/ActsGeometry.h>
 #include <trackbase/InttDefs.h>
 #include <trackbase/MvtxDefs.h>
@@ -53,10 +53,11 @@
 #include <trackbase_historic/SvtxTrackMap.h>
 #include <trackbase_historic/SvtxTrackMap_v2.h>
 #include <trackbase_historic/SvtxTrackState.h>  // for SvtxTrackState
-#include <trackbase_historic/SvtxTrackState_v1.h>
+#include <trackbase_historic/SvtxTrackState_v2.h>
 #include <trackbase_historic/SvtxTrack_v4.h>
 #include <trackbase_historic/TrackSeed.h>
 #include <trackbase_historic/TrackSeedContainer.h>
+#include <trackbase_historic/TrackSeedHelper.h>
 
 #include <GenFit/AbsMeasurement.h>  // for AbsMeasurement
 #include <GenFit/Exception.h>       // for Exception
@@ -108,10 +109,17 @@ namespace
     return x * x;
   }
 
-  // convert gf state to SvtxTrackState_v1
-  SvtxTrackState_v1 create_track_state(float pathlength, const genfit::MeasuredStateOnPlane* gf_state)
+  // square
+  template <class T>
+  inline static T get_r(const T& x, const T& y)
   {
-    SvtxTrackState_v1 out(pathlength);
+    return std::sqrt( square(x)+square(y));
+  }
+
+  // convert gf state to SvtxTrackState_v2
+  SvtxTrackState_v2 create_track_state(float pathlength, const genfit::MeasuredStateOnPlane* gf_state)
+  {
+    SvtxTrackState_v2 out(pathlength);
     out.set_x(gf_state->getPos().x());
     out.set_y(gf_state->getPos().y());
     out.set_z(gf_state->getPos().z());
@@ -246,9 +254,10 @@ int PHGenFitTrkFitter::process_event(PHCompositeNode* topNode)
     svtxtrack->set_crossing(crossing);
 
     // track position comes from silicon seed
-    svtxtrack->set_x(siseed->get_x());
-    svtxtrack->set_y(siseed->get_y());
-    svtxtrack->set_z(siseed->get_z());
+    const auto position = TrackSeedHelper::get_xyz(siseed);
+    svtxtrack->set_x(position.x());
+    svtxtrack->set_y(position.y());
+    svtxtrack->set_z(position.z());
 
     // track momentum comes from tpc seed
     svtxtrack->set_charge(tpcseed->get_qOverR() > 0 ? 1 : -1);
@@ -514,52 +523,16 @@ int PHGenFitTrkFitter::GetNodes(PHCompositeNode* topNode)
     return Fun4AllReturnCodes::ABORTEVENT;
   }
 
-  // tpc distortion corrections
-  m_dcc_static = findNode::getClass<TpcDistortionCorrectionContainer>(topNode, "TpcDistortionCorrectionContainerStatic");
-  m_dcc_average = findNode::getClass<TpcDistortionCorrectionContainer>(topNode, "TpcDistortionCorrectionContainerAverage");
-  m_dcc_fluctuation = findNode::getClass<TpcDistortionCorrectionContainer>(topNode, "TpcDistortionCorrectionContainerFluctuation");
+  // global position wrapper
+  m_globalPositionWrapper.loadNodes(topNode);
 
   return Fun4AllReturnCodes::EVENT_OK;
-}
-
-//_________________________________________________________________________________
-Acts::Vector3 PHGenFitTrkFitter::getGlobalPosition(TrkrDefs::cluskey key, TrkrCluster* cluster, short int crossing)
-{
-  // get global position from Acts transform
-  auto globalPosition = m_tgeometry->getGlobalPosition(key, cluster);
-
-  // for the TPC calculate the proper z based on crossing and side
-  const auto trkrid = TrkrDefs::getTrkrId(key);
-  if (trkrid == TrkrDefs::tpcId)
-  {
-    const auto side = TpcDefs::getSide(key);
-    globalPosition.z() = m_clusterCrossingCorrection.correctZ(globalPosition.z(), side, crossing);
-
-    // apply distortion corrections
-    if (m_dcc_static)
-    {
-      globalPosition = m_distortionCorrection.get_corrected_position(globalPosition, m_dcc_static);
-    }
-
-    if (m_dcc_average)
-    {
-      globalPosition = m_distortionCorrection.get_corrected_position(globalPosition, m_dcc_average);
-    }
-
-    if (m_dcc_fluctuation)
-    {
-      globalPosition = m_distortionCorrection.get_corrected_position(globalPosition, m_dcc_fluctuation);
-    }
-  }
-
-  return globalPosition;
 }
 
 /*
  * fit track with SvtxTrack as input seed.
  * \param intrack Input SvtxTrack
  */
-// PHGenFit::Track* PHGenFitTrkFitter::ReFitTrack(PHCompositeNode *topNode, const SvtxTrack* intrack,
 std::shared_ptr<PHGenFit::Track> PHGenFitTrkFitter::ReFitTrack(PHCompositeNode* topNode, const SvtxTrack* intrack)
 {
   // std::shared_ptr<PHGenFit::Track> empty_track(nullptr);
@@ -626,9 +599,8 @@ std::shared_ptr<PHGenFit::Track> PHGenFitTrkFitter::ReFitTrack(PHCompositeNode* 
     }
 
     const auto cluster = m_clustermap->findCluster(cluster_key);
-    const auto globalPosition = getGlobalPosition(cluster_key, cluster, crossing);
-
-    const float r = sqrt(square(globalPosition.x()) + square(globalPosition.y()));
+    const auto globalPosition = m_globalPositionWrapper.getGlobalPositionDistortionCorrected(cluster_key, cluster, crossing);
+    const float r = get_r(globalPosition.x(), globalPosition.y());
     m_r_cluster_id.emplace(r, cluster_key);
     if (Verbosity() > 10)
     {
@@ -667,7 +639,7 @@ std::shared_ptr<PHGenFit::Track> PHGenFitTrkFitter::ReFitTrack(PHCompositeNode* 
       continue;
     }
 
-    const auto globalPosition_acts = getGlobalPosition(cluster_key, cluster, crossing);
+    const auto globalPosition_acts = m_globalPositionWrapper.getGlobalPositionDistortionCorrected(cluster_key, cluster, crossing);
     const TVector3 pos(globalPosition_acts.x(), globalPosition_acts.y(), globalPosition_acts.z());
 
     const double cluster_rphi_error = cluster->getRPhiError();
@@ -685,7 +657,7 @@ std::shared_ptr<PHGenFit::Track> PHGenFitTrkFitter::ReFitTrack(PHCompositeNode* 
       auto geom = static_cast<CylinderGeom_Mvtx*>(geom_container_mvtx->GetLayerGeom(layer));
       auto hitsetkey = TrkrDefs::getHitSetKeyFromClusKey(cluster_key);
       auto surf = m_tgeometry->maps().getSiliconSurface(hitsetkey);
-      geom->find_sensor_center(surf, m_tgeometry, ladder_location);
+	  CylinderGeom_MvtxHelper::find_sensor_center(surf, m_tgeometry, ladder_location);
 
       TVector3 n(ladder_location[0], ladder_location[1], 0);
       n.RotateZ(geom->get_stave_phi_tilt());
@@ -700,7 +672,7 @@ std::shared_ptr<PHGenFit::Track> PHGenFitTrkFitter::ReFitTrack(PHCompositeNode* 
       double hit_location[3] = {0.0, 0.0, 0.0};
       auto hitsetkey = TrkrDefs::getHitSetKeyFromClusKey(cluster_key);
       auto surf = m_tgeometry->maps().getSiliconSurface(hitsetkey);
-      geom->find_segment_center(surf, m_tgeometry, hit_location);
+      CylinderGeomInttHelper::find_segment_center(surf, m_tgeometry, hit_location);
 
       TVector3 n(hit_location[0], hit_location[1], 0);
       n.RotateZ(geom->get_strip_phi_tilt());
@@ -733,6 +705,10 @@ std::shared_ptr<PHGenFit::Track> PHGenFitTrkFitter::ReFitTrack(PHCompositeNode* 
 
     }
 
+    // assign cluster key to measurement
+    meas->set_cluster_key( cluster_key );
+
+    // add to list
     measurements.push_back(meas.release());
   }
 
@@ -834,7 +810,7 @@ std::shared_ptr<SvtxTrack> PHGenFitTrkFitter::MakeSvtxTrack(const SvtxTrack* svt
     so that the track state list is never empty. Note that insert_state, despite taking a pointer as argument,
     does not take ownership of the state
     */
-    SvtxTrackState_v1 first(0.0);
+    SvtxTrackState_v2 first(0.0);
     out_track->insert_state(&first);
   }
 
@@ -992,6 +968,10 @@ std::shared_ptr<SvtxTrack> PHGenFitTrkFitter::MakeSvtxTrack(const SvtxTrack* svt
 
   const auto gftrack = phgf_track->getGenFitTrack();
   const auto rep = gftrack->getCardinalRep();
+
+  std::cout << "PHGenFitTrkFitter - measurements: " << gftrack->getNumPointsWithMeasurement() << std::endl;
+  std::cout << "PHGenFitTrkFitter - cluster keys: " << phgf_track->get_cluster_keys().size() << std::endl;
+
   for (unsigned int id = 0; id < gftrack->getNumPointsWithMeasurement(); ++id)
   {
     genfit::TrackPoint* trpoint = gftrack->getPointWithMeasurementAndFitterInfo(id, gftrack->getCardinalRep());
@@ -1031,6 +1011,10 @@ std::shared_ptr<SvtxTrack> PHGenFitTrkFitter::MakeSvtxTrack(const SvtxTrack* svt
 
     // create new svtx state and add to track
     auto state = create_track_state(pathlength, gf_state);
+
+    // get matching cluster key from phgf_track and assign to state
+    state.set_cluskey(phgf_track->get_cluster_keys()[id]);
+
     out_track->insert_state(&state);
 
 #ifdef _DEBUG_
@@ -1063,7 +1047,7 @@ std::shared_ptr<SvtxTrack> PHGenFitTrkFitter::MakeSvtxTrack(const SvtxTrack* svt
       }
 
       // get position
-      const auto globalPosition = getGlobalPosition( cluster_key, cluster, crossing );
+      const auto globalPosition = m_globalPositionWrapper.getGlobalPositionDistortionCorrected( cluster_key, cluster, crossing );
       const TVector3 pos_A(globalPosition.x(), globalPosition.y(), globalPosition.z() );
       const float r_cluster = std::sqrt( square(globalPosition.x()) + square(globalPosition.y()) );
 
@@ -1149,6 +1133,7 @@ std::shared_ptr<SvtxTrack> PHGenFitTrkFitter::MakeSvtxTrack(const SvtxTrack* svt
 
       // create new svtx state and add to track
       auto state = create_track_state(pathlength, &gf_state);
+      state.set_cluskey(cluster_key);
       out_track->insert_state(&state);
     }
   }

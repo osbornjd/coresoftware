@@ -1,4 +1,4 @@
-AUTOMAKE_OPTIONS = foreign
+AUTOMAKE_OPTIONS = foreign subdir-objects
 
 AM_CPPFLAGS = \
   -I$(includedir) \
@@ -20,27 +20,39 @@ pkginclude_HEADERS = \
   Fun4AllPrdfOutputManager.h \
   Fun4AllRolloverFileOutStream.h \
   Fun4AllStreamingInputManager.h \
+  Fun4AllTriggeredInputManager.h \
+  intt_pool.h \
   InputManagerType.h \
   MicromegasBcoMatchingInformation.h\
-	MvtxRawDefs.h \
+  MicromegasBcoMatchingInformation_v1.h\
+  MicromegasBcoMatchingInformation_v2.h\
+  MvtxRawDefs.h \
   SingleCemcTriggerInput.h \
   SingleGl1PoolInput.h \
   SingleGl1TriggerInput.h \
+  SingleGl1TriggeredInput.h \
   SingleHcalTriggerInput.h \
   SingleLL1TriggerInput.h \
   SingleMbdTriggerInput.h \
   SingleMicromegasPoolInput.h \
+  SingleMicromegasPoolInput_v1.h \
+  SingleMicromegasPoolInput_v2.h \
+  SingleInttEventInput.h \
   SingleInttPoolInput.h \
   SingleMvtxPoolInput.h \
   SinglePrdfInput.h \
   SingleStreamingInput.h \
   SingleTpcPoolInput.h \
   SingleTriggerInput.h \
+  SingleTriggeredInput.h \
   SingleZdcInput.h \
-  SingleZdcTriggerInput.h
+  SingleZdcTriggerInput.h \
+  SingleTpcTimeFrameInput.h \
+  TpcTimeFrameBuilder.h
 
 decoderincludedir = $(includedir)/mvtx_decoder
 decoderinclude_HEADERS = \
+  mvtx_decoder/RDH.h \
   mvtx_decoder/DecodingStat.h \
   mvtx_decoder/GBTLink.h \
   mvtx_decoder/GBTWord.h \
@@ -49,7 +61,7 @@ decoderinclude_HEADERS = \
   mvtx_decoder/PayLoadCont.h \
   mvtx_decoder/PayLoadSG.h \
   mvtx_decoder/PixelData.h \
-	mvtx_decoder/StrobeData.h
+  mvtx_decoder/StrobeData.h
 
 lib_LTLIBRARIES = \
   libmvtx_decoder.la \
@@ -57,13 +69,14 @@ lib_LTLIBRARIES = \
 
 # source for mvtx decoder library
 libmvtx_decoder_la_SOURCES =\
+  mvtx_decoder/RDH.cc \
   mvtx_decoder/DecodingStat.cc \
   mvtx_decoder/GBTLink.cc \
   mvtx_decoder/GBTWord.cc \
   mvtx_decoder/InteractionRecord.cc \
   mvtx_decoder/PayLoadCont.cc \
   mvtx_decoder/PixelData.cc \
-	mvtx_decoder/StrobeData.cc
+  mvtx_decoder/StrobeData.cc
 
 libfun4allraw_la_SOURCES = \
   Fun4AllEventOutStream.cc \
@@ -75,26 +88,33 @@ libfun4allraw_la_SOURCES = \
   Fun4AllPrdfOutputManager.cc \
   Fun4AllRolloverFileOutStream.cc \
   Fun4AllStreamingInputManager.cc \
+  Fun4AllTriggeredInputManager.cc \
   intt_pool.cc \
+  MicromegasBcoMatchingInformation_v1.cc\
+  MicromegasBcoMatchingInformation_v2.cc\
   mvtx_pool.cc \
-  tpc_pool.cc \
-  MicromegasBcoMatchingInformation.cc\
-	MvtxRawDefs.cc \
+  MvtxRawDefs.cc \
   SingleCemcTriggerInput.cc \
   SingleGl1PoolInput.cc \
   SingleGl1TriggerInput.cc \
+  SingleGl1TriggeredInput.cc \
   SingleHcalTriggerInput.cc \
+  SingleInttEventInput.cc \
   SingleInttPoolInput.cc \
   SingleLL1TriggerInput.cc \
   SingleMbdTriggerInput.cc \
-  SingleMicromegasPoolInput.cc \
+  SingleMicromegasPoolInput_v1.cc \
+  SingleMicromegasPoolInput_v2.cc \
   SingleMvtxPoolInput.cc \
   SinglePrdfInput.cc \
   SingleStreamingInput.cc \
   SingleTpcPoolInput.cc \
   SingleTriggerInput.cc \
+  SingleTriggeredInput.cc \
   SingleZdcInput.cc \
-  SingleZdcTriggerInput.cc
+  SingleZdcTriggerInput.cc \
+  SingleTpcTimeFrameInput.cc \
+  TpcTimeFrameBuilder.cc
 
 libfun4allraw_la_LIBADD = \
   libmvtx_decoder.la \

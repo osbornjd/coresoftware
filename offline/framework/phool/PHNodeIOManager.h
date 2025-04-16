@@ -10,6 +10,8 @@
 #include "phool.h"
 
 #include <cstddef>
+#include <cstdint>
+#include <limits>
 #include <map>
 #include <string>
 
@@ -28,7 +30,7 @@ class PHNodeIOManager : public PHIOManager
   PHNodeIOManager(const std::string &, const PHAccessType, const PHTreeType);
   ~PHNodeIOManager() override;
 
-// cppcheck-suppress [virtualCallInConstructor]
+  // cppcheck-suppress [virtualCallInConstructor]
   void closeFile() override;
   bool write(PHCompositeNode *) override;
   void print() const override;
@@ -45,24 +47,30 @@ class PHNodeIOManager : public PHIOManager
   uint64_t GetFileSize();
   std::map<std::string, TBranch *> *GetBranchMap();
 
-  bool write(TObject **, const std::string &, int buffersize, int splitlevel);
+  bool write(TObject **, const std::string &, int nodebuffersize, int nodesplitlevel);
   bool NodeExist(const std::string &nodename);
+
+  void SplitLevel(const int split) { splitlevel = split; }
+  void BufferSize(const int size) { buffersize = size; }
+  int SplitLevel() const { return splitlevel; }
+  int BufferSize() const { return buffersize; }
 
  private:
   int FillBranchMap();
   PHCompositeNode *reconstructNodeTree(PHCompositeNode *);
   bool readEventFromFile(size_t requestedEvent);
-  std::string getBranchClassName(TBranch *);
+  static std::string getBranchClassName(TBranch *);
 
-  TFile *file {nullptr};
-  TTree *tree {nullptr};
-  std::string TreeName {"T"};
-  int accessMode {PHReadOnly};
-  int m_CompressionSetting {505}; // ZSTD
-  int isFunctionalFlag {0};  // flag to tell if that object initialized properly
+  TFile *file{nullptr};
+  TTree *tree{nullptr};
+  std::string TreeName{"T"};
+  int accessMode{PHReadOnly};
+  int m_CompressionSetting{505};  // ZSTD
+  int isFunctionalFlag{0};        // flag to tell if that object initialized properly
+  int buffersize{std::numeric_limits<int>::min()};
+  int splitlevel{std::numeric_limits<int>::min()};
   std::map<std::string, TBranch *> fBranches;
   std::map<std::string, bool> objectToRead;
-
 };
 
 #endif

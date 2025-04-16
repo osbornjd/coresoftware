@@ -12,6 +12,8 @@ AM_LDFLAGS = \
   -L$(OFFLINE_MAIN)/lib \
   -L$(OFFLINE_MAIN)/lib64 \
   -lcalo_io \
+  -lcalotrigger \
+  -lcalotrigger_io \
   -lffarawobjects \
   -lfun4all \
   -lSubsysReco

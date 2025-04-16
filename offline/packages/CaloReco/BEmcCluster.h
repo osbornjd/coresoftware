@@ -21,14 +21,23 @@ class BEmcRec;
 class EmcModule
 {
  public:
-  EmcModule();
-  EmcModule(int ich_, float amp_, float tof_);
+  EmcModule() = default;
 
+  //_____________________________________________________________________________
+  EmcModule(int ich_, float amp_, float tof_)
+    : ich(ich_)
+      , amp(amp_)
+      , tof(tof_)
+  {
+  }
+  
   virtual ~EmcModule() {}
 
-  int ich;    // module id (linear)
-  float amp;  // module signal
-  float tof;  // module time-of-flight
+  int ich {0};    // module id (linear)
+  float amp {0};  // module signal
+  float tof {0};  // module time-of-flight
+
+
 };
 
 // ///////////////////////////////////////////////////////////////////////////
@@ -77,7 +86,7 @@ class EmcCluster : public TObject
   /// Returns number of EmcModules in EmcCluster
   int GetNofHits() { return fHitList.size(); }
   /// Returns EmcCluster fHitList
-  std::vector<EmcModule> GetHitList() { return fHitList; };
+  const std::vector<EmcModule> &GetHitList() { return fHitList; };
   /// Returns the EmcModule with the maximum energy
   EmcModule GetMaxTower();
   /// Returns the EmcModule corresponding to the reconstructed impact tower
@@ -101,14 +110,14 @@ class EmcCluster : public TObject
   /// Returns the EmcCluster total energy
   float GetTotalEnergy();
   /// Returns EmcCluster 1-st (pxcg,pycg) and 2-d momenta (pxx,pxy,pyy)
-  void GetMoments(float& pxcg, float& pycg,
+  void GetMoments(float& x, float& y,
                   float& pxx, float& pxy, float& pyy);
   /// Returns the EmcCluster corrected position in Sector (SM) frame
   void GetCorrPos(float& xc, float& yc);
   /// Returns the EmcCluster position in PHENIX global coord system
-  void GetGlobalPos(float& xg, float& yg, float& zg);
+  void GetGlobalPos(float& xA, float& yA, float& zA);
   /// Splits the Cluster onto SubClusters; returns list of clusters and list of peak towers corresponding to subclusters
-  int GetSubClusters(std::vector<EmcCluster>& sClList, std::vector<EmcModule>& ppeaks);
+  int GetSubClusters(std::vector<EmcCluster>& PkList, std::vector<EmcModule>& ppeaks, bool dosubclustersplitting);
   float GetProb(float& chi2, int& ndf);
 
  protected:

@@ -100,7 +100,7 @@
 #include <cstdlib>
 #include <exception>  // for exception
 #include <filesystem>
-#include <iostream>   // for operator<<, endl
+#include <iostream>  // for operator<<, endl
 #include <memory>
 
 class G4EmSaturation;
@@ -294,7 +294,7 @@ int PHG4Reco::InitField(PHCompositeNode *topNode)
     if (std::filesystem::path(m_FieldMapFile).extension() != ".root")
     {
       // loading from database
-      m_FieldMapFile  = CDBInterface::instance()->getUrl(m_FieldMapFile);
+      m_FieldMapFile = CDBInterface::instance()->getUrl(m_FieldMapFile);
     }
     if (std::filesystem::exists(m_FieldMapFile))
     {
@@ -1005,10 +1005,6 @@ PMMA      -3  12.01 1.008 15.99  6.  1.  8.  1.19  3.6  5.7  1.4
   C4F10->AddElement(G4NistManager::Instance()->FindOrBuildElement("C"), natoms = 4);
   C4F10->AddElement(G4NistManager::Instance()->FindOrBuildElement("F"), natoms = 10);
 
-  G4Material *CF4 = new G4Material("CF4", density = 3.72 * mg / cm3, ncomponents = 2, kStateGas, 288.15 * kelvin, 1 * atmosphere);
-  CF4->AddElement(G4NistManager::Instance()->FindOrBuildElement("C"), natoms = 1);
-  CF4->AddElement(G4NistManager::Instance()->FindOrBuildElement("F"), natoms = 4);
-
   G4Element *elLu = new G4Element(name = "Lutetium", symbol = "Lu", z = 71., a = 174.97 * g / mole);
   G4Material *LSO = new G4Material("LSO",                    // its name
                                    density = 7.4 * g / cm3,  // its density
@@ -1022,28 +1018,6 @@ PMMA      -3  12.01 1.008 15.99  6.  1.  8.  1.19  3.6  5.7  1.4
   G4Material *SilverEpoxyGlue_INTT = new G4Material("SilverEpoxyGlue_INTT", density = 3.2 * g / cm3, ncomponents = 2);
   SilverEpoxyGlue_INTT->AddMaterial(Epoxy, fractionmass = 0.79);
   SilverEpoxyGlue_INTT->AddMaterial(G4NistManager::Instance()->FindOrBuildMaterial("G4_Ag"), fractionmass = 0.21);
-
-  // this here is very close but makes more sense since it uses Ne and CF4
-  double G4_Ne_frac = 0.5;
-  double CF4_frac = 0.5;
-  const double den_G4_Ne = G4NistManager::Instance()->FindOrBuildMaterial("G4_Ne")->GetDensity();
-  const double den_CF4_2 = CF4->GetDensity();
-  const double den_sphenix_tpc_gas = den_G4_Ne * G4_Ne_frac + den_CF4_2 * CF4_frac;
-  G4Material *sPHENIX_tpc_gas = new G4Material("sPHENIX_TPC_Gas", den_sphenix_tpc_gas, ncomponents = 2, kStateGas);
-  sPHENIX_tpc_gas->AddMaterial(CF4, den_CF4_2 * CF4_frac / den_sphenix_tpc_gas);
-  sPHENIX_tpc_gas->AddMaterial(G4NistManager::Instance()->FindOrBuildMaterial("G4_Ne"), den_G4_Ne * G4_Ne_frac / den_sphenix_tpc_gas);
-
-  // Due to supply issues, we are now expecting to use Ar CF4.
-  // The fractions are tuned to produce very similar drift speed
-  // and other parameters as the original NeCF4 mixture.
-  double alt_G4_Ar_frac = 0.6;
-  double alt_CF4_frac = 0.4;
-  const double alt_den_G4_Ar = G4NistManager::Instance()->FindOrBuildMaterial("G4_Ar")->GetDensity();
-  const double alt_den_CF4 = CF4->GetDensity();
-  const double alt_den_sphenix_tpc_gas = alt_den_G4_Ar * alt_G4_Ar_frac + alt_den_CF4 * alt_CF4_frac;
-  G4Material *alt_sPHENIX_tpc_gas = new G4Material("sPHENIX_TPC_Gas_ArCF4", alt_den_sphenix_tpc_gas, ncomponents = 2, kStateGas);
-  alt_sPHENIX_tpc_gas->AddMaterial(CF4, alt_den_CF4 * alt_CF4_frac / alt_den_sphenix_tpc_gas);
-  alt_sPHENIX_tpc_gas->AddMaterial(G4NistManager::Instance()->FindOrBuildMaterial("G4_Ar"), alt_den_G4_Ar * alt_G4_Ar_frac / alt_den_sphenix_tpc_gas);
 
   // define P10 Gas which will be used for TPC Benchmarking
   G4Material *P10 =

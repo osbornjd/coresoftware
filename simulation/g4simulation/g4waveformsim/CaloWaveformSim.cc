@@ -21,8 +21,9 @@
 
 #include <fun4all/Fun4AllReturnCodes.h>
 
+#include <calobase/TowerInfo.h>
 #include <calobase/TowerInfoContainer.h>
-#include <calobase/TowerInfoContainerv3.h>
+#include <calobase/TowerInfoContainerSimv2.h>
 
 #include <g4detectors/PHG4CylinderCellGeomContainer.h>
 #include <g4detectors/PHG4CylinderCellGeom_Spacalv1.h>
@@ -55,7 +56,7 @@ CaloWaveformSim::~CaloWaveformSim()
   gsl_rng_free(m_RandomGenerator);
 }
 
-int CaloWaveformSim::Init(PHCompositeNode *topNode)
+int CaloWaveformSim::InitRun(PHCompositeNode *topNode)
 {
   m_RandomGenerator = gsl_rng_alloc(gsl_rng_mt19937);
   unsigned int seed = PHRandomSeed();  // fixed seed handled in PHRandomSeed()
@@ -297,6 +298,17 @@ int CaloWaveformSim::process_event(PHCompositeNode *topNode)
 
     float t0 = hit->get_t(0) / m_sampletime;
     unsigned int tower_index = decode_tower(key);
+    //here I will add the truth matching part
+    // for the cell reco, the truth matching info relys on edep not light yield, I will be consistent here :)
+    TowerInfo* tower = m_CaloWaveformContainer->get_tower_at_channel(tower_index);
+    TowerInfo::EdepMap& edepMap = tower->get_hitEdepMap();
+    TowerInfo::ShowerEdepMap& showerMap = tower->get_showerEdepMap();
+
+    int showerID = hit->get_shower_id();
+    float hitEdep = hit->get_edep();
+
+    edepMap[hit->get_hit_id()] += hitEdep;
+    showerMap[showerID] += hitEdep;
 
     f_fit->SetParameters(ADC, _shiftval + t0, 0.);
     for (int i = 0; i < m_nsamples; i++)
@@ -322,12 +334,30 @@ int CaloWaveformSim::process_event(PHCompositeNode *topNode)
 
     for (int i = 0; i < m_nchannels; i++)
     {
+      std::vector<float> m_waveform_pedestal;
+      m_waveform_pedestal.resize(m_nsamples);
+      if(m_noiseType == NoiseType::NOISE_TREE)
+      {
+        TowerInfo *pedestal_tower = m_PedestalContainer->get_tower_at_channel(i);
+        float pedestal_mean = 0;
+        for(int j = 0; j < m_nsamples; j++)
+        {
+          m_waveform_pedestal.at(j) = (j < m_pedestalsamples) ? pedestal_tower->get_waveform_value(j) : pedestal_tower->get_waveform_value(m_pedestalsamples - 1);
+          pedestal_mean += m_waveform_pedestal.at(j);
+        }
+        pedestal_mean /= m_nsamples;
+        for(int j = 0; j < m_nsamples; j++)
+        {
+          m_waveform_pedestal.at(j)  = (m_waveform_pedestal.at(j) - pedestal_mean) * m_pedestal_scale + pedestal_mean;
+        }
+      }
       for (int j = 0; j < m_nsamples; j++)
       {
         if (m_noiseType == NoiseType::NOISE_TREE)
         {
-          TowerInfo *pedestal_tower = m_PedestalContainer->get_tower_at_channel(i);
-          m_waveforms.at(i).at(j) += (j < m_pedestalsamples) ? pedestal_tower->get_waveform_value(j) : pedestal_tower->get_waveform_value(m_pedestalsamples - 1);
+          //TowerInfo *pedestal_tower = m_PedestalContainer->get_tower_at_channel(i);
+          //m_waveforms.at(i).at(j) += (j < m_pedestalsamples) ? pedestal_tower->get_waveform_value(j) : pedestal_tower->get_waveform_value(m_pedestalsamples - 1);
+          m_waveforms.at(i).at(j) += m_waveform_pedestal.at(j);
         }
         if (m_noiseType == NoiseType::NOISE_GAUSSIAN)
         {
@@ -337,6 +367,16 @@ int CaloWaveformSim::process_event(PHCompositeNode *topNode)
         {
           m_waveforms.at(i).at(j) += m_fixpedestal;
         }
+        // saturate at 2^14 - 1
+        if(m_waveforms.at(i).at(j) > 16383)
+        {
+          m_waveforms.at(i).at(j) = 16383;
+        }
+        if(m_waveforms.at(i).at(j) < 0)
+	      {
+	        m_waveforms.at(i).at(j) = 0;
+	      }
+        
         m_CaloWaveformContainer->get_tower_at_channel(i)->set_waveform_value(j, m_waveforms.at(i).at(j));
       }
     }
@@ -457,7 +497,7 @@ int CaloWaveformSim::process_event(PHCompositeNode *topNode)
       DetNode = new PHCompositeNode(DetectorNodeName);
       dstNode->addNode(DetNode);
     }
-    m_CaloWaveformContainer = new TowerInfoContainerv3(DetectorEnum);
+    m_CaloWaveformContainer = new TowerInfoContainerSimv2(DetectorEnum);
 
     PHIODataNode<PHObject> *newTowerNode = new PHIODataNode<PHObject>(m_CaloWaveformContainer, "WAVEFORM_" + m_detector, "PHObject");
     DetNode->addNode(newTowerNode);

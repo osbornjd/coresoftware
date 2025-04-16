@@ -14,8 +14,15 @@ AM_CPPFLAGS = \
   -isystem$(ROOTSYS)/include
 
 pkginclude_HEADERS = \
+  CaloStatusMapper.h \
+  CaloStatusMapperDefs.h \
   ConstituentsinJets.h \
+  DijetQA.h \
+  JetKinematicCheck.h \
   JetQADefs.h \
+  JetSeedCount.h \
+  PhotonJetsKinematics.h \
+  RhosinEvent.h \
   StructureinJets.h \
   TrksInJetQA.h \
   TrksInJetQAHist.h \
@@ -28,13 +35,16 @@ pkginclude_HEADERS = \
   TrksInJetQAHitManager.h \
   TrksInJetQAClustManager.h \
   TrksInJetQATrkManager.h \
-  TrksInJetQAJetManager.h \
-  RhosinEvent.h \
-  JetSeedCount.h \
-  JetKinematicCheck.h
+  TrksInJetQAJetManager.h
 
 libjetqa_la_SOURCES = \
-  ConstituentsinJets.cc\
+  CaloStatusMapper.cc \
+  ConstituentsinJets.cc \
+  DijetQA.cc \
+  JetKinematicCheck.cc \
+  JetSeedCount.cc \
+  PhotonJetsKinematics.cc \
+  RhosinEvent.cc \
   StructureinJets.cc \
   TrksInJetQA.cc \
   TrksInJetQABaseFiller.cc \
@@ -44,15 +54,13 @@ libjetqa_la_SOURCES = \
   TrksInJetQAHitManager.cc \
   TrksInJetQAClustManager.cc \
   TrksInJetQATrkManager.cc \
-  TrksInJetQAJetManager.cc \
-  RhosinEvent.cc \
-  JetSeedCount.cc \
-  JetKinematicCheck.cc
+  TrksInJetQAJetManager.cc
 
 libjetqa_la_LIBADD = \
   -L$(libdir) \
   -L$(OFFLINE_MAIN)/lib \
   -lcalo_io \
+  -lcalotrigger \
   -ljetbackground\
   -lg4jets \
   -lcentrality_io \
@@ -80,10 +88,6 @@ testexternals.C:
 	echo "{" >> $@
 	echo "  return 0;" >> $@
 	echo "}" >> $@
-
-# Rule for generating table CINT dictionaries.
-%_Dict.cc: %.h %LinkDef.h
-	rootcint -f $@ @CINTDEFS@ -c $(DEFAULT_INCLUDES) $(AM_CPPFLAGS) $^
 
 clean-local:
 	rm -f $(BUILT_SOURCES)

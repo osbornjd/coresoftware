@@ -12,8 +12,8 @@
 #include <unistd.h>
 #include <exception>
 #include <iostream>
-#include <string>
 #include <sstream>
+#include <string>
 
 #define rdtsc(low, high)       \
   __asm__ __volatile__("rdtsc" \
@@ -44,8 +44,6 @@ class PHTimer
     , _state(STOP)
     , _start_time(get_clock_counts())
     , _stop_time(get_clock_counts())
-    , _accumulated_time(0)
-    , _ncycle(0)
   {
     _stop_time._low++;
   }
@@ -87,7 +85,7 @@ class PHTimer
     }
     else
     {
-      os <<  _name << ": timer never started.\n";
+      os << _name << ": timer never started.\n";
     }
     PRINT(os, "**");
   }
@@ -99,7 +97,7 @@ class PHTimer
   }
 
   //! get timer name
-  std::string get_name(void) const
+  const std::string& get_name(void) const
   {
     return _name;
   }
@@ -158,7 +156,7 @@ class PHTimer
       }
       catch (std::exception& e)
       {
-        std::cerr << e.what() << std::endl;
+        std::cout << e.what() << std::endl;
       }
       _period = 1.0 / _frequency;
     }
@@ -183,24 +181,20 @@ class PHTimer
     double _period;
 
     //! read pc frequency from cpuinfo place
-    void set_cpu_freq(const std::string &cpuinfopath = "/proc/cpuinfo");
+    void set_cpu_freq(const std::string& cpuinfopath = "/proc/cpuinfo");
   };
 
   //! used to store high precision time using two integers
   struct time_struct
   {
     //! constructor
-    time_struct(void)
-      : _low(0)
-      , _high(0)
-    {
-    }
+    time_struct(void) = default;
 
     //! low wheight bits cpu count
-    unsigned long _low;
+    unsigned long _low{0};
 
     //! high wheight bits cpu count
-    unsigned long _high;
+    unsigned long _high{0};
   };
 
   //! gets time from cpu clock counts
@@ -235,10 +229,10 @@ class PHTimer
   time_struct _stop_time;
 
   //! cumulated time
-  double _accumulated_time;
+  double _accumulated_time{0};
 
   //! number of restart/stop cycles
-  unsigned int _ncycle;
+  unsigned int _ncycle{0};
 };
 
 #endif

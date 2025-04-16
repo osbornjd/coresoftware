@@ -12,11 +12,11 @@ class PHNode;
 class PHNodeReset : public PHNodeOperation
 {
  public:
-  PHNodeReset() {}
-  ~PHNodeReset() override {}
+  PHNodeReset() = default;
+  ~PHNodeReset() override = default;
 
  protected:
-  void perform(PHNode*) override;
+  void perform(PHNode *) override;
 };
 
 #endif

@@ -13,7 +13,6 @@
 
 #include <tpc/TpcDistortionCorrectionContainer.h>
 
-#include <trackbase/ActsGeometry.h>
 #include <trackbase/TpcDefs.h>
 #include <trackbase/TrkrCluster.h>
 #include <trackbase/TrkrClusterContainer.h>
@@ -188,9 +187,6 @@ int TpcSpaceChargeReconstruction::InitRun(PHCompositeNode* /*unused*/)
 //_____________________________________________________________________
 int TpcSpaceChargeReconstruction::process_event(PHCompositeNode* topNode)
 {
-  // increment local event counter
-  ++m_event;
-
   // load nodes
   const auto res = load_nodes(topNode);
   if (res != Fun4AllReturnCodes::EVENT_OK)
@@ -279,36 +275,20 @@ void TpcSpaceChargeReconstruction::SetDefaultParameters()
 //_____________________________________________________________________
 int TpcSpaceChargeReconstruction::load_nodes(PHCompositeNode* topNode)
 {
-  // get necessary nodes
-  m_tgeometry = findNode::getClass<ActsGeometry>(topNode, "ActsGeometry");
-  assert(m_tgeometry);
 
+  // tracks
   m_track_map = findNode::getClass<SvtxTrackMap>(topNode, "SvtxTrackMap");
   assert(m_track_map);
 
+  // clusters
   m_cluster_map = findNode::getClass<TrkrClusterContainer>(topNode, "CORRECTED_TRKR_CLUSTER");
-  if (m_cluster_map)
-  {
-    if (m_event < 2)
-    {
-      std::cout << "TpcSpaceChargeReconstruction::load_nodes - Using CORRECTED_TRKR_CLUSTER node " << std::endl;
-    }
-  }
-  else
-  {
-    if (m_event < 2)
-    {
-      std::cout << "TpcSpaceChargeReconstruction::load_nodes - CORRECTED_TRKR_CLUSTER node not found, using TRKR_CLUSTER" << std::endl;
-    }
-    m_cluster_map = findNode::getClass<TrkrClusterContainer>(topNode, "TRKR_CLUSTER");
-  }
+  if(!m_cluster_map)
+  { m_cluster_map = findNode::getClass<TrkrClusterContainer>(topNode, "TRKR_CLUSTER"); }
 
   assert(m_cluster_map);
 
-  // tpc distortion corrections
-  m_dcc_static = findNode::getClass<TpcDistortionCorrectionContainer>(topNode, "TpcDistortionCorrectionContainerStatic");
-  m_dcc_average = findNode::getClass<TpcDistortionCorrectionContainer>(topNode, "TpcDistortionCorrectionContainerAverage");
-  m_dcc_fluctuation = findNode::getClass<TpcDistortionCorrectionContainer>(topNode, "TpcDistortionCorrectionContainerFluctuation");
+  // global position wrapper
+  m_globalPositionWrapper.loadNodes(topNode);
 
   return Fun4AllReturnCodes::EVENT_OK;
 }
@@ -387,39 +367,6 @@ void TpcSpaceChargeReconstruction::create_histograms()
   }
 }
 
-//_________________________________________________________________________________
-Acts::Vector3 TpcSpaceChargeReconstruction::get_global_position(TrkrDefs::cluskey key, TrkrCluster* cluster, short int crossing) const
-{
-  // get global position from Acts transform
-  auto globalPosition = m_tgeometry->getGlobalPosition(key, cluster);
-
-  // for the TPC calculate the proper z based on crossing and side
-  const auto trkrid = TrkrDefs::getTrkrId(key);
-  if (trkrid == TrkrDefs::tpcId)
-  {
-    const auto side = TpcDefs::getSide(key);
-    globalPosition.z() = m_clusterCrossingCorrection.correctZ(globalPosition.z(), side, crossing);
-
-    // apply distortion corrections
-    if (m_dcc_static)
-    {
-      globalPosition = m_distortionCorrection.get_corrected_position(globalPosition, m_dcc_static);
-    }
-
-    if (m_dcc_average)
-    {
-      globalPosition = m_distortionCorrection.get_corrected_position(globalPosition, m_dcc_average);
-    }
-
-    if (m_dcc_fluctuation)
-    {
-      globalPosition = m_distortionCorrection.get_corrected_position(globalPosition, m_dcc_fluctuation);
-    }
-  }
-
-  return globalPosition;
-}
-
 //_____________________________________________________________________
 void TpcSpaceChargeReconstruction::process_tracks()
 {
@@ -493,8 +440,6 @@ void TpcSpaceChargeReconstruction::process_track(SvtxTrack* track)
   assert(crossing != SHRT_MAX);
 
   // running track state
-  auto state_iter = track->begin_states();
-
   // loop over clusters
   for (const auto& cluster_key : get_cluster_keys(track))
   {
@@ -515,7 +460,7 @@ void TpcSpaceChargeReconstruction::process_track(SvtxTrack* track)
     }
 
     // cluster r, phi and z
-    const auto global_position = get_global_position(cluster_key, cluster, crossing);
+    const auto global_position = m_globalPositionWrapper.getGlobalPositionDistortionCorrected(cluster_key, cluster, crossing);
     const auto cluster_r = get_r(global_position.x(), global_position.y());
     const auto cluster_phi = std::atan2(global_position.y(), global_position.x());
     const auto cluster_z = global_position.z();
@@ -524,26 +469,24 @@ void TpcSpaceChargeReconstruction::process_track(SvtxTrack* track)
     double cluster_rphi_error = cluster->getRPhiError();
     double cluster_z_error = cluster->getZError();
 
-    /*
-     * as instructed by Christof, it should not be necessary to cut on small
-     * cluster errors any more with clusters of version 4 or higher
-     */
-
-    // find track state that is the closest to cluster
-    /* this assumes that both clusters and states are sorted along r */
-    float dr_min = -1;
-    for (auto iter = state_iter; iter != track->end_states(); ++iter)
+    // find track state that match cluster
+    bool found = false;
+    auto state_iter = track->begin_states();
+    for(; state_iter != track->end_states(); ++state_iter)
     {
-      const auto dr = std::abs(cluster_r - get_r(iter->second->get_x(), iter->second->get_y()));
-      if (dr_min < 0 || dr < dr_min)
+      const auto& [pathlengh, state] = *state_iter;
+      if( state->get_cluskey() == cluster_key )
       {
-        state_iter = iter;
-        dr_min = dr;
-      }
-      else
-      {
+        found = true;
         break;
       }
+    }
+
+    if( !found )
+    {
+      if( Verbosity() )
+      { std::cout << "TpcSpaceChargeReconstruction::process_track - could not find track state for layer: " <<  (int) TrkrDefs::getLayer(cluster_key) << std::endl; }
+      continue;
     }
 
     // get relevant track state

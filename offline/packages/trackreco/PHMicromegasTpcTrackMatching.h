@@ -3,8 +3,7 @@
 #ifndef TRACKRECO_PHMICROMEGASTPCTRACKMATCHING_H
 #define TRACKRECO_PHMICROMEGASTPCTRACKMATCHING_H
 
-#include <tpc/TpcClusterZCrossingCorrection.h>
-#include <tpc/TpcDistortionCorrection.h>
+#include <tpc/TpcGlobalPositionWrapper.h>
 
 #include <trackbase/TrkrDefs.h>
 
@@ -36,10 +35,14 @@ class PHMicromegasTpcTrackMatching : public SubsysReco
   void set_rphi_search_window_lyr2(const double win) { _rphi_search_win[1] = win; }
   void set_z_search_window_lyr2(const double win) { _z_search_win[1] = win; }
   void set_min_tpc_layer(const unsigned int layer) { _min_tpc_layer = layer; }
+  void set_max_tpc_layer(const unsigned int layer) { _max_tpc_layer = layer; }
   void set_test_windows_printout(const bool test) { _test_windows = test; }
   void set_pp_mode(const bool mode) { _pp_mode = mode; }
+  void set_use_silicon( const bool value ) { _use_silicon = value; }
   void SetIteration(int iter) { _n_iteration = iter; }
 
+  void zeroField(const bool flag) { _zero_field = flag; }
+  int Init(PHCompositeNode* topNode) override;
   int InitRun(PHCompositeNode* topNode) override;
   int process_event(PHCompositeNode*) override;
   int End(PHCompositeNode*) override;
@@ -53,12 +56,24 @@ class PHMicromegasTpcTrackMatching : public SubsysReco
   int GetNodes(PHCompositeNode* topNode);
 
   void copyMicromegasClustersToCorrectedMap();
-  Acts::Vector3 getGlobalPosition(TrkrDefs::cluskey key, TrkrCluster* cluster, short int crossing, unsigned int side);
 
   //! number of layers in the micromegas
   static constexpr unsigned int _n_mm_layers{2};
 
   bool _use_truth_clusters = false;
+
+  //! if true, use straight fit instead of helical to extrapolate to TPOT
+  bool _zero_field = false;
+
+  //! if true, use silicon clusters instead of TPC to extrapolate to TPOT
+  bool _use_silicon = false;
+
+  // range of TPC layers to use in projection to micromegas
+  unsigned int _min_tpc_layer = 39;
+
+  // range of TPC layers to use in projection to micromegas
+  unsigned int _max_tpc_layer = 55;
+
   TrkrClusterContainer* _cluster_map{nullptr};
   TrkrClusterContainer* _corrected_cluster_map{nullptr};
 
@@ -72,8 +87,8 @@ class PHMicromegasTpcTrackMatching : public SubsysReco
   //! default z search window for each layer
   std::array<double, _n_mm_layers> _z_search_win{26.0, 0.25};
 
-  // range of TPC layers to use in projection to micromegas
-  unsigned int _min_tpc_layer{38};
+  // get the cluster list for zeroField
+  std::vector<TrkrDefs::cluskey> getTrackletClusterList(TrackSeed* tracklet);
 
   /// first micromegas layer
   /** it is reset in ::Setup using actual micromegas geometry */
@@ -86,20 +101,12 @@ class PHMicromegasTpcTrackMatching : public SubsysReco
   PHG4CylinderGeomContainer* _geomContainerMicromegas{nullptr};
   TrkrClusterIterationMapv1* _iteration_map{nullptr};
   int _n_iteration{0};
-  //  std::string _track_map_name = "TpcTrackSeedContainer";
 
+  //! acts geometry
   ActsGeometry* _tGeometry{nullptr};
 
-  // crossing z correction
-  TpcClusterZCrossingCorrection m_clusterCrossingCorrection;
-
-  // distortion corrections
-  TpcDistortionCorrectionContainer* m_dcc_static{nullptr};
-  TpcDistortionCorrectionContainer* m_dcc_average{nullptr};
-  TpcDistortionCorrectionContainer* m_dcc_fluctuation{nullptr};
-
-  /// tpc distortion correction utility class
-  TpcDistortionCorrection m_distortionCorrection;
+  //! tpc global position wrapper
+  TpcGlobalPositionWrapper m_globalPositionWrapper;
 
   //! true to printout actual residuals for testing
   bool _test_windows{false};

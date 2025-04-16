@@ -52,7 +52,7 @@ void PHTimeStamp::set(const int year, const int month, const int day,
     setTics(0);
     return;
   }
-  tm newTime;
+  tm newTime{};
   newTime.tm_year = year - 1900;
   newTime.tm_mon = month - 1;
   newTime.tm_mday = day;
@@ -71,7 +71,7 @@ void PHTimeStamp::set(const int year, const int month, const int day,
 void PHTimeStamp::set(const char *timeString)
 {
 #ifndef WIN32
-  tm newTime;
+  tm newTime{};
   strptime(timeString, "%A %h %d %H:%M:%S %Y", &newTime);
   setTics(mktime(&newTime));
 #endif
@@ -97,24 +97,19 @@ void PHTimeStamp::setBinTics(const phtime_t t)
   binaryTime = t;
 }
 
-phtime_t PHTimeStamp::ticsToBinaryTime(time_t tics) const
+phtime_t PHTimeStamp::ticsToBinaryTime(time_t tics)
 {
-  return tics * ticFactor + ticOffset;
+  return (tics * ticFactor) + ticOffset;
 }
 
-time_t PHTimeStamp::binaryTimeToTics(phtime_t bt) const
+time_t PHTimeStamp::binaryTimeToTics(phtime_t bt)
 {
   return (bt - ticOffset) / ticFactor;
 }
 
-int PHTimeStamp::isInRange(const PHTimeStamp &t1, const PHTimeStamp &t2)
+int PHTimeStamp::isInRange(const PHTimeStamp &t1, const PHTimeStamp &t2) const
 {
   return (binaryTime > t1.getBinaryTime() && binaryTime < t2.getBinaryTime());
-}
-
-void PHTimeStamp::print()
-{
-  std::cout << *this;
 }
 
 //
@@ -179,7 +174,10 @@ char *PHTimeStamp::formatTimeString() const
 
   char *u = strtok(timeString, " ");
 
-  if (u) strcpy(line, u);
+  if (u)
+  {
+    strcpy(line, u);
+  }
 
   while ((u = strtok(nullptr, " ")))
   {

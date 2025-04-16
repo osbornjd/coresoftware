@@ -13,11 +13,11 @@ class MinimumBiasInfov1 : public MinimumBiasInfo
 
   void identify(std::ostream &os = std::cout) const override;
 
-  virtual void Reset() override{};
+  void Reset() override { _isMinBias = false; }
 
   int isValid() const override { return 1; }
 
-  PHObject* CloneMe() const override { return new MinimumBiasInfov1(*this); }
+  PHObject *CloneMe() const override { return new MinimumBiasInfov1(*this); }
 
   void CopyTo(MinimumBiasInfo *mbinfo) override;
 

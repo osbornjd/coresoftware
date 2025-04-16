@@ -5,32 +5,28 @@
 #include <calobase/TowerInfoContainer.h>
 #include <calobase/TowerInfoDefs.h>
 
-// Fun4All
-#include <ffaobjects/EventHeader.h>
+#include <cdbobjects/CDBTTree.h>
 
-#include <fun4all/Fun4AllHistoManager.h>
+#include <ffamodules/CDBInterface.h>
+
 #include <fun4all/Fun4AllReturnCodes.h>
-#include <fun4all/Fun4AllServer.h>
+#include <fun4all/SubsysReco.h>
 
-#include <phool/PHCompositeNode.h>
 #include <phool/getClass.h>
 #include <phool/phool.h>
 
-#include <cdbobjects/CDBTTree.h>
-#include <ffamodules/CDBInterface.h>
-
 // ROOT
 #include <TFile.h>
-#include <TH1F.h>
-#include <TH2F.h>
-#include <TLine.h>
-#include <TPad.h>
+#include <TH1.h>
+#include <TH2.h>
 #include <TProfile2D.h>
-#include <TStyle.h>
 #include <TSystem.h>
-#include <TTree.h>
 
-#include <boost/format.hpp>
+#include <algorithm>  // for sort
+#include <cstdlib>    // for exit, size_t
+#include <fstream>
+#include <iostream>
+#include <limits>  // for numeric_limits
 
 //________________________________
 emcNoisyTowerFinder::emcNoisyTowerFinder(const std::string &name, const std::string &outputName)
@@ -38,17 +34,14 @@ emcNoisyTowerFinder::emcNoisyTowerFinder(const std::string &name, const std::str
   , Outfile(outputName)
 {
 }
-//__________________________________
-emcNoisyTowerFinder::~emcNoisyTowerFinder()
-{
-  std::cout << "emcNoisyTowerFinder::~emcNoisyTowerFinder() Calling dtor" << std::endl;
-}
 
 //_____________________________
-int emcNoisyTowerFinder::Init(PHCompositeNode * /*topNode*/)
+int emcNoisyTowerFinder::InitRun(PHCompositeNode * /*topNode*/)
 {
-  std::cout << "emcNoisyTowerFinder::Init(PHCompositeNode *topNode) Initializing" << std::endl;
-
+  if (Verbosity() > 0)
+  {
+    std::cout << "emcNoisyTowerFinder::Init(PHCompositeNode *topNode) Initializing" << std::endl;
+  }
   foutput = new TFile(Outfile.c_str(), "recreate");
 
   h_hits_eta_phi_adc = new TH2F("h_hits_eta_phi_adc", "", Neta, 0, Neta, Nphi, 0, Nphi);
@@ -64,6 +57,7 @@ int emcNoisyTowerFinder::Init(PHCompositeNode * /*topNode*/)
   if (calibdir.empty())
   {
     std::cout << "CaloTowerCalib::::InitRun No EMCal Calibration NOT even a default" << std::endl;
+    gSystem->Exit(1);
     exit(1);
   }
   cdbttree = new CDBTTree(calibdir);
@@ -72,18 +66,10 @@ int emcNoisyTowerFinder::Init(PHCompositeNode * /*topNode*/)
 }
 
 //_____________________________
-int emcNoisyTowerFinder::InitRun(PHCompositeNode * /*topNode*/)
-{
-  std::cout << "emcNoisyTowerFinder::InitRun(PHCompositeNode *topNode) Initializing for Run XXX" << std::endl;
-  return Fun4AllReturnCodes::EVENT_OK;
-}
-
-//_____________________________
 int emcNoisyTowerFinder::process_event(PHCompositeNode *topNode)
 {
   // Get TowerInfoContainer
-  TowerInfoContainer *towers;
-  towers = findNode::getClass<TowerInfoContainer>(topNode, "TOWERS_CEMC");
+  TowerInfoContainer *towers = findNode::getClass<TowerInfoContainer>(topNode, "TOWERS_CEMC");
   if (!towers)
   {
     std::cout << PHWHERE << "emcNoisyTowerFinder::process_event Could not find node TOWERS_CEMC" << std::endl;
@@ -128,38 +114,80 @@ int emcNoisyTowerFinder::process_event(PHCompositeNode *topNode)
 }
 
 //__________________________
-int emcNoisyTowerFinder::ResetEvent(PHCompositeNode * /*topNode*/)
-{
-  return Fun4AllReturnCodes::EVENT_OK;
-}
-//__________________________
-
-//__________________________
 void emcNoisyTowerFinder::FindHot(std::string &infilename, std::string &outfilename, const std::string &inHist)
 {
-  TFile *fin = new TFile(infilename.c_str());
-  if (!fin)
+  // TH2F *h_hits_eta_phi_adc = nullptr;
+  bool isListFile = (infilename.substr(infilename.rfind('.') + 1) == "txt" || infilename.substr(infilename.rfind('.') + 1) == "list");
+
+  if (isListFile)
   {
-    std::cout << "emcNoisyTowerFinder::FindHot: input file not found " << infilename.c_str() << std::endl;
-    return;
+    std::ifstream fileList(infilename);
+    std::string line;
+    while (std::getline(fileList, line))
+    {
+      TFile *fin = new TFile(line.c_str());
+      if (!fin || fin->IsZombie())
+      {
+        std::cout << "emcNoisyTowerFinder::FindHot: input file not found or is corrupted " << line << std::endl;
+        continue;
+      }
+      TH2 *tempHist{nullptr};
+      fin->GetObject(inHist.c_str(), tempHist);
+      if (!tempHist)
+      {
+        std::cout << "emcNoisyTowerFinder::FindHot: input hist not found in file " << line << std::endl;
+        delete fin;
+        continue;
+      }
+      if (!h_hits_eta_phi_adc)
+      {
+        h_hits_eta_phi_adc = (TH2 *) tempHist->Clone();
+        h_hits_eta_phi_adc->SetDirectory(nullptr);  // Detach from the file to keep it in memory
+      }
+      else
+      {
+        h_hits_eta_phi_adc->Add(tempHist);
+      }
+      delete fin;
+    }
+    fileList.close();
   }
-  h_hits_eta_phi_adc = (TH2F *) fin->Get(inHist.c_str());
-  if (!h_hits_eta_phi_adc)
+  else
   {
-    std::cout << "emcNoisyTowerFinder::FindHot: input hist not found " << inHist.c_str() << std::endl;
-    return;
+    TFile *fin = new TFile(infilename.c_str());
+    if (!fin || fin->IsZombie())
+    {
+      std::cout << "emcNoisyTowerFinder::FindHot: input file not found or is corrupted " << infilename << std::endl;
+      return;
+    }
+    fin->GetObject(inHist.c_str(), h_hits_eta_phi_adc);
+    if (!h_hits_eta_phi_adc)
+    {
+      std::cout << "emcNoisyTowerFinder::FindHot: input hist not found " << inHist << std::endl;
+      delete fin;
+      return;
+    }
+    h_hits_eta_phi_adc->SetDirectory(nullptr);  // Detach from the file to keep it in memory
+    delete fin;
   }
 
-  TH2F *h_hits = h_hits_eta_phi_adc;
+  if (!h_hits_eta_phi_adc)
+  {
+    std::cout << "emcNoisyTowerFinder::FindHot: no valid histogram found" << std::endl;
+    return;
+  }
+  TH2 *h_hits = h_hits_eta_phi_adc;
 
   TFile *fout = new TFile(outfilename.c_str(), "recreate");
 
-  TH2F *h_hot = new TH2F("h_hot", "", Neta, 0, Neta, Nphi, 0, Nphi);
-  TH2F *h_hitClean;  // = new TH2F("h_hitClean", "", Neta, 0, Neta, Nphi, 0, Nphi);
-  TH2F *h_heatSigma = new TH2F("h_heatSigma", "", Neta, 0, Neta, Nphi, 0, Nphi);
-  TH1F *h_perMedian = new TH1F("h_perMedian", "", 500, 0, 5);
-  TH1F *h1_hits[Neta];
-  TH1F *h1_hits2[Neta];
+  TH2 *h_hot = new TH2F("h_hot", "", Neta, 0, Neta, Nphi, 0, Nphi);
+  TH2 *h_hitClean{nullptr};  // = new TH2F("h_hitClean", "", Neta, 0, Neta, Nphi, 0, Nphi);
+  TH2 *h_heatSigma = new TH2F("h_heatSigma", "", Neta, 0, Neta, Nphi, 0, Nphi);
+  TH1 *h_perMedian = new TH1F("h_perMedian", "", 500, 0, 5);
+  std::vector<TH1 *> h1_hits;
+  h1_hits.resize(Neta);
+  std::vector<TH1 *> h1_hits2;
+  h1_hits2.resize(Neta);
   h_hits->Write();
   h_hitClean = (TH2F *) h_hits->Clone("h_hitClean");
 
@@ -175,7 +203,7 @@ void emcNoisyTowerFinder::FindHot(std::string &infilename, std::string &outfilen
     h1_hits[ie] = new TH1F((std::string("h1_hits") + std::to_string(ie)).c_str(), "", 200, min, max);
     h1_hits2[ie] = new TH1F((std::string("h1_hits2_") + std::to_string(ie)).c_str(), "", 200, min, max);
     std::vector<float> vals;
-    for (int iphi = 0; iphi < 256; iphi++)
+    for (int iphi = 0; iphi < Nphi; iphi++)
     {
       float val = h_hits->GetBinContent(ie + 1, iphi + 1);
       h1_hits[ie]->Fill(val);
@@ -229,17 +257,21 @@ void emcNoisyTowerFinder::FindHot(std::string &infilename, std::string &outfilen
   std::string f_cdbout_name = outfilename;
   f_cdbout_name.insert(pos, "cdb");
 
-  CDBTTree *cdbttree_out = new CDBTTree(f_cdbout_name.c_str());
+  CDBTTree *cdbttree_out = new CDBTTree(f_cdbout_name);
   std::string m_fieldname_out = "status";
-  for (int i = 0; i < 96; i++)
+  for (int i = 0; i < Neta; i++)
   {
-    for (int j = 0; j < 256; j++)
+    for (int j = 0; j < Nphi; j++)
     {
       unsigned int key = TowerInfoDefs::encode_emcal(i, j);
+      if (Neta == 24)
+      {
+        key = TowerInfoDefs::encode_hcal(i, j);
+      }
       int val = h_hot->GetBinContent(i + 1, j + 1);
       float sigma = h_heatSigma->GetBinContent(i + 1, j + 1);
       cdbttree_out->SetIntValue(key, m_fieldname_out, val);
-      cdbttree_out->SetFloatValue(key, "CEMC_sigma", sigma);
+      cdbttree_out->SetFloatValue(key, m_caloName + "_sigma", sigma);
     }
   }
   cdbttree_out->Commit();
@@ -249,17 +281,6 @@ void emcNoisyTowerFinder::FindHot(std::string &infilename, std::string &outfilen
   fout->Close();
 }
 
-//____________________________________________________________________________..
-int emcNoisyTowerFinder::Reset(PHCompositeNode * /*topNode*/)
-{
-  std::cout << "emcNoisyTowerFinder::Reset(PHCompositeNode *topNode) being Reset" << std::endl;
-  return Fun4AllReturnCodes::EVENT_OK;
-}
-//____________________________________________________
-void emcNoisyTowerFinder::Print(const std::string &what) const
-{
-  std::cout << "emcNoisyTowerFinder::Print(const std::string &what) const Printing info for " << what << std::endl;
-}
 //____________________________________________________
 int emcNoisyTowerFinder::End(PHCompositeNode * /*topNode*/)
 {
@@ -270,12 +291,6 @@ int emcNoisyTowerFinder::End(PHCompositeNode * /*topNode*/)
   // fchannels=NULL;
 
   std::cout << "emcNoisyTowerFinder::Reset(PHCompositeNode *topNode) being Reset" << std::endl;
-  return Fun4AllReturnCodes::EVENT_OK;
-}
-//____________________________________________________
-int emcNoisyTowerFinder::EndRun(int runnumber)
-{
-  std::cout << "emcNoisyTowerFinder::EndRun: this is the end of run: " << runnumber << std::endl;
   return Fun4AllReturnCodes::EVENT_OK;
 }
 //____________________________________________________
@@ -292,10 +307,8 @@ float emcNoisyTowerFinder::findMedian(const std::vector<float> &arr)
   size_t n = sortedArr.size();
   if (n % 2 == 0)
   {
-    return (sortedArr[n / 2 - 1] + sortedArr[n / 2]) / 2.0;
+    return (sortedArr[(n / 2) - 1] + sortedArr[n / 2]) / 2.0;
   }
-  else
-  {
-    return sortedArr[n / 2];
-  }
+
+  return sortedArr[n / 2];
 }

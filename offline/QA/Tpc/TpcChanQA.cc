@@ -1,28 +1,36 @@
 // Include necessary files
 #include "TpcChanQA.h"
 
+#include <qautils/QAHistManagerDef.h>
+
+#include <fun4all/Fun4AllHistoManager.h>
 #include <fun4all/Fun4AllReturnCodes.h>
 
+#include <phool/PHCompositeNode.h>
+#include <phool/PHIODataNode.h>    // for PHIODataNode
+#include <phool/PHNodeIterator.h>  // for PHNodeIterator
+#include <phool/PHObject.h>        // for PHObject
 #include <phool/getClass.h>
 
 #include <Event/Event.h>
 #include <Event/packet.h>
 
-#include <TFile.h>
 #include <TH1.h>
 #include <TH2.h>
 
+#include <boost/format.hpp>
+
 #include <cassert>
 #include <cstddef>
-#include <memory>
 #include <iostream>
+#include <memory>
 #include <string>
+
 //
 
 //____________________________________________________________________________..
 TpcChanQA::TpcChanQA(const std::string &name)
-  : SubsysReco("TpcChanQA")
-  , m_fname(name)
+  : SubsysReco(name)
 {
   // reserves memory for max ADC samples
   m_adcSamples.resize(1024, 0);
@@ -48,16 +56,7 @@ int TpcChanQA::InitRun(PHCompositeNode * /*unused*/)
     side = 1;
   }
 
-  // Creates data file and checks whether it was successfully opened
-  m_file = TFile::Open(m_fname.c_str(), "recreate");
-  assert(m_file->IsOpen());
-
-  // Define histograms initialized in header file
-  std::string name = "h_channel_hits_sec" + sectorNum;
-  h_channel_hits = new TH1F(name.c_str(), name.c_str(), 256, 0, 256);
-  name = "h_channel_ADCs_sec" + sectorNum;
-  h_channel_ADCs = new TH2F(name.c_str(), name.c_str(), 256, 0, 256, 1024, 0, 1024);
-  //
+  createHistos();
 
   return Fun4AllReturnCodes::EVENT_OK;
 }
@@ -81,6 +80,15 @@ int TpcChanQA::process_event(PHCompositeNode *topNode)
   {
     return Fun4AllReturnCodes::DISCARDEVENT;
   }
+
+  // Call HistoManager
+  auto hm = QAHistManagerDef::getHistoManager();
+  assert(hm);
+
+  // Reference histograms initialized in header file to histos in HistoManager
+  h_channel_hits = dynamic_cast<TH1 *>(hm->getHisto(boost::str(boost::format("%schannel_hits_sec%s") % getHistoPrefix() % sectorNum.c_str()).c_str()));
+  h_channel_ADCs = dynamic_cast<TH2 *>(hm->getHisto(boost::str(boost::format("%schannel_ADCs_sec%s") % getHistoPrefix() % sectorNum.c_str()).c_str()));
+  //
 
   // Loop over packets in event
   for (int packet : m_packets)
@@ -115,7 +123,11 @@ int TpcChanQA::process_event(PHCompositeNode *topNode)
       h_channel_hits->Fill(m_Channel);
 
       // Checks if sample number and number of ADC values agrees
-      assert(m_nSamples < (int) m_adcSamples.size());
+      // assert(m_nSamples < (int) m_adcSamples.size());
+      if (m_nSamples > (int) m_adcSamples.size())
+      {
+        continue;
+      }
 
       // Loop over samples in waveform
       for (int s = 0; s < m_nSamples; s++)
@@ -133,20 +145,27 @@ int TpcChanQA::process_event(PHCompositeNode *topNode)
 //____________________________________________________________________________..
 int TpcChanQA::End(PHCompositeNode * /*unused*/)
 {
-  // Set histogram directory to 0 so data is saved after closing file
-  h_channel_hits->SetDirectory(nullptr);
-  h_channel_ADCs->SetDirectory(nullptr);
-
-  // Write histograms to file
-  m_file->cd();
-  h_channel_hits->Write();
-  h_channel_ADCs->Write();
-
-  std::cout << __PRETTY_FUNCTION__ << " : completed saving to " << m_file->GetName() << std::endl;
-  m_file->ls();
-
-  // Close the file
-  m_file->Close();
-
   return Fun4AllReturnCodes::EVENT_OK;
+}
+
+//____________________________________________________________________________..
+std::string TpcChanQA::getHistoPrefix() const { return std::string("h_") + Name() + std::string("_"); }  // Define prefix to all histos in HistoManager
+
+//____________________________________________________________________________..
+void TpcChanQA::createHistos()
+{
+  // Initialize HistoManager
+  auto hm = QAHistManagerDef::getHistoManager();
+  assert(hm);
+
+  // Create and register histos in HistoManager
+  {
+    auto h = new TH1F(boost::str(boost::format("%schannel_hits_sec%s") % getHistoPrefix() % sectorNum.c_str()).c_str(), ";Channels;hits", 256, 0, 256);
+    hm->registerHisto(h);
+  }
+
+  {
+    auto h = new TH2F(boost::str(boost::format("%schannel_ADCs_sec%s") % getHistoPrefix() % sectorNum.c_str()).c_str(), ";Channels;ADCs", 256, 0, 256, 1024, 0, 1024);
+    hm->registerHisto(h);
+  }
 }

@@ -1,4 +1,4 @@
-// include guard to prevent TpcFFTQA.h from being preprocessed multiple times
+// include guard to prevent TpcNoiseQA.h from being preprocessed multiple times
 #ifndef QA_TPC_TPCCHANQA_H
 #define QA_TPC_TPCCHANQA_H
 //
@@ -7,12 +7,13 @@
 
 #include <string>
 #include <vector>
-
+#include <cmath>
 // Call classes to be used in code
 class PHCompositeNode;
 class TFile;
 class TH1;
 class TH2;
+class Fun4AllHistoManager;
 //
 
 class TpcChanQA : public SubsysReco  // Inherit public parts of SubsysReco
@@ -34,6 +35,7 @@ class TpcChanQA : public SubsysReco  // Inherit public parts of SubsysReco
   // called at the end of the run when processing is over
   int End(PHCompositeNode *topNode) override;
 
+  void set_filename(const std::string &fname) { m_fname = fname; }
   // Define function that stores packets to a vector
   void AddPacket(int packet)
   {
@@ -42,7 +44,6 @@ class TpcChanQA : public SubsysReco  // Inherit public parts of SubsysReco
 
   // List of private members
  private:
-  TFile *m_file{nullptr};        // File being processed
   TH1 *h_channel_hits{nullptr};  // Histogram of hits per channel
   TH2 *h_channel_ADCs{nullptr};  // Histogram of ADC counts per channel
 
@@ -52,11 +53,14 @@ class TpcChanQA : public SubsysReco  // Inherit public parts of SubsysReco
   int m_Channel{0};           // Channel number
   int m_nSamples{0};          // Number of samples in waveform
 
-  std::vector<int> m_packets;
-  std::vector<unsigned short> m_adcSamples;  // ADC values in waveform
+  void createHistos();
+  std::string getHistoPrefix() const;
 
   std::string m_fname;    // Name of file given to program
   std::string sectorNum;  // Sector number associated with data file
+
+  std::vector<int> m_packets;
+  std::vector<unsigned short> m_adcSamples;  // ADC values in waveform
 };
 
 #endif  // ends preprocessing if TpcFFTQA.h has already been defined

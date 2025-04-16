@@ -1,21 +1,22 @@
 #include "TriggerPrimitivev1.h"
 #include "TriggerDefs.h"
 
-#include <cmath>
 #include <iostream>
+#include <map>
+#include <utility>
 
 TriggerPrimitivev1::TriggerPrimitivev1(TriggerDefs::TriggerPrimKey key)
+  : m_triggerprimkey(key)
 {
-  m_triggerprimkey = key;
 }
 
 //______________________________________
 void TriggerPrimitivev1::Reset()
 {
-  for (auto  &sum : _sums)
-    {
-      sum.second->clear();
-    }
+  for (auto& sum : _sums)
+  {
+    sum.second->clear();
+  }
 }
 
 void TriggerPrimitivev1::add_sum(TriggerDefs::TriggerSumKey key, std::vector<unsigned int>* sum)
@@ -49,24 +50,30 @@ void TriggerPrimitivev1::identify(std::ostream& out) const
   ConstRange range = getSums();
   for (auto iter = range.first; iter != range.second; ++iter)
   {
-    int pass = 0;
+    int pass = 1;
     for (unsigned int& i : *(*iter).second)
     {
       if (i)
-	{
-	  pass = 1;
-	}      
-    }
-    if (!pass)
       {
-	continue;
+        pass = 1;
       }
+    }
+
+    if (!pass)
+    {
+      pass = 1;
+    }
+
+    if (!pass)
+    {
+      continue;
+    }
     out << " TriggerId: " << TriggerDefs::getTriggerId_from_TriggerPrimKey(m_triggerprimkey) << " - "
-	<< " DetectorId: " << TriggerDefs::getDetectorId_from_TriggerPrimKey(m_triggerprimkey) << " - "
-	<< " PrimitiveId: " << TriggerDefs::getPrimitiveId_from_TriggerPrimKey(m_triggerprimkey) << " | "
-	<< "Sumkey " << (*iter).first << " : ";
+        << " DetectorId: " << TriggerDefs::getDetectorId_from_TriggerPrimKey(m_triggerprimkey) << " - "
+        << " PrimitiveId: " << TriggerDefs::getPrimitiveId_from_TriggerPrimKey(m_triggerprimkey) << " | "
+        << "Sumkey " << (*iter).first << " : ";
     for (unsigned int& i : *(*iter).second)
-    {      
+    {
       out << i << " ";
     }
     out << " " << std::endl;

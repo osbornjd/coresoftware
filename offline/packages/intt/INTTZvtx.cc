@@ -146,6 +146,7 @@ INTTZvtx::~INTTZvtx()
     delete evt_phi_diff_1D;
     delete evt_phi_diff_inner_phi;
     delete evt_inner_outer_phi;
+    delete phi_diff_inner_phi;
 
     delete c2;
     // all the pads related to c2 are automatically deleted
@@ -272,6 +273,11 @@ void INTTZvtx::InitHist()
     evt_phi_diff_1D->GetXaxis()->SetTitle("Inner - Outer [degree]");
     evt_phi_diff_1D->GetYaxis()->SetTitle("Entry");
     evt_phi_diff_1D->GetXaxis()->SetNdivisions(505);
+
+    phi_diff_inner_phi = new TH2F("phi_diff_inner_phi", "All evt phi_diff_inner_phi", 361, 0, 361, 100, -1.5, 1.5);
+    phi_diff_inner_phi->GetXaxis()->SetTitle("Inner phi [degree]");
+    phi_diff_inner_phi->GetYaxis()->SetTitle("Inner - Outer [degree]");
+    phi_diff_inner_phi->GetXaxis()->SetNdivisions(505);
   }
 
   if (m_enable_qa)
@@ -429,12 +435,6 @@ void INTTZvtx::InitHist()
     N_group_detail_hist->GetYaxis()->SetTitle("Entry");
     N_group_detail_hist->GetXaxis()->SetNdivisions(505);
     m_v_qahist.push_back(N_group_detail_hist);
-
-    phi_diff_inner_phi = new TH2F("phi_diff_inner_phi", "All evt phi_diff_inner_phi", 361, 0, 361, 100, -1.5, 1.5);
-    phi_diff_inner_phi->GetXaxis()->SetTitle("Inner phi [degree]");
-    phi_diff_inner_phi->GetYaxis()->SetTitle("Inner - Outer [degree]");
-    phi_diff_inner_phi->GetXaxis()->SetNdivisions(505);
-    m_v_qahist.push_back(phi_diff_inner_phi);
 
     dca_inner_phi = new TH2F("dca_inner_phi", "All dca_inner_phi", 90, 0, 360, 100, -10., 10);
     dca_inner_phi->GetXaxis()->SetTitle("Inner phi [degree]");
@@ -811,7 +811,10 @@ bool INTTZvtx::ProcessEvt(
                 outer_clu_phi_map[true_scan_i][outer_phi_clu_i].second.x, outer_clu_phi_map[true_scan_i][outer_phi_clu_i].second.y,
                 inner_clu_phi_map[inner_phi_i][inner_phi_clu_i].second.x, inner_clu_phi_map[inner_phi_i][inner_phi_clu_i].second.y,
                 beam_origin.first, beam_origin.second);
-            dca_inner_phi->Fill(Clus_InnerPhi_Offset, DCA_sign);
+            if (m_enable_qa)
+            {
+              dca_inner_phi->Fill(Clus_InnerPhi_Offset, DCA_sign);
+            }
 
             if (DCA_cut.first < DCA_sign && DCA_sign < DCA_cut.second)
             {
@@ -1879,7 +1882,14 @@ std::vector<double> INTTZvtx::find_Ngroup(TH1* hist_in)
     }
   }
 
-  peak_group_ratio = group_entry_vec[peak_group_ID] / (accumulate(group_entry_vec.begin(), group_entry_vec.end(), 0.0));
+  if (group_entry_vec.size() > 0)
+  {
+    peak_group_ratio = group_entry_vec[peak_group_ID] / (accumulate(group_entry_vec.begin(), group_entry_vec.end(), 0.0));
+  }
+  else
+  {
+    peak_group_ratio = 0.0;
+  }
 
   // for (int i = 0; i < group_Nbin_vec.size(); i++)
   // {
@@ -1894,6 +1904,12 @@ std::vector<double> INTTZvtx::find_Ngroup(TH1* hist_in)
   // std::cout<<"Peak group ID : "<<peak_group_ID<<std::endl;
   // std::cout<<"peak group width : "<<group_widthL_vec[peak_group_ID]<<" "<<group_widthR_vec[peak_group_ID]<<std::endl;
   // std::cout<<"ratio : "<<peak_group_ratio<<std::endl;
+
+  // for the case that all bin content in the for statemene above is 0
+  if (int(group_widthL_vec.size()) <= peak_group_ID || int(group_widthR_vec.size()) <= peak_group_ID)
+  {  // added by Genki (Jan 2025)
+    return {double(group_Nbin_vec.size()), peak_group_ratio, -9999, -9999};
+  }
 
   // note : {N_group, ratio (if two), peak widthL, peak widthR}
   return {double(group_Nbin_vec.size()), peak_group_ratio, group_widthL_vec[peak_group_ID], group_widthR_vec[peak_group_ID]};

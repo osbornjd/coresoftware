@@ -13,7 +13,7 @@
 #include "PHObject.h"
 
 #include <ctime>
-#include <iosfwd> 
+#include <iosfwd>
 
 typedef unsigned long long phtime_t;
 
@@ -28,7 +28,7 @@ class PHTimeStamp : public PHObject
   PHTimeStamp(const time_t);
   void setBinTics(const phtime_t t);
 
-  ~PHTimeStamp() override {}
+  ~PHTimeStamp() override = default;
 
  public:
   void set(const int, const int, const int, const int, const int, const int, const int = 0);
@@ -41,8 +41,7 @@ class PHTimeStamp : public PHObject
   time_t getTics() const;
   void setTics(const time_t);
 
-  int isInRange(const PHTimeStamp &, const PHTimeStamp &);
-  void print();
+  int isInRange(const PHTimeStamp &, const PHTimeStamp &) const;
 
   int operator==(const PHTimeStamp &) const;
   int operator!=(const PHTimeStamp &) const;
@@ -58,11 +57,11 @@ class PHTimeStamp : public PHObject
   void print() const;
 
  private:
-  phtime_t ticsToBinaryTime(time_t) const;
-  time_t binaryTimeToTics(phtime_t) const;
+  static phtime_t ticsToBinaryTime(time_t);
+  static time_t binaryTimeToTics(phtime_t);
 
  protected:
-  phtime_t binaryTime;
+  phtime_t binaryTime{};
   ClassDefOverride(PHTimeStamp, 1)
 };
 

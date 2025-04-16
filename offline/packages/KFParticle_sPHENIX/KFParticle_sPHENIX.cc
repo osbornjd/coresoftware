@@ -21,6 +21,8 @@
 
 #include "KFParticle_sPHENIX.h"
 
+#include <globalvertex/MbdVertex.h>
+#include <globalvertex/MbdVertexMap.h>
 #include <globalvertex/SvtxVertexMap.h>
 #include <trackbase_historic/SvtxTrackMap.h>
 
@@ -55,7 +57,7 @@ namespace TMVA
   class Reader;
 }
 
-int candidateCounter = 0;
+//int candidateCounter = 0;
 
 /// KFParticle constructor
 KFParticle_sPHENIX::KFParticle_sPHENIX()
@@ -84,6 +86,7 @@ KFParticle_sPHENIX::KFParticle_sPHENIX(const std::string &name)
 
 int KFParticle_sPHENIX::Init(PHCompositeNode *topNode)
 {
+  
   if (m_save_output && Verbosity() >= VERBOSITY_SOME)
   {
     std::cout << "Output nTuple: " << m_outfile_name << std::endl;
@@ -107,6 +110,16 @@ int KFParticle_sPHENIX::Init(PHCompositeNode *topNode)
     returnCode = parseDecayDescriptor();
   }
 
+  if (m_get_trigger_info)
+  {
+    triggeranalyzer = new TriggerAnalyzer();
+  }
+
+  if (m_use_PID)
+  {
+    init_dEdx_fits();
+  }
+
   return returnCode;
 }
 
@@ -121,24 +134,14 @@ int KFParticle_sPHENIX::InitRun(PHCompositeNode *topNode)
 
 int KFParticle_sPHENIX::process_event(PHCompositeNode *topNode)
 {
+  
   std::vector<KFParticle> mother, vertex_kfparticle;
   std::vector<std::vector<KFParticle>> daughters, intermediates;
   int nPVs, multiplicity;
 
-  if (!m_use_fake_pv)
-  {
-    SvtxVertexMap *check_vertexmap = findNode::getClass<SvtxVertexMap>(topNode, m_vtx_map_node_name);
-    if (check_vertexmap->size() == 0)
-    {
-      if (Verbosity() >= VERBOSITY_SOME)
-      {
-        std::cout << "KFParticle: Event skipped as there are no vertices" << std::endl;
-      }
-      return Fun4AllReturnCodes::ABORTEVENT;
-    }
-  }
-
   SvtxTrackMap *check_trackmap = findNode::getClass<SvtxTrackMap>(topNode, m_trk_map_node_name);
+  multiplicity = check_trackmap->size();
+
   if (check_trackmap->size() == 0)
   {
     if (Verbosity() >= VERBOSITY_SOME)
@@ -148,8 +151,36 @@ int KFParticle_sPHENIX::process_event(PHCompositeNode *topNode)
     return Fun4AllReturnCodes::ABORTEVENT;
   }
 
-  createDecay(topNode, mother, vertex_kfparticle, daughters, intermediates, nPVs, multiplicity);
+  if (!m_use_fake_pv)
+  {
+    if (m_use_mbd_vertex)
+    {
+      MbdVertexMap* check_vertexmap = findNode::getClass<MbdVertexMap>(topNode, "MbdVertexMap");
+      if (check_vertexmap->size() == 0)
+      {
+        if (Verbosity() >= VERBOSITY_SOME)
+        {
+          std::cout << "KFParticle: Event skipped as there are no vertices" << std::endl;
+        }
+        return Fun4AllReturnCodes::ABORTEVENT;
+      }
+    }
+    else
+    {
+      SvtxVertexMap* check_vertexmap = findNode::getClass<SvtxVertexMap>(topNode, m_vtx_map_node_name);
+      if (check_vertexmap->size() == 0)
+      {
+        if (Verbosity() >= VERBOSITY_SOME)
+        {
+          std::cout << "KFParticle: Event skipped as there are no vertices" << std::endl;
+        }
+        return Fun4AllReturnCodes::ABORTEVENT;
+      }
+    }
 
+  }
+  
+  createDecay(topNode, mother, vertex_kfparticle, daughters, intermediates, nPVs);
   if (!m_has_intermediates_sPHENIX)
   {
     intermediates = daughters;
@@ -163,21 +194,23 @@ int KFParticle_sPHENIX::process_event(PHCompositeNode *topNode)
   {
     for (unsigned int i = 0; i < mother.size(); ++i)
     {
-      if (m_save_output && candidateCounter == 0)
+      
+      if (m_save_output && getCandidateCounter() == 0)
       {
         m_outfile = new TFile(m_outfile_name.c_str(), "RECREATE");
-        initializeBranches();
+        initializeBranches(topNode);
       }
 
-      candidateCounter += 1;
+      //candidateCounter += 1;
+      incrementCandidateCounter();
 
       if (m_save_output)
       {
-        fillBranch(topNode, mother[i], vertex_kfparticle[i], daughters[i], intermediates[i], nPVs, multiplicity);
+        fillBranch(topNode, mother[i], vertex_kfparticle[i], daughters[i], intermediates[i]);
       }
       if (m_save_dst)
       {
-        fillParticleNode(topNode, mother[i], daughters[i], intermediates[i]);
+        fillParticleNode(topNode, mother[i], vertex_kfparticle[i], daughters[i], intermediates[i]);
       }
 
       if (Verbosity() >= VERBOSITY_SOME)
@@ -199,9 +232,9 @@ int KFParticle_sPHENIX::process_event(PHCompositeNode *topNode)
 
 int KFParticle_sPHENIX::End(PHCompositeNode * /*topNode*/)
 {
-  std::cout << "KFParticle_sPHENIX object " << Name() << " finished. Number of candidates: " << candidateCounter << std::endl;
+  std::cout << "KFParticle_sPHENIX object " << Name() << " finished. Number of candidates: " << getCandidateCounter() << std::endl;
 
-  if (m_save_output && candidateCounter != 0)
+  if (m_save_output && getCandidateCounter() != 0)
   {
     m_outfile->Write();
     m_outfile->Close();
@@ -300,7 +333,7 @@ int KFParticle_sPHENIX::parseDecayDescriptor()
   if (checkForCC == "[]CC")
   {
     manipulateDecayDescriptor = manipulateDecayDescriptor.substr(1, manipulateDecayDescriptor.size() - 4);
-    getChargeConjugate(true);
+    getChargeConjugate();
   }
 
   // Find the initial particle
@@ -448,7 +481,7 @@ int KFParticle_sPHENIX::parseDecayDescriptor()
 
   if (intermediates_name.size() > 0)
   {
-    hasIntermediateStates(true);
+    hasIntermediateStates();
     setIntermediateStates(intermediate_list);
     setNumberOfIntermediateStates(intermediates_name.size());
     setNumberTracksFromIntermeditateState(m_nTracksFromIntermediates);

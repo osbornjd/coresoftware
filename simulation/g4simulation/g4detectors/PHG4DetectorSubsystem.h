@@ -22,7 +22,7 @@ class PHG4DetectorSubsystem : public PHG4Subsystem
     root = 2
   };
 
-  ~PHG4DetectorSubsystem() override {}
+  ~PHG4DetectorSubsystem() override = default;
 
   int Init(PHCompositeNode *) final;
   int InitRun(PHCompositeNode *) final;
@@ -55,8 +55,6 @@ class PHG4DetectorSubsystem : public PHG4Subsystem
 
   void UseCalibFiles(const FILE_TYPE ftyp) { filetype = ftyp; }
   int ReadParamsFromCDB(const std::string &domain);
-  int SaveParamsToDB();
-  int ReadParamsFromDB(const std::string &name, const int issuper);
   int SaveParamsToFile(const FILE_TYPE ftyp);
   int ReadParamsFromFile(const std::string &name, const FILE_TYPE ftyp, const int issuper);
   void SetCalibrationFileDir(const std::string &calibdir) { calibfiledir = calibdir; }
@@ -70,7 +68,7 @@ class PHG4DetectorSubsystem : public PHG4Subsystem
   void SetSupportActive(const int i = 1);
 
   void SuperDetector(const std::string &name);
-  const std::string SuperDetector() const { return superdetector; }
+  const std::string &SuperDetector() const { return superdetector; }
 
   int GetLayer() const { return layer; }
   virtual void SetDefaultParameters() = 0;  // this one has to be implemented by the daughter
@@ -86,16 +84,16 @@ class PHG4DetectorSubsystem : public PHG4Subsystem
   int BeginRunExecuted() const { return beginrunexecuted; }
 
  private:
-  PHParameters *params = nullptr;
-  PHParametersContainer *paramscontainer = nullptr;
-  PHCompositeNode *savetopNode = nullptr;
-  bool overlapcheck = false;
-  int layer = -1;
-  int usedb = 0;
-  int beginrunexecuted = 0;
-  FILE_TYPE filetype = PHG4DetectorSubsystem::none;
-  std::string superdetector = "NONE";
-  std::string calibfiledir = "./";
+  PHParameters *params {nullptr};
+  PHParametersContainer *paramscontainer {nullptr};
+  PHCompositeNode *savetopNode {nullptr};
+  bool overlapcheck {false};
+  int layer {-1};
+  int usedb {0};
+  int beginrunexecuted {0};
+  FILE_TYPE filetype {PHG4DetectorSubsystem::none};
+  std::string superdetector {"NONE"};
+  std::string calibfiledir {"./"};
   std::string m_Domain;
 
   std::map<const std::string, double> dparams;

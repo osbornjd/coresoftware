@@ -112,6 +112,8 @@ class Jet : public PHObject
     HCALOUT_TOWERINFO_EMBED = 36,
     HCALOUT_TOWERINFO_SIM = 37,
     JET_PROBE = 38,
+    ECAL_HCAL_TOPO_CLUSTER = 39,    /* EMCal+IHCal+OHCal 3-D topoCluster input */
+    CHARGED_PARTICLE = 40  /* for truth-level track jets */
   };
 
   enum PROPERTY
@@ -194,6 +196,8 @@ class Jet : public PHObject
   //   deprecated by Jetv2
   virtual bool has_property(Jet::PROPERTY /*prop_id*/) const { return false; };
   virtual void print_property(std::ostream& /*os*/) const {};
+  virtual int get_isCalib() {return 0;};
+  virtual void set_isCalib(int) {};
   //----------------------------------------------------------------------------------
 
   // some types

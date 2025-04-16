@@ -27,6 +27,7 @@ pkginclude_HEADERS = \
   ALICEKF.h \
   AssocInfoContainer.h \
   AssocInfoContainerv1.h \
+  DSTClusterPruning.h \
   GPUTPCBaseTrackParam.h \
   GPUTPCTrackLinearisation.h \
   GPUTPCTrackParam.h \
@@ -77,7 +78,8 @@ pkginclude_HEADERS = \
   PrelimDistortionCorrection.h \
   SecondaryVertexFinder.h \
   SvtxTrackStateRemoval.h \
-  TrackingIterationCounter.h
+  TrackingIterationCounter.h \
+  TpcSeedFilter.h
 
 ROOTDICTS = \
   AssocInfoContainer_Dict.cc \
@@ -126,6 +128,7 @@ ACTS_LIBS = \
 libtrack_reco_la_SOURCES = \
   $(ACTS_SOURCES) \
   ALICEKF.cc \
+  DSTClusterPruning.cc \
   PH3DVertexing.cc \
   PHCASeeding.cc \
   AzimuthalSeeder.cc \
@@ -162,7 +165,8 @@ libtrack_reco_la_SOURCES = \
   PrelimDistortionCorrection.cc \
   SecondaryVertexFinder.cc \
   SvtxTrackStateRemoval.cc \
-  TrackingIterationCounter.cc
+  TrackingIterationCounter.cc \
+  TpcSeedFilter.cc
 
 libtrack_reco_io_la_LIBADD = \
   -lphool
@@ -182,15 +186,17 @@ libtrack_reco_la_LIBADD = \
   -lglobalvertex_io \
   -lgsl \
   -lgslcblas \
+  -lintt \
   -lintt_io \
   -lmicromegas_io \
+  -lmvtx \
   -lmvtx_io \
-  -lphparameter \
+  -lphparameter_io \
   -lPHGenFit \
   -lSubsysReco \
   -ltrack_io \
   -ltpc \
-  -ltrackbase_historic_io
+  -ltrackbase_historic
 
 
 # Rule for generating table CINT dictionaries.

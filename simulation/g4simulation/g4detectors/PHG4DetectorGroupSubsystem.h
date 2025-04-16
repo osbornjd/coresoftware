@@ -23,7 +23,7 @@ class PHG4DetectorGroupSubsystem : public PHG4Subsystem
     root = 2
   };
 
-  ~PHG4DetectorGroupSubsystem() override {}
+  ~PHG4DetectorGroupSubsystem() override = default;
   int Init(PHCompositeNode *) final;
   int InitRun(PHCompositeNode *) final;
 
@@ -47,8 +47,6 @@ class PHG4DetectorGroupSubsystem : public PHG4Subsystem
   int ReadDB() const { return m_UseDBFlag; }
   FILE_TYPE get_filetype() const { return m_FileType; }
   void UseCalibFiles(const FILE_TYPE ftyp) { m_FileType = ftyp; }
-  int SaveParamsToDB();
-  int ReadParamsFromDB(const std::string &name, const int issuper);
   int SaveParamsToFile(const FILE_TYPE ftyp);
   int ReadParamsFromFile(const std::string &name, const FILE_TYPE ftyp, const int issuper);
   void SetCalibrationFileDir(const std::string &calibdir) { m_CalibFileDir = calibdir; }
@@ -66,7 +64,7 @@ class PHG4DetectorGroupSubsystem : public PHG4Subsystem
   void BlackHole(const int detid, const int i);
   void BlackHole(const int i = 1);
   void SuperDetector(const std::string &name);
-  const std::string SuperDetector() const { return m_SuperDetector; }
+  const std::string &SuperDetector() const { return m_SuperDetector; }
   int GetLayer() const { return m_Layer; }
   virtual void SetDefaultParameters() = 0;  // this one has to be implemented by the daughter
 
