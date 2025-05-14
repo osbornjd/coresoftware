@@ -104,7 +104,7 @@ int TrackResiduals::InitRun(PHCompositeNode* topNode)
 
   // global position wrapper
   m_globalPositionWrapper.loadNodes(topNode);
-
+  m_globalPositionWrapper.set_suppressCrossing(m_convertSeeds);
   // clusterMover needs the correct radii of the TPC layers
   auto tpccellgeo = findNode::getClass<PHG4TpcCylinderGeomContainer>(topNode, "CYLINDERCELLGEOM_SVTX");
   m_clusterMover.initialize_geometry(tpccellgeo);
@@ -545,7 +545,7 @@ void TrackResiduals::circleFitClusters(
     const Acts::Vector3 pos = m_globalPositionWrapper.getGlobalPositionDistortionCorrected(key, cluster, crossing );
     clusPos.push_back(pos);
   }
-  TrackFitUtils::position_vector_t yzpoints;
+  TrackFitUtils::position_vector_t yzpoints,xypoints;
 
   for (auto& pos : clusPos)
   {
@@ -555,15 +555,17 @@ void TrackResiduals::circleFitClusters(
     {
       continue;
     }
+    xypoints.push_back(std::make_pair(pos.x(), pos.y()));
     yzpoints.push_back(std::make_pair(pos.z(), pos.y()));
     global_vec.push_back(pos);
   }
 
+  auto xyparams = TrackFitUtils::line_fit(xypoints);
   auto yzLineParams = TrackFitUtils::line_fit(yzpoints);
   auto fitpars = TrackFitUtils::fitClusters(global_vec, keys, false);
   // auto fitpars = TrackFitUtils::fitClusters(global_vec, keys, !m_linefitTPCOnly);
-  m_xyint = std::numeric_limits<float>::quiet_NaN();
-  m_xyslope = std::numeric_limits<float>::quiet_NaN();
+  m_xyint = std::get<1>(xyparams);
+  m_xyslope = std::get<0>(xyparams);
   m_yzint = std::get<1>(yzLineParams);
   m_yzslope = std::get<0>(yzLineParams);
   if (fitpars.size() > 0)
@@ -923,7 +925,7 @@ void TrackResiduals::fillHitTree(TrkrHitSetContainer* hitmap,
         m_hittbin = TpcDefs::getTBin(hitkey);
 
         auto geoLayer = tpcGeom->GetLayerCellGeom(m_hitlayer);
-        auto phi = geoLayer->get_phicenter(m_hitpad);
+        auto phi = geoLayer->get_phicenter(m_hitpad, m_side);
         auto radius = geoLayer->get_radius();
         float AdcClockPeriod = geoLayer->get_zstep();
         auto glob = geometry->getGlobalPositionTpc(m_hitsetkey, hitkey, phi, radius, AdcClockPeriod);
@@ -1092,7 +1094,8 @@ void TrackResiduals::fillClusterBranchesKF(TrkrDefs::cluskey ckey, SvtxTrack* tr
   // get local coordinates
   Acts::Vector2 loc;
   clusglob_moved *= Acts::UnitConstants::cm;  // we want mm for transformations
-  Acts::Vector3 normal = surf->normal(geometry->geometry().getGeoContext());
+  Acts::Vector3 normal = surf->normal(geometry->geometry().getGeoContext(),
+  Acts::Vector3(1,1,1), Acts::Vector3(1,1,1));
   auto local = surf->globalToLocal(geometry->geometry().getGeoContext(),
                                    clusglob_moved, normal);
   if (local.ok())
@@ -1136,7 +1139,7 @@ void TrackResiduals::fillClusterBranchesKF(TrkrDefs::cluskey ckey, SvtxTrack* tr
   m_clushitsetkey.push_back(TrkrDefs::getHitSetKeyFromClusKey(ckey));
 
   auto misaligncenter = surf->center(geometry->geometry().getGeoContext());
-  auto misalignnorm = -1 * surf->normal(geometry->geometry().getGeoContext());
+  auto misalignnorm = -1 * surf->normal(geometry->geometry().getGeoContext(), Acts::Vector3(1, 1, 1), Acts::Vector3(1, 1, 1));
   auto misrot = surf->transform(geometry->geometry().getGeoContext()).rotation();
 
   float mgamma = atan2(-misrot(1, 0), misrot(0, 0));
@@ -1146,7 +1149,7 @@ void TrackResiduals::fillClusterBranchesKF(TrkrDefs::cluskey ckey, SvtxTrack* tr
   //! Switch to get ideal transforms
   alignmentTransformationContainer::use_alignment = false;
   auto idealcenter = surf_ideal->center(geometry->geometry().getGeoContext());
-  auto idealnorm = -1 * surf_ideal->normal(geometry->geometry().getGeoContext());
+  auto idealnorm = -1 * surf_ideal->normal(geometry->geometry().getGeoContext(), Acts::Vector3(1, 1, 1), Acts::Vector3(1, 1, 1));
 
   // replace the corrected moved cluster local position with the readout position from ideal geometry for now
   // This allows us to see the distortion corrections by subtracting this uncorrected position
@@ -1395,7 +1398,7 @@ void TrackResiduals::fillClusterBranchesSeeds(TrkrDefs::cluskey ckey,  // SvtxTr
   auto surf = geometry->maps().getSurface(ckey, cluster);
 
   auto misaligncenter = surf->center(geometry->geometry().getGeoContext());
-  auto misalignnorm = -1 * surf->normal(geometry->geometry().getGeoContext());
+  auto misalignnorm = -1 * surf->normal(geometry->geometry().getGeoContext(), Acts::Vector3(1, 1, 1), Acts::Vector3(1, 1, 1));
   auto misrot = surf->transform(geometry->geometry().getGeoContext()).rotation();
 
   float mgamma = atan2(-misrot(1, 0), misrot(0, 0));
@@ -1405,7 +1408,7 @@ void TrackResiduals::fillClusterBranchesSeeds(TrkrDefs::cluskey ckey,  // SvtxTr
   //! Switch to get ideal transforms
   alignmentTransformationContainer::use_alignment = false;
   auto idealcenter = surf->center(geometry->geometry().getGeoContext());
-  auto idealnorm = -1 * surf->normal(geometry->geometry().getGeoContext());
+  auto idealnorm = -1 * surf->normal(geometry->geometry().getGeoContext(), Acts::Vector3(1, 1, 1), Acts::Vector3(1, 1, 1));
   Acts::Vector3 ideal_local(loc.x(), loc.y(), 0.0);
   Acts::Vector3 ideal_glob = surf->transform(geometry->geometry().getGeoContext()) * (ideal_local * Acts::UnitConstants::cm);
   auto idealrot = surf->transform(geometry->geometry().getGeoContext()).rotation();
@@ -1508,7 +1511,7 @@ void TrackResiduals::fillStatesWithLineFit(const TrkrDefs::cluskey& key,
                                                                  m_xyint, m_yzslope, m_yzint);
 
   auto surf = geometry->maps().getSurface(key, cluster);
-  Acts::Vector3 surfnorm = surf->normal(geometry->geometry().getGeoContext());
+  Acts::Vector3 surfnorm = surf->normal(geometry->geometry().getGeoContext(), Acts::Vector3(1, 1, 1), Acts::Vector3(1, 1, 1));
   if (!std::isnan(intersection.x()))
   {
     auto locstateres = surf->globalToLocal(geometry->geometry().getGeoContext(),
@@ -1601,7 +1604,7 @@ void TrackResiduals::createBranches()
   m_vertextree->Branch("gl1BunchCrossing", &m_gl1BunchCrossing, "m_gl1BunchCrossing/l");
   m_vertextree->Branch("gl1bco", &m_bco, "m_bco/l");
   m_vertextree->Branch("trbco", &m_bcotr, "m_bcotr/l");
-  m_vertextree->Branch("vertexid", &m_vertexid, "m_vertexid/I");
+  m_vertextree->Branch("vertexid", &m_vertexid);
   m_vertextree->Branch("vertex_crossing", &m_vertex_crossing, "m_vertex_crossing/I");
   m_vertextree->Branch("vx", &m_vx, "m_vx/F");
   m_vertextree->Branch("vy", &m_vy, "m_vy/F");
@@ -1730,7 +1733,7 @@ void TrackResiduals::createBranches()
   m_tree->Branch("nmms", &m_nmms, "m_nmms/I");
   m_tree->Branch("nmmsstate", &m_nmmsstate, "m_nmmsstate/I");
   m_tree->Branch("tile", &m_tileid, "m_tileid/I");
-  m_tree->Branch("vertexid", &m_vertexid, "m_vertexid/I");
+  m_tree->Branch("vertexid", &m_vertexid);
   m_tree->Branch("vertex_crossing", &m_vertex_crossing, "m_vertex_crossing/I");
   m_tree->Branch("vx", &m_vx, "m_vx/F");
   m_tree->Branch("vy", &m_vy, "m_vy/F");

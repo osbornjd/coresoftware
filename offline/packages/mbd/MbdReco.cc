@@ -8,7 +8,10 @@
 #include <globalvertex/MbdVertexMapv1.h>
 #include <globalvertex/MbdVertexv2.h>
 
+#include <ffarawobjects/CaloPacket.h>
+
 #include <fun4all/Fun4AllReturnCodes.h>
+
 
 #include <Event/Event.h>
 
@@ -21,6 +24,7 @@
 #include <phool/getClass.h>
 #include <phool/phool.h>
 
+#include <ffaobjects/EventHeader.h>
 #include <ffarawobjects/CaloPacketContainer.h>
 #include <ffarawobjects/Gl1Packet.h>
 
@@ -38,7 +42,7 @@ int MbdReco::Init(PHCompositeNode * /*topNode*/)
   m_gaussian = std::make_unique<TF1>("gaussian", "gaus", 0, 20);
   m_gaussian->FixParameter(2, m_tres);
 
-  m_mbdevent = std::make_unique<MbdEvent>(_calpass);
+  m_mbdevent = std::make_unique<MbdEvent>(_calpass,_always_process_charge);
 
   return Fun4AllReturnCodes::EVENT_OK;
 }
@@ -64,7 +68,7 @@ int MbdReco::process_event(PHCompositeNode *topNode)
 {
   getNodes(topNode);
 
-  if ( (m_mbdevent==nullptr && m_mbdraw==nullptr) || m_mbdpmts==nullptr )
+  if ( (m_mbdevent==nullptr && m_mbdraw==nullptr && m_mbdpacket[0]==nullptr && m_mbdpacket[1]==nullptr) || m_mbdpmts==nullptr )
   {
     static int counter = 0;
     if ( counter<2 )
@@ -76,16 +80,25 @@ int MbdReco::process_event(PHCompositeNode *topNode)
   }
 
   // Process raw waveforms from real data
-  if ( m_mbdevent!=nullptr || m_mbdraw!=nullptr )
+  if ( m_mbdevent!=nullptr || m_mbdraw!=nullptr || m_mbdpacket[0]==nullptr || m_mbdpacket[1]==nullptr)
   {
     int status = Fun4AllReturnCodes::EVENT_OK;
+    if ( m_evtheader!=nullptr )
+    {
+      m_mbdevent->set_EventNumber( m_evtheader->get_EvtSequence() );
+    }
     if ( m_event!=nullptr )
     {
       status = m_mbdevent->SetRawData(m_event, m_mbdpmts);
     }
-    else if ( m_mbdraw!=nullptr )
+    else if ( m_mbdraw!=nullptr || m_mbdpacket[0]!=nullptr || m_mbdpacket[1]!=nullptr)
     {
-      status = m_mbdevent->SetRawData(m_mbdraw, m_mbdpmts,m_gl1raw);
+      if (m_mbdraw)
+      {
+	m_mbdpacket[0] = m_mbdraw->getPacketbyId(1001);
+	m_mbdpacket[1] = m_mbdraw->getPacketbyId(1002);
+      }
+      status = m_mbdevent->SetRawData(m_mbdpacket, m_mbdpmts,m_gl1raw);
     }
 
     if (status == Fun4AllReturnCodes::DISCARDEVENT )
@@ -125,7 +138,7 @@ int MbdReco::process_event(PHCompositeNode *topNode)
     m_mbdevent->ProcessRawPackets( m_mbdpmts );
   }
 
-  m_mbdevent->Calculate(m_mbdpmts, m_mbdout);
+  m_mbdevent->Calculate(m_mbdpmts, m_mbdout, topNode);
 
   // For multiple global vertex
   if (m_mbdevent->get_bbcn(0) > 0 && m_mbdevent->get_bbcn(1) > 0 && _calpass==0 )
@@ -242,8 +255,10 @@ int MbdReco::getNodes(PHCompositeNode *topNode)
 
   // Get the raw data from event combined DST
   m_mbdraw = findNode::getClass<CaloPacketContainer>(topNode, "MBDPackets");
-  
-  if (!m_event && !m_mbdraw)
+
+  m_mbdpacket[0] = findNode::getClass<CaloPacket>(topNode,1001);
+  m_mbdpacket[1] = findNode::getClass<CaloPacket>(topNode,1002);
+  if (!m_event && !m_mbdraw && !m_mbdpacket[0] && !m_mbdpacket[1])
   {
     // not PRDF and not event combined DST, so we assume this is a sim file
     _simflag = 1;
@@ -257,7 +272,11 @@ int MbdReco::getNodes(PHCompositeNode *topNode)
   }
 
   // Get the raw gl1 data from event combined DST
-  m_gl1raw = findNode::getClass<Gl1Packet>(topNode, "GL1Packet");
+  m_gl1raw = findNode::getClass<Gl1Packet>(topNode,14001);
+  if (!m_gl1raw)
+  {
+    m_gl1raw = findNode::getClass<Gl1Packet>(topNode, "GL1Packet");
+  }
   /*
   if ( !m_gl1raw )
   {
@@ -279,6 +298,17 @@ int MbdReco::getNodes(PHCompositeNode *topNode)
   {
     std::cout << PHWHERE << "MbdVertexMap node not found on node tree" << std::endl;
     return Fun4AllReturnCodes::ABORTEVENT;
+  }
+
+  m_evtheader = findNode::getClass<EventHeader>(topNode, "EventHeader");
+  if (!m_evtheader )
+  {
+    static int ctr = 0;
+    if ( ctr<4 )
+    {
+      std::cout << PHWHERE << " EventHeader node not found on node tree" << std::endl;
+      ctr++;
+    }
   }
 
   return Fun4AllReturnCodes::EVENT_OK;

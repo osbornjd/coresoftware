@@ -44,6 +44,8 @@ class TpcLaminationFitting : public SubsysReco
     m_fitFileName = fitFileName;
   }
 
+  void set_ppMode(bool mode){ ppMode = mode; }
+  
   void set_grid_dimensions(int phibins, int rbins);
 
   void set_nLayerCut(unsigned int cut) { m_nLayerCut = cut; }
@@ -79,6 +81,7 @@ class TpcLaminationFitting : public SubsysReco
   TH2 *m_hLamination[18][2]{{nullptr}};
   TF1 *m_fLamination[18][2]{{nullptr}};
   double m_laminationCenter[18][2]{{0.0}};
+  double m_laminationOffset[18][2]{{0.0}};
   bool m_laminationGoodFit[18][2]{{false}};
   double m_distanceToFit[18][2]{{0.0}};
   int m_nBinsFit[18][2]{{0}};
@@ -96,6 +99,10 @@ class TpcLaminationFitting : public SubsysReco
   double m_nClusters{0};
   int m_nEvents{0};
   int m_runnumber{};
+
+  bool ppMode{false};
+  std::map<int, float>  m_run_ZDC_map_pp;
+  std::map<int, float>  m_run_ZDC_map_auau;
   
   TTree *m_laminationTree{nullptr};
   bool m_side{false};
