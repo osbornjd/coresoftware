@@ -774,7 +774,13 @@ int Fun4AllServer::process_event()
     {
       std::cout << "Fun4AllServer::process_event Resetting Event " << Subsystem.first->Name() << std::endl;
     }
+#ifdef FFAMEMTRACKER
+    ffamemtracker->Snapshot("Fun4AllServerResetEvent");
+#endif
     Subsystem.first->ResetEvent(Subsystem.second);
+#ifdef FFAMEMTRACKER
+    ffamemtracker->Snapshot("Fun4AllServerResetEvent");
+#endif
   }
   for (auto &syncman : SyncManagers)
   {
@@ -803,7 +809,13 @@ int Fun4AllServer::ResetNodeTree()
     {
       if (mainIter.cd(nodename))
       {
+#ifdef FFAMEMTRACKER
+        ffamemtracker->Snapshot("Fun4AllServerResetNode");
+#endif
         mainIter.forEach(reset);
+#ifdef FFAMEMTRACKER
+        ffamemtracker->Snapshot("Fun4AllServerResetNodeAfter");
+#endif
         mainIter.cd();
       }
     }
@@ -1403,6 +1415,9 @@ int Fun4AllServer::run(const int nevnts, const bool require_nevents)
   std::vector<Fun4AllSyncManager *>::const_iterator iter;
   while (!iret)
   {
+#ifdef FFAMEMTRACKER
+    ffamemtracker->Snapshot("Fun4AllServerBeginRun");
+#endif
     int resetnodetree = 0;
     for (iter = SyncManagers.begin(); iter != SyncManagers.end(); ++iter)
     {
@@ -1428,22 +1443,37 @@ int Fun4AllServer::run(const int nevnts, const bool require_nevents)
         iret += retval;
       }
     }
+#ifdef FFAMEMTRACKER
+    ffamemtracker->Snapshot("Fun4AllServerAfterTheSyncManager");
+#endif
     if (resetnodetree)
     {
       // if the node tree needs resetting, we just push the current
       // event(s) (which are all properly synced at this point)
       // back into the input managers and just read again.
+#ifdef FFAMEMTRACKER
+      ffamemtracker->Snapshot("Fun4AllServerPushBackInputMgrsEvents");
+#endif
       for (iter = SyncManagers.begin(); iter != SyncManagers.end(); ++iter)
       {
         (*iter)->PushBackInputMgrsEvents(1);
       }
+#ifdef FFAMEMTRACKER
+      ffamemtracker->Snapshot("Fun4AllServerResetNodeTree");
+#endif
       ResetNodeTree();
+#ifdef FFAMEMTRACKER
+      ffamemtracker->Snapshot("Fun4AllServerResetNodeTreeAfter");
+#endif
       continue;  // go back to run loop
     }
     if (iret)
     {
       break;
     }
+#ifdef FFAMEMTRACKER
+    ffamemtracker->Snapshot("Fun4AllServerSyncManager");
+#endif
     int currentrun = 0;
     for (iter = SyncManagers.begin(); iter != SyncManagers.end(); ++iter)
     {
@@ -1507,7 +1537,9 @@ int Fun4AllServer::run(const int nevnts, const bool require_nevents)
       int iverb = Verbosity();
       Verbosity(++iverb);
     }
-
+#ifdef FFAMEMTRACKER
+    ffamemtracker->Snapshot("Fun4AllServerSyncRunAfter");
+#endif
     iret = process_event();
 
     if (icnt == 0 && Verbosity() > VERBOSITY_QUIET)
