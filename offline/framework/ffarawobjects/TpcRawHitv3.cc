@@ -65,7 +65,20 @@ TpcRawHitv3::TpcRawHitv3(TpcRawHitv3 &&other) noexcept
   other.checksumerror = true;
   other.parityerror = true;
 }
-
+void TpcRawHitv3::moveData(TpcRawHitv3&& otherhit) noexcept
+{
+  TpcRawHitv3::set_bco(otherhit.get_bco());
+  TpcRawHitv3::set_packetid(otherhit.get_packetid());
+  TpcRawHitv3::set_fee(otherhit.get_fee());
+  TpcRawHitv3::set_channel(otherhit.get_channel());
+  TpcRawHitv3::set_sampaaddress(otherhit.get_sampaaddress());
+  TpcRawHitv3::set_sampachannel(otherhit.get_sampachannel());
+  TpcRawHitv3::set_type(otherhit.get_type());
+  TpcRawHitv3::set_checksumerror(otherhit.get_checksumerror());
+  TpcRawHitv3::set_parityerror(otherhit.get_parityerror());
+  TpcRawHitv3::set_samples(otherhit.get_samples());
+  m_adcData = std::move(otherhit.m_adcData);
+}
 void TpcRawHitv3::identify(std::ostream &os) const
 {
   os << "BCO: 0x" << std::hex << bco << std::dec << std::endl;

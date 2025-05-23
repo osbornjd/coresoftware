@@ -19,6 +19,8 @@ class TpcRawHitv3 : public TpcRawHit
   TpcRawHitv3(TpcRawHitv3 &&other) noexcept;
 
   ~TpcRawHitv3() override = default;
+  
+  void moveData(TpcRawHitv3 &&otherhit) noexcept;
 
   /** identify Function from PHObject
       @param os Output Stream
