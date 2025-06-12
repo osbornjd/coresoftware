@@ -21,8 +21,8 @@
 #include <Acts/Definitions/Algebra.hpp>
 #include <Acts/EventData/VectorMultiTrajectory.hpp>
 #include <Acts/Utilities/BinnedArray.hpp>
-#include <Acts/Utilities/Logger.hpp>
 #include <Acts/Utilities/Helpers.hpp>
+#include <Acts/Utilities/Logger.hpp>
 
 #include <ActsExamples/EventData/Trajectories.hpp>
 
@@ -126,12 +126,12 @@ class PHActsTrkFitter : public SubsysReco
   /// Set flag for pp running
   void set_pp_mode(bool ispp) { m_pp_mode = ispp; }
 
-  void set_enable_geometric_crossing_estimate(bool flag) { m_enable_crossing_estimate = flag ; }
+  void set_enable_geometric_crossing_estimate(bool flag) { m_enable_crossing_estimate = flag; }
   void set_use_clustermover(bool use) { m_use_clustermover = use; }
   void ignoreLayer(int layer) { m_ignoreLayer.insert(layer); }
-  void setTrkrClusterContainerName(std::string &name){ m_clusterContainerName = name; }
+  void setTrkrClusterContainerName(std::string& name) { m_clusterContainerName = name; }
   void setDirectNavigation(bool flag) { m_directNavigation = flag; }
-    
+
  private:
   /// Get all the nodes
   int getNodes(PHCompositeNode* topNode);
@@ -217,7 +217,7 @@ class PHActsTrkFitter : public SubsysReco
   bool m_pp_mode = false;
 
   bool m_directNavigation = true;
-  
+
   // do we have a constant field
   bool m_ConstField{false};
   double fieldstrength{std::numeric_limits<double>::quiet_NaN()};
@@ -225,7 +225,7 @@ class PHActsTrkFitter : public SubsysReco
   // max variation of bunch crossing away from crossing_estimate
   short int max_bunch_search = 2;
 
-  //name of TRKR_CLUSTER container
+  // name of TRKR_CLUSTER container
   std::string m_clusterContainerName = "TRKR_CLUSTER";
 
   //!@name evaluator
@@ -241,7 +241,7 @@ class PHActsTrkFitter : public SubsysReco
   std::map<const unsigned int, Trajectory>* m_trajectories = nullptr;
 
   //! tracks
-//  SvtxTrackMap* m_seedTracks = nullptr;
+  //  SvtxTrackMap* m_seedTracks = nullptr;
 
   //! tpc global position wrapper
   TpcGlobalPositionWrapper m_globalPositionWrapper;
@@ -279,14 +279,18 @@ class PHActsTrkFitter : public SubsysReco
 
   std::vector<const Acts::Surface*> m_materialSurfaces = {};
 
-  struct MaterialSurfaceSelector {
+  struct MaterialSurfaceSelector
+  {
     std::vector<const Acts::Surface*> surfaces = {};
-  
+
     /// @param surface is the test surface
-    void operator()(const Acts::Surface* surface) {
-      if (surface->surfaceMaterial() != nullptr) {
+    void operator()(const Acts::Surface* surface)
+    {
+      if (surface->surfaceMaterial() != nullptr)
+      {
         if (std::find(surfaces.begin(), surfaces.end(), surface) ==
-            surfaces.end()) {
+            surfaces.end())
+        {
           surfaces.push_back(surface);
         }
       }
