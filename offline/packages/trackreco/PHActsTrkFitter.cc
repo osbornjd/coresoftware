@@ -405,7 +405,8 @@ void PHActsTrkFitter::loopTracks(Acts::Logging::Level logLevel)
       // non pp mode, we want only crossing zero, veto others
       if (siseed && silicon_crossing != 0)
       {
-        continue;
+        crossing = 0;
+        crossing_estimate = 0;
       }
       crossing_estimate = crossing;
     }
