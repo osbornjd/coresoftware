@@ -39,6 +39,10 @@ class InttCalib : public SubsysReco
   void SetppMode(bool mode) { m_ppmode = mode; }
   void SetBcoMaximumEvent(int mext) {m_evts_bco = mext; }
   void SetRunNumber(int runnum) { m_run_num = runnum; }
+  void SetRawHitContainerName(const std::string& name)
+  {
+    m_rawhit_container_name = name;
+  }
   void SetDoFeebyFee(bool in) {m_do_fee = in;}
   int SaveHitrates();
   int LoadHitrates();
@@ -83,6 +87,7 @@ class InttCalib : public SubsysReco
 
   int m_evts{0};
   int m_run_num{0};
+  std::string m_rawhit_container_name = "INTTRAWHIT";
   double m_bco_stdDev{0};  
   double m_bco_mean{0};  
   double m_mean[8] = {0.};

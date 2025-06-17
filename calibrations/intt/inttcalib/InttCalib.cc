@@ -73,16 +73,6 @@ int InttCalib::InitRun(PHCompositeNode * /*unused*/)
 
   m_do_nothing = false;
 
-  if (m_survey.LoadFromCDB("InttSurveyMap"))
-  {
-    std::cout << PHWHERE << "\n"
-              << "\tCould not load 'InttSurveyMap' from CDB\n"
-              << "\tModule will do nothing" << std::endl;
-    m_do_nothing = true;
-    // gSystem->Exit(1);
-    // exit(1);
-  }
-
   std::cout<<"INITRUNEND"<<std::endl;
   return Fun4AllReturnCodes::EVENT_OK;
 }
@@ -116,7 +106,7 @@ int InttCalib::process_event(PHCompositeNode *top_node)
     }
   }
   InttRawHitContainer *intt_raw_hit_container =
-      findNode::getClass<InttRawHitContainer>(top_node, "INTTRAWHIT");
+      findNode::getClass<InttRawHitContainer>(top_node, m_rawhit_container_name.c_str());
   if (!intt_raw_hit_container)
   {
     std::cout << PHWHERE << "\n"
@@ -209,13 +199,13 @@ int InttCalib::EndRun(int const run_number)
   {
     ConfigureHotMap_v3();
     MakeHotMapCdb_v3();
-    MakeHotMapPng_v3();
+    //MakeHotMapPng_v3();
   }
   if (m_do_make_bco)
   {
     ConfigureBcoMap();
     MakeBcoMapCdb();
-    MakeBcoMapPng();
+    //MakeBcoMapPng();
   }
 
   return Fun4AllReturnCodes::EVENT_OK;
