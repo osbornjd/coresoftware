@@ -172,7 +172,7 @@ int InttCalib::process_event(PHCompositeNode *top_node)
   {
     ConfigureBcoMap();
     MakeBcoMapCdb();
-    MakeBcoMapPng();
+    //MakeBcoMapPng();
     m_do_make_bco = false;
   }
   return Fun4AllReturnCodes::EVENT_OK;
