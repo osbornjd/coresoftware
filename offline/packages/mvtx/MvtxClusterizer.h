@@ -65,24 +65,24 @@ class MvtxClusterizer : public SubsysReco
  private:
   // bool are_adjacent(const pixel lhs, const pixel rhs);
   bool record_ClusHitsVerbose{false};
-  bool are_adjacent(const std::pair<TrkrDefs::hitkey, TrkrHit *> &lhs, const std::pair<TrkrDefs::hitkey, TrkrHit *> &rhs);
-  bool are_adjacent(RawHit *lhs, RawHit *rhs);
+  bool are_adjacent(const std::pair<TrkrDefs::hitkey, TrkrHit *> &lhs, const std::pair<TrkrDefs::hitkey, TrkrHit *> &rhs) const;
+  bool are_adjacent(RawHit *lhs, RawHit *rhs) const;
 
   void ClusterMvtx(PHCompositeNode *topNode);
   void ClusterMvtxRaw(PHCompositeNode *topNode);
   void PrintClusters(PHCompositeNode *topNode);
 
   // node tree storage pointers
-  TrkrHitSetContainer *m_hits;
-  RawHitSetContainer *m_rawhits;
-  TrkrClusterContainer *m_clusterlist;
+  TrkrHitSetContainer *m_hits {nullptr};
+  RawHitSetContainer *m_rawhits {nullptr};
+  TrkrClusterContainer *m_clusterlist {nullptr};
 
-  TrkrClusterHitAssoc *m_clusterhitassoc;
+  TrkrClusterHitAssoc *m_clusterhitassoc {nullptr};
 
   // settings
-  bool m_makeZClustering;  // z_clustering_option
-  bool do_hit_assoc = true;
-  bool do_read_raw = false;
+  bool m_makeZClustering {true};  // z_clustering_option
+  bool do_hit_assoc {true};
+  bool do_read_raw {false};
 };
 
 #endif  // MVTX_MVTXCLUSTERIZER_H

@@ -17,11 +17,17 @@ pkginclude_HEADERS = \
   CaloStatusMapper.h \
   CaloStatusMapperDefs.h \
   ConstituentsinJets.h \
+  DijetQA.h \
+  EMClusterKinematics.h \
+  JetKinematicCheck.h \
   JetQADefs.h \
+  JetSeedCount.h \
+  PhotonJetsKinematics.h \
+  RhosinEvent.h \
   StructureinJets.h \
   TrksInJetQA.h \
   TrksInJetQAHist.h \
-  TrksInJetQATypes.h \
+  TrksInJetQADefs.h \
   TrksInJetQAConfig.h \
   TrksInJetQABaseFiller.h \
   TrksInJetQAInJetFiller.h \
@@ -31,13 +37,17 @@ pkginclude_HEADERS = \
   TrksInJetQAClustManager.h \
   TrksInJetQATrkManager.h \
   TrksInJetQAJetManager.h \
-  RhosinEvent.h \
-  JetSeedCount.h \
-  JetKinematicCheck.h
+  UEvsEtaCentrality.h
 
 libjetqa_la_SOURCES = \
   CaloStatusMapper.cc \
   ConstituentsinJets.cc \
+  DijetQA.cc \
+  EMClusterKinematics.cc \
+  JetKinematicCheck.cc \
+  JetSeedCount.cc \
+  PhotonJetsKinematics.cc \
+  RhosinEvent.cc \
   StructureinJets.cc \
   TrksInJetQA.cc \
   TrksInJetQABaseFiller.cc \
@@ -48,9 +58,7 @@ libjetqa_la_SOURCES = \
   TrksInJetQAClustManager.cc \
   TrksInJetQATrkManager.cc \
   TrksInJetQAJetManager.cc \
-  RhosinEvent.cc \
-  JetSeedCount.cc \
-  JetKinematicCheck.cc
+  UEvsEtaCentrality.cc
 
 libjetqa_la_LIBADD = \
   -L$(libdir) \

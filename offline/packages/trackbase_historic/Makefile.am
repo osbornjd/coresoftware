@@ -11,7 +11,8 @@ lib_LTLIBRARIES = \
 AM_CPPFLAGS = \
   -I$(includedir) \
   -isystem$(OFFLINE_MAIN)/include  \
-  -isystem$(ROOTSYS)/include
+  -isystem$(ROOTSYS)/include \
+  -isystem$(OPT_SPHENIX)/include
 
 AM_LDFLAGS = \
   -L$(libdir) \
@@ -56,6 +57,7 @@ pkginclude_HEADERS = \
   SvtxTrackState.h \
   SvtxTrackState_v1.h \
   SvtxTrackState_v2.h \
+  SvtxTrackState_v3.h \
   TrackAnalysisUtils.h \
   SvtxTrackInfo.h \
   SvtxTrackInfo_v1.h \
@@ -66,7 +68,10 @@ pkginclude_HEADERS = \
   TrackInfoContainer_v2.h \
   TrackInfoContainer_v3.h \
   TrackStateInfo.h \
-  TrackStateInfo_v1.h
+  TrackStateInfo_v1.h \
+  WeightedTrack.h \
+  WeightedTrackZeroField.h \
+  WeightedTrackMap.h
 
 ROOTDICTS = \
   TrackSeed_Dict.cc \
@@ -88,6 +93,7 @@ ROOTDICTS = \
   SvtxTrackState_Dict.cc \
   SvtxTrackState_v1_Dict.cc \
   SvtxTrackState_v2_Dict.cc \
+  SvtxTrackState_v3_Dict.cc \
   SvtxTrack_v1_Dict.cc \
   SvtxTrack_v2_Dict.cc \
   SvtxTrack_v3_Dict.cc \
@@ -112,54 +118,14 @@ ROOTDICTS = \
   TrackInfoContainer_v2_Dict.cc \
   TrackInfoContainer_v3_Dict.cc \
   TrackStateInfo_Dict.cc \
-  TrackStateInfo_v1_Dict.cc
+  TrackStateInfo_v1_Dict.cc \
+  WeightedTrack_Dict.cc \
+  WeightedTrackZeroField_Dict.cc \
+  WeightedTrackMap_Dict.cc
 
 pcmdir = $(libdir)
-nobase_dist_pcm_DATA = \
-  TrackSeed_Dict_rdict.pcm \
-  TrackSeed_v1_Dict_rdict.pcm \
-  TrackSeed_v2_Dict_rdict.pcm \
-  SvtxTrackSeed_v1_Dict_rdict.pcm \
-  SvtxTrackSeed_v2_Dict_rdict.pcm \
-  TrackSeed_FastSim_v1_Dict_rdict.pcm \
-  TrackSeed_FastSim_v2_Dict_rdict.pcm \
-  TrackSeedContainer_Dict_rdict.pcm \
-  TrackSeedContainer_v1_Dict_rdict.pcm \
-  PHG4ParticleSvtxMap_Dict_rdict.pcm \
-  PHG4ParticleSvtxMap_v1_Dict_rdict.pcm \
-  SvtxPHG4ParticleMap_Dict_rdict.pcm \
-  SvtxPHG4ParticleMap_v1_Dict_rdict.pcm \
-  SvtxAlignmentState_Dict_rdict.pcm \
-  SvtxAlignmentState_v1_Dict_rdict.pcm \
-  SvtxTrack_Dict_rdict.pcm \
-  SvtxTrackState_Dict_rdict.pcm \
-  SvtxTrackState_v1_Dict_rdict.pcm \
-  SvtxTrackState_v2_Dict_rdict.pcm \
-  SvtxTrack_v1_Dict_rdict.pcm \
-  SvtxTrack_v2_Dict_rdict.pcm \
-  SvtxTrack_v3_Dict_rdict.pcm \
-  SvtxTrack_v4_Dict_rdict.pcm \
-  SvtxTrack_FastSim_Dict_rdict.pcm \
-  SvtxTrack_FastSim_v1_Dict_rdict.pcm \
-  SvtxTrack_FastSim_v2_Dict_rdict.pcm \
-  SvtxTrack_FastSim_v3_Dict_rdict.pcm \
-  SvtxAlignmentStateMap_Dict_rdict.pcm \
-  SvtxAlignmentStateMap_v1_Dict_rdict.pcm \
-  SvtxTrackMap_Dict_rdict.pcm \
-  SvtxTrackMap_v1_Dict_rdict.pcm \
-  SvtxTrackMap_v2_Dict_rdict.pcm \
-  SvtxTrackCaloClusterMap_Dict_rdict.pcm \
-  SvtxTrackCaloClusterMap_v1_Dict_rdict.pcm \
-  SvtxTrackInfo_Dict_rdict.pcm \
-  SvtxTrackInfo_v1_Dict_rdict.pcm \
-  SvtxTrackInfo_v2_Dict_rdict.pcm \
-  SvtxTrackInfo_v3_Dict_rdict.pcm \
-  TrackInfoContainer_Dict_rdict.pcm \
-  TrackInfoContainer_v1_Dict_rdict.pcm \
-  TrackInfoContainer_v2_Dict_rdict.pcm \
-  TrackInfoContainer_v3_Dict_rdict.pcm \
-  TrackStateInfo_Dict_rdict.pcm \
-  TrackStateInfo_v1_Dict_rdict.pcm
+# more elegant way to create pcm files (without listing them)
+nobase_dist_pcm_DATA = $(ROOTDICTS:.cc=_rdict.pcm)
 
 libtrackbase_historic_la_SOURCES = \
   ActsTransformations.cc \
@@ -186,6 +152,7 @@ libtrackbase_historic_io_la_SOURCES = \
   SvtxAlignmentState_v1.cc \
   SvtxTrackState_v1.cc \
   SvtxTrackState_v2.cc \
+  SvtxTrackState_v3.cc \
   SvtxTrack.cc \
   SvtxTrack_v1.cc \
   SvtxTrack_v2.cc \
@@ -208,7 +175,10 @@ libtrackbase_historic_io_la_SOURCES = \
   TrackInfoContainer_v1.cc \
   TrackInfoContainer_v2.cc \
   TrackInfoContainer_v3.cc \
-  TrackStateInfo_v1.cc
+  TrackStateInfo_v1.cc \
+  WeightedTrack.cc \
+  WeightedTrackZeroField.cc \
+  WeightedTrackMap.cc
 
 AM_LDFLAGS = \
   -L$(libdir) \
@@ -222,7 +192,8 @@ libtrackbase_historic_io_la_LIBADD = \
 
 libtrackbase_historic_la_LIBADD = \
   libtrackbase_historic_io.la \
-  -ltrack
+  -ltrack \
+  -ltpc
 
 # Rule for generating table CINT dictionaries.
 %_Dict.cc: %.h %LinkDef.h

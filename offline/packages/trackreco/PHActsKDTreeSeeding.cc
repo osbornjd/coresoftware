@@ -42,6 +42,7 @@
 #include <Acts/Seeding/SpacePointGrid.hpp>
 #include <Acts/Utilities/KDTree.hpp>
 
+#include <cmath>
 #include <optional>
 
 namespace
@@ -119,13 +120,14 @@ SeedContainer PHActsKDTreeSeeding::runSeeder()
 
   auto spacePoints = getMvtxSpacePoints();
 
-  std::function<std::pair<Acts::Vector3, Acts::Vector2>(
-      const SpacePoint* sp)>
+  std::function<
+      std::tuple<Acts::Vector3, Acts::Vector2, std::optional<Acts::ActsScalar>>(
+          const SpacePoint* sp)>
       create_coordinates = [](const SpacePoint* sp)
   {
     Acts::Vector3 position(sp->x(), sp->y(), sp->z());
     Acts::Vector2 variance(sp->varianceR(), sp->varianceZ());
-    return std::make_pair(position, variance);
+    return std::make_tuple(position, variance, sp->t());
   };
 
   /// Call acts seeding algo
@@ -298,7 +300,7 @@ void PHActsKDTreeSeeding::matchInttClusters(
       /// Check that the projection is within some reasonable amount of the segment
       /// to reject e.g. looking at segments in the opposite hemisphere. This is about
       /// the size of one intt segment (256 * 80 micron strips in a segment)
-      if (fabs(dphi) > 0.2)
+      if (std::abs(dphi) > 0.2)
       {
         continue;
       }
@@ -316,7 +318,7 @@ void PHActsKDTreeSeeding::matchInttClusters(
 
         /// Z strip spacing is the entire strip, so because we use fabs
         /// we divide by two
-        if (fabs(projectionLocal[1] - cluster->getLocalX()) < m_rPhiSearchWin and
+        if (fabs(projectionLocal[1] - cluster->getLocalX()) < m_rPhiSearchWin &&
             fabs(projectionLocal[2] - cluster->getLocalY()) < stripZSpacing / 2.)
         {
           /// Cache INTT global positions with seed
@@ -437,7 +439,7 @@ SpacePointPtr PHActsKDTreeSeeding::makeSpacePoint(const Surface& surf,
    * uncertainties by a tuned factor that gives the v17 performance
    * Track reconstruction is an art as much as it is a science...
    */
-  SpacePointPtr spPtr(new SpacePoint{key, x, y, z, r, surf->geometryId(), var[0] * m_uncfactor, var[1] * m_uncfactor});
+  SpacePointPtr spPtr(new SpacePoint{key, x, y, z, r, surf->geometryId(), var[0] * m_uncfactor, var[1] * m_uncfactor,std::nullopt});
 
   if (Verbosity() > 2)
   {

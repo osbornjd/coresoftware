@@ -35,7 +35,7 @@ class PHG4TruthInfoContainer : public PHObject
   typedef std::pair<ShowerIterator, ShowerIterator> ShowerRange;
   typedef std::pair<ConstShowerIterator, ConstShowerIterator> ConstShowerRange;
 
-  PHG4TruthInfoContainer();
+  PHG4TruthInfoContainer() = default;
   ~PHG4TruthInfoContainer() override;
 
   // from PHObject
@@ -46,14 +46,20 @@ class PHG4TruthInfoContainer : public PHObject
   // --- particle storage ------------------------------------------------------
 
   //! Add a particle that the user has created
-  ConstIterator AddParticle(const int particleid, PHG4Particle* newparticle);
+  ConstIterator AddParticle(const int trackid, PHG4Particle* newparticle);
+  ConstIterator AddsPHENIXPrimaryParticle(const int trackid, PHG4Particle* newparticle);
   void delete_particle(Iterator piter);
   void delete_particle(int trackid);
 
   PHG4Particle* GetParticle(const int trackid);
+  PHG4Particle* GetParticle(const int trackid) const;
   PHG4Particle* GetPrimaryParticle(const int trackid);
 
+  PHG4Particle* GetsPHENIXPrimaryParticle(const int trackid);
+
   bool is_primary(const PHG4Particle* p) const;
+
+  bool is_sPHENIX_primary(const PHG4Particle* p) const;
 
   //! Get a range of iterators covering the entire container
   Range GetParticleRange() { return Range(particlemap.begin(), particlemap.end()); }
@@ -62,11 +68,14 @@ class PHG4TruthInfoContainer : public PHObject
   Range GetPrimaryParticleRange() { return Range(particlemap.upper_bound(0), particlemap.end()); }
   ConstRange GetPrimaryParticleRange() const { return ConstRange(particlemap.upper_bound(0), particlemap.end()); }
 
+  Range GetSPHENIXPrimaryParticleRange() { return Range(sPHENIXprimaryparticlemap.begin(), sPHENIXprimaryparticlemap.end()); }
+  ConstRange GetSPHENIXPrimaryParticleRange() const { return ConstRange(sPHENIXprimaryparticlemap.begin(), sPHENIXprimaryparticlemap.end()); }
+
   Range GetSecondaryParticleRange() { return Range(particlemap.begin(), particlemap.upper_bound(0)); }
   ConstRange GetSecondaryParticleRange() const { return ConstRange(particlemap.begin(), particlemap.upper_bound(0)); }
 
   //! track -> particle map size
-  unsigned int size(void) const { return particlemap.size(); }
+  unsigned int size() const { return particlemap.size(); }
   int GetNumPrimaryVertexParticles()
   {
     return std::distance(particlemap.upper_bound(0), particlemap.end());
@@ -74,6 +83,8 @@ class PHG4TruthInfoContainer : public PHObject
 
   //! Get the Particle Map storage
   const Map& GetMap() const { return particlemap; }
+
+  const Map& GetSPHENIXPrimaryParticleMap() const { return sPHENIXprimaryparticlemap; }
 
   int maxtrkindex() const;
   int mintrkindex() const;
@@ -107,7 +118,7 @@ class PHG4TruthInfoContainer : public PHObject
   // --- vertex storage --------------------------------------------------------
 
   //! Add a vertex and return an iterator to the user
-  ConstVtxIterator AddVertex(const int vtxid, PHG4VtxPoint* vertex);
+  ConstVtxIterator AddVertex(const int vtxid, PHG4VtxPoint* newvtx);
   void delete_vtx(VtxIterator viter);
   void delete_vtx(int vtxid);
 
@@ -169,7 +180,7 @@ class PHG4TruthInfoContainer : public PHObject
 
   //! Add a shower that the user has created
   ConstShowerIterator AddShower(const int showerid, PHG4Shower* newshower);
-  void delete_shower(ShowerIterator piter);
+  void delete_shower(ShowerIterator siter);
 
   PHG4Shower* GetShower(const int showerid);
   PHG4Shower* GetPrimaryShower(const int showerid);
@@ -185,7 +196,7 @@ class PHG4TruthInfoContainer : public PHObject
   ConstShowerRange GetSecondaryShowerRange() const { return ConstShowerRange(showermap.begin(), showermap.upper_bound(0)); }
 
   //! shower size
-  unsigned int shower_size(void) const { return showermap.size(); }
+  unsigned int shower_size() const { return showermap.size(); }
 
   //! Get the Shower Map storage
   const ShowerMap& GetShowerMap() const { return showermap; }
@@ -207,6 +218,8 @@ class PHG4TruthInfoContainer : public PHObject
   /// -M+1
   /// -M   secondary particle id => particle*
   Map particlemap;
+
+  Map sPHENIXprimaryparticlemap;  // for sPHENIX primary particle identification
 
   /// vertex storage map format description:
   /// primary vertexes are appended in the positive direction
@@ -230,7 +243,7 @@ class PHG4TruthInfoContainer : public PHObject
   std::map<int, int> particle_embed_flags;  //< trackid => embed flag
   std::map<int, int> vertex_embed_flags;    //< vtxid => embed flag
 
-  ClassDefOverride(PHG4TruthInfoContainer, 1)
+  ClassDefOverride(PHG4TruthInfoContainer, 2)
 };
 
 /**

@@ -24,18 +24,21 @@ class CaloRecoUtility
  public:
   ~CaloRecoUtility();
   CaloRecoUtility();
-  CaloRecoUtility(CaloRecoUtility& cru);
-  CaloRecoUtility& operator=(CaloRecoUtility const&);
+  // cppcheck: deleting copy ctor and = operator to prevent accidental use
+  // if they are used at some point they need to be properly implemented
+  // the default does not work for allocated memory
+  CaloRecoUtility(const CaloRecoUtility& cru) = delete;
+  CaloRecoUtility& operator=(CaloRecoUtility const&) = delete;
 
   //! corrects cluster Z (implicitly also eta) for updated z vertex
   // assuming
-  void ShowerDepthCorrZVertex(RawCluster* clus, float zvtx);
-  void ProbCorrsZVertex(RawCluster* clus, float zvtx);
+  static void ShowerDepthCorrZVertex(RawCluster* clus, float vz);
+  void ProbCorrsZVertex(RawCluster* clus, float vz);
   void LoadProfile();
 
  private:
-  bool _profLoaded;
-  BEmcRec* _bemc = nullptr;
+  bool _profLoaded {false};
+  BEmcRec* _bemc {nullptr};
 };
 
 #endif

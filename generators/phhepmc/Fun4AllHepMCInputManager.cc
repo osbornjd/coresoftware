@@ -3,12 +3,12 @@
 #include "PHHepMCGenEvent.h"
 #include "PHHepMCGenEventMap.h"
 
-#include <frog/FROG.h>
-
+#include <fun4all/DBInterface.h>
 #include <fun4all/Fun4AllInputManager.h>  // for Fun4AllInpu...
 #include <fun4all/Fun4AllReturnCodes.h>
 #include <fun4all/Fun4AllServer.h>
 #include <fun4all/Fun4AllSyncManager.h>
+#include <fun4all/InputFileHandlerReturnCodes.h>
 
 #include <phool/PHCompositeNode.h>
 #include <phool/PHIODataNode.h>    // for PHIODataNode
@@ -45,8 +45,6 @@ Fun4AllHepMCInputManager::Fun4AllHepMCInputManager(const std::string &name, cons
   : Fun4AllInputManager(name, nodename, topnodename)
   , topNodeName(topnodename)
 {
-  set_embedding_id(0);  // default embedding ID. Welcome to change via macro
-
   Fun4AllServer *se = Fun4AllServer::instance();
   topNode = se->topNode(topNodeName);
   PHNodeIterator iter(topNode);
@@ -93,8 +91,7 @@ int Fun4AllHepMCInputManager::fileopen(const std::string &filenam)
     fileclose();
   }
   filename = filenam;
-  FROG frog;
-  std::string fname(frog.location(filename));
+  std::string fname  = DBInterface::instance()->location(filename);
   if (Verbosity() > 0)
   {
     std::cout << Name() << ": opening file " << fname << std::endl;
@@ -166,13 +163,11 @@ int Fun4AllHepMCInputManager::run(const int /*nevents*/)
         }
         return -1;
       }
-      else
+
+      if (OpenNextFile() == InputFileHandlerReturnCodes::FAILURE)
       {
-        if (OpenNextFile())
-        {
-          std::cout << "Fun4AllHepMCInputManager::run::" << Name() << ": No Input file from filelist opened" << std::endl;
-          return -1;
-        }
+        std::cout << "Fun4AllHepMCInputManager::run::" << Name() << ": No Input file from filelist opened" << std::endl;
+        return -1;
       }
     }
 
@@ -355,18 +350,24 @@ Fun4AllHepMCInputManager::ConvertFromOscar()
   }
 
   delete evt;
-  //use PHENIX unit
+  // use PHENIX unit
   evt = new HepMC::GenEvent(HepMC::Units::GEV, HepMC::Units::CM);
 
-  if (Verbosity() > 1) std::cout << "Reading Oscar Event " << events_total << std::endl;
-  //Grab New Event From Oscar
+  if (Verbosity() > 1)
+  {
+    std::cout << "Reading Oscar Event " << events_total << std::endl;
+  }
+  // Grab New Event From Oscar
   std::string theLine;
   std::vector<std::vector<double> > theEventVec;
   std::vector<HepMC::FourVector> theVtxVec;
   while (getline(theOscarFile, theLine))
   {
-    if (theLine.compare(0, 1, "#") == 0) continue;
-    std::vector<double> theInfo;  //format: N,pid,px,py,pz,E,mass,xvtx,yvtx,zvtx,?
+    if (theLine.compare(0, 1, "#") == 0)
+    {
+      continue;
+    }
+    std::vector<double> theInfo;  // format: N,pid,px,py,pz,E,mass,xvtx,yvtx,zvtx,?
     double number = NAN;
     for (std::istringstream numbers_iss(theLine); numbers_iss >> number;)
     {
@@ -377,33 +378,31 @@ Fun4AllHepMCInputManager::ConvertFromOscar()
     {
       break;
     }
-    else if (theInfo.size() == 2 && theInfo[0] == 0 && theInfo[1] > 0)
+    if (theInfo.size() == 2 && theInfo[0] == 0 && theInfo[1] > 0)
     {
       continue;
     }
-    else
-    {
-      theEventVec.push_back(theInfo);
-      HepMC::FourVector vert(theInfo[8] * toMM, theInfo[9] * toMM, theInfo[10] * toMM, theInfo[11]);
-      theVtxVec.push_back(vert);
-    }
 
-  }  //while(getline)
+    theEventVec.push_back(theInfo);
+    HepMC::FourVector vert(theInfo[8] * toMM, theInfo[9] * toMM, theInfo[10] * toMM, theInfo[11]);
+    theVtxVec.push_back(vert);
 
-  //Set Event Number
+  }  // while(getline)
+
+  // Set Event Number
   evt->set_event_number(events_total);
 
-  //Loop Over One Event, Fill HepMC
+  // Loop Over One Event, Fill HepMC
   for (unsigned int i = 0; i < theEventVec.size(); i++)
   {
-    //int N = (int)theEventVec[i][0];
+    // int N = (int)theEventVec[i][0];
     int pid = (int) theEventVec[i][1];
     double px = theEventVec[i][3];
     double py = theEventVec[i][4];
     double pz = theEventVec[i][5];
     double E = theEventVec[i][6];
     double m = theEventVec[i][7];
-    int status = 1;  //oscar only writes final state particles
+    int status = 1;  // oscar only writes final state particles
 
     HepMC::GenVertex *v = new HepMC::GenVertex(theVtxVec[i]);
     evt->add_vertex(v);
@@ -434,4 +433,3 @@ int Fun4AllHepMCInputManager::MyCurrentEvent(const unsigned int index) const
   }
   return m_MyEvent.at(index);
 }
-

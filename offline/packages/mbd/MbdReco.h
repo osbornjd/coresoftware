@@ -3,18 +3,22 @@
 
 #include <fun4all/SubsysReco.h>
 
+#include <array>
 #include <memory>
 #include <string>
 
 class PHCompositeNode;
 class MbdEvent;
 class MbdPmtContainer;
+class MbdRawContainer;
 class MbdVertexMap;
 class MbdOut;
 class MbdGeom;
 class Event;
+class CaloPacket;
 class CaloPacketContainer;
 class Gl1Packet;
+class EventHeader;
 class TF1;
 class TH1;
 
@@ -30,27 +34,37 @@ class MbdReco : public SubsysReco
   int process_event(PHCompositeNode *topNode) override;
   int End(PHCompositeNode *topNode) override;
 
+  void DoOnlyFits() { _fitsonly = 1; }
   void SetCalPass(const int calpass) { _calpass = calpass; }
+  void SetProcChargeCh(const bool s) { _always_process_charge = s; }
   void SetMbdTrigOnly(const int m) { _mbdonly = m; }
 
  private:
-  int createNodes(PHCompositeNode *topNode);
-  int getNodes(PHCompositeNode *topNode);
-  int _simflag{0};
-  int _calpass{0};
-  int _mbdonly{0};  // only use mbd triggers
+  int  createNodes(PHCompositeNode *topNode);
+  int  getNodes(PHCompositeNode *topNode);
+  int  _simflag{0};
+  int  _calpass{0};
+  bool _always_process_charge{0};
+  int  _mbdonly{0};     // only use mbd triggers
+  int  _rawdstflag{0};  // dst with raw container
+  int  _fitsonly{0};    // stop reco after waveform fits (for DST_CALOFIT pass)
 
   float m_tres = 0.05;
   std::unique_ptr<TF1> m_gaussian = nullptr;
 
+  int _evtnum{-1};
+
   std::unique_ptr<MbdEvent> m_mbdevent{nullptr};
   Event *m_event{nullptr};
-  CaloPacketContainer *m_mbdraw{nullptr};
-  Gl1Packet *m_gl1raw{nullptr};
+  std::array<CaloPacket *,2>m_mbdpacket{nullptr};
+  CaloPacketContainer *m_mbdpackets{nullptr};
+  Gl1Packet *m_gl1packet{nullptr};
   MbdOut *m_mbdout{nullptr};
   MbdPmtContainer *m_mbdpmts{nullptr};
+  MbdRawContainer *m_mbdraws{nullptr};
   MbdGeom *m_mbdgeom{nullptr};
   MbdVertexMap *m_mbdvtxmap{nullptr};
+  EventHeader *m_evtheader{nullptr};
 };
 
-#endif  // __MBDRECO_H__
+#endif  // MBD_MBDRECO_H

@@ -1,15 +1,17 @@
 #include "SingleMvtxPoolInput.h"
-#include "mvtx_pool.h"
-#include "Fun4AllStreamingInputManager.h"
 
+#include "Fun4AllStreamingInputManager.h"
 #include "MvtxRawDefs.h"
-#include <fun4all/Fun4AllUtils.h>
+#include "mvtx_pool.h"
+
 #include <ffarawobjects/MvtxFeeIdInfov1.h>
 #include <ffarawobjects/MvtxRawEvtHeaderv2.h>
 #include <ffarawobjects/MvtxRawHitContainerv1.h>
 #include <ffarawobjects/MvtxRawHitv1.h>
 
-#include <frog/FROG.h>
+#include <fun4all/Fun4AllUtils.h>
+#include <fun4all/InputFileHandlerReturnCodes.h>
+
 #include <phool/PHCompositeNode.h>
 #include <phool/PHNodeIterator.h>  // for PHNodeIterator
 #include <phool/getClass.h>
@@ -21,15 +23,16 @@
 #include <Event/Eventiterator.h>
 #include <Event/fileEventiterator.h>
 
-#include <cmath>
 #include <cassert>
+#include <cmath>
 #include <memory>
 #include <set>
 
 SingleMvtxPoolInput::SingleMvtxPoolInput(const std::string &name)
   : SingleStreamingInput(name)
+  , plist(new Packet *[2])
 {
-  plist = new Packet *[2];
+  
   m_rawHitContainerName = "MVTXRAWHIT";
 }
 
@@ -54,7 +57,7 @@ void SingleMvtxPoolInput::FillPool(const uint64_t minBCO)
   }
   while (GetEventiterator() == nullptr)  // at startup this is a null pointer
   {
-    if (!OpenNextFile())
+    if (OpenNextFile() == InputFileHandlerReturnCodes::FAILURE)
     {
       AllDone(1);
       return;
@@ -68,7 +71,7 @@ void SingleMvtxPoolInput::FillPool(const uint64_t minBCO)
     while (!evt)
     {
       fileclose();
-      if (!OpenNextFile())
+      if (OpenNextFile() == InputFileHandlerReturnCodes::FAILURE)
       {
         AllDone(1);
         return;
@@ -104,7 +107,7 @@ void SingleMvtxPoolInput::FillPool(const uint64_t minBCO)
         plist[i]->identify();
       }
 
-      if (poolmap.find(plist[i]->getIdentifier()) == poolmap.end())
+      if (!poolmap.contains(plist[i]->getIdentifier()))
       {
         if (Verbosity() > 1)
         {
@@ -128,18 +131,18 @@ void SingleMvtxPoolInput::FillPool(const uint64_t minBCO)
       {
         for (int i_fee{0}; i_fee < num_feeId; ++i_fee)
         {
-          //auto feeId = pool->iValue(i_fee, "FEEID");
+          // auto feeId = pool->iValue(i_fee, "FEEID");
           auto feeId = pool->get_feeid(i_fee);
           auto link = MvtxRawDefs::decode_feeid(feeId);
 
           //          auto hbfSize = plist[i]->iValue(feeId, "NR_HBF");
           // auto num_strobes_old = pool->iValue(feeId, "NR_STROBES");
-          //auto num_L1Trgs_old = pool->iValue(feeId, "NR_PHYS_TRG");
+          // auto num_L1Trgs_old = pool->iValue(feeId, "NR_PHYS_TRG");
           auto num_strobes = pool->get_strbSet_size(feeId);
           auto num_L1Trgs = pool->get_trgSet_size(feeId);
           for (int iL1 = 0; iL1 < num_L1Trgs; ++iL1)
           {
-          //  auto l1Trg_bco = pool->lValue(feeId, iL1, "L1_IR_BCO");
+            //  auto l1Trg_bco = pool->lValue(feeId, iL1, "L1_IR_BCO");
             auto l1Trg_bco = pool->get_L1_IR_BCO(feeId, iL1);
             //            auto l1Trg_bc  = plist[i]->iValue(feeId, iL1, "L1_IR_BC");
             m_FeeGTML1BCOMap[feeId].insert(l1Trg_bco);
@@ -159,7 +162,7 @@ void SingleMvtxPoolInput::FillPool(const uint64_t minBCO)
             m_BclkStack.insert(strb_bco);
             m_FEEBclkMap[feeId] = strb_bco;
 
-            if (strb_bco < minBCO - m_NegativeBco)
+            if (strb_bco < minBCO)
             {
               continue;
             }
@@ -189,7 +192,6 @@ void SingleMvtxPoolInput::FillPool(const uint64_t minBCO)
                 StreamingInputManager()->AddMvtxRawHit(strb_bco, newhit.get());
               }
               m_MvtxRawHitMap[strb_bco].push_back(newhit.release());
-
             }
             if (StreamingInputManager())
             {
@@ -200,10 +202,32 @@ void SingleMvtxPoolInput::FillPool(const uint64_t minBCO)
       }
     }
     // Assign L1 trg to Strobe windows data.
-    for (auto &lv1Bco : gtmL1BcoSet)
+    for (const auto &lv1Bco : gtmL1BcoSet)
     {
       auto it = m_BclkStack.lower_bound(lv1Bco);
-      auto const strb_it = (it == m_BclkStack.begin()) ? (*it == lv1Bco ? it : m_BclkStack.cend()) : --it;
+//      auto const strb_it = (it == m_BclkStack.begin()) ? (*it == lv1Bco ? it : m_BclkStack.cend()) : --it;
+// this is equivalent but human readable for the above:
+      auto strb_it = m_BclkStack.cend(); 
+
+      if (it == m_BclkStack.begin())
+      {
+	if (*it == lv1Bco)
+	{
+	  strb_it = it;
+	}
+	else
+	{
+	  strb_it = m_BclkStack.cend();
+	}
+      }
+      else
+      {
+	// safe because it != begin()
+	auto prev = it;
+	--prev;
+	strb_it = prev;
+      }
+     
       if (strb_it != m_BclkStack.cend())
       {
         if (StreamingInputManager())
@@ -270,20 +294,19 @@ void SingleMvtxPoolInput::Print(const std::string &what) const
 void SingleMvtxPoolInput::CleanupUsedPackets(const uint64_t bclk)
 {
   m_BclkStack.erase(m_BclkStack.begin(), m_BclkStack.upper_bound(bclk));
-  for(auto it = m_MvtxRawHitMap.begin(); it != m_MvtxRawHitMap.end() && (it->first <= bclk); it = m_MvtxRawHitMap.erase(it))
+  for (auto it = m_MvtxRawHitMap.begin(); it != m_MvtxRawHitMap.end() && (it->first <= bclk); it = m_MvtxRawHitMap.erase(it))
   {
-    for( const auto& rawhit : it->second)
+    for (const auto &rawhit : it->second)
     {
       delete rawhit;
     }
   }
   m_MvtxRawHitMap.erase(m_MvtxRawHitMap.begin(), m_MvtxRawHitMap.upper_bound(bclk));
   m_FeeStrobeMap.erase(m_FeeStrobeMap.begin(), m_FeeStrobeMap.upper_bound(bclk));
-  for(auto& [feeid, gtmbcoset] : m_FeeGTML1BCOMap)
+  for (auto &[feeid, gtmbcoset] : m_FeeGTML1BCOMap)
   {
     gtmbcoset.erase(gtmbcoset.begin(), gtmbcoset.upper_bound(bclk));
   }
-
 }
 
 bool SingleMvtxPoolInput::CheckPoolDepth(const uint64_t bclk)
@@ -352,16 +375,15 @@ bool SingleMvtxPoolInput::GetSomeMoreEvents()
         // 		<< std::dec << std::endl;
         return true;
       }
-      else
-      {
-        std::cout << PHWHERE << Name() << ": erasing FEE " << bcliter.first
+      
+              std::cout << PHWHERE << Name() << ": erasing FEE " << bcliter.first
                   << " with stuck bclk: " << std::hex << bcliter.second
                   << " current bco range: 0x" << m_MvtxRawHitMap.begin()->first
                   << ", to: 0x" << highest_bclk << ", delta: " << std::dec
                   << (highest_bclk - m_MvtxRawHitMap.begin()->first)
                   << std::dec << std::endl;
         toerase.insert(bcliter.first);
-      }
+     
     }
   }
   for (auto iter : toerase)
@@ -416,49 +438,55 @@ void SingleMvtxPoolInput::CreateDSTNode(PHCompositeNode *topNode)
 
 void SingleMvtxPoolInput::ConfigureStreamingInputManager()
 {
-
   auto [runnumber, segment] = Fun4AllUtils::GetRunSegment(*(GetFileList().begin()));
 
   if (m_readStrWidthFromDB)
   {
     m_strobeWidth = MvtxRawDefs::getStrobeLength(runnumber);
-  }
-
-  if(std::isnan(m_strobeWidth))
-  {
-    std::cout << PHWHERE << "WARNING: Strobe length is not defined for run " << runnumber << std::endl;
-    std::cout << "Defaulting to 89 mus strobe length" << std::endl;
-    m_strobeWidth = 89.;
-  }
-  if(m_strobeWidth > 88.)
-  {
-    m_BcoRange = 1000;
-    m_NegativeBco = 1000;
-  }
-  else if (m_strobeWidth > 9 && m_strobeWidth < 11)
-  {
-    m_BcoRange = 500;
-    m_NegativeBco = 500;
-  }
-  else if (m_strobeWidth < 1) // triggered mode
-  {
-    m_BcoRange = 2;
-    m_NegativeBco = 0;
-    if(StreamingInputManager())
+    if (std::isnan(m_strobeWidth))
     {
-      StreamingInputManager()->runMvtxTriggered(true);
+      std::cout << PHWHERE << "WARNING: Strobe length is not defined for run " << runnumber;
+      std::cout << " neither in the OCDB or DAQ DB. Exiting SingleMvtxPoolInput." << std::endl;
+      // std::cout << "Defaulting to 89 mus strobe length" << std::endl;
+      // m_strobeWidth = 89.;
+      exit(1);
     }
   }
-  else // catchall for anyting else to set to a range based on the rhic clock
+
+  if (!m_mvtx_is_standalone)
   {
-    m_BcoRange = std::ceil(m_strobeWidth * 1000. / sphenix_constants::time_between_crossings);
-    m_NegativeBco = std::ceil(m_strobeWidth * 1000. / sphenix_constants::time_between_crossings);
+    if (m_strobeWidth > 88.)
+    {
+      m_BcoRange = 1000;
+      m_NegativeBco = 1000;
+    }
+    else if (m_strobeWidth > 9 && m_strobeWidth < 11)
+    {
+      m_BcoRange = 500;
+      m_NegativeBco = 120;
+    }
+    else if (m_strobeWidth < 1)  // triggered mode
+    {
+      m_BcoRange = 3;
+      m_NegativeBco = 0;
+      if (StreamingInputManager())
+      {
+        StreamingInputManager()->runMvtxTriggered(true);
+      }
+    }
+    else  // catchall for anyting else to set to a range based on the rhic clock
+    {
+      m_BcoRange = std::ceil(m_strobeWidth * 1000. / sphenix_constants::time_between_crossings);
+      m_NegativeBco = std::ceil(m_strobeWidth * 1000. / sphenix_constants::time_between_crossings);
+    }
   }
-  if(Verbosity() > 1)
+
+  if (Verbosity() > 1)
   {
     std::cout << "Mvtx strobe length " << m_strobeWidth << std::endl;
     std::cout << "Mvtx BCO range and negative bco range set based on strobe length " << m_BcoRange << ", " << m_NegativeBco << std::endl;
   }
+
   if (StreamingInputManager())
   {
     StreamingInputManager()->SetMvtxBcoRange(m_BcoRange);

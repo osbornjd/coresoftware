@@ -47,6 +47,8 @@ void MbdSig::Init()
   name = "gsubpulse";
   name += _ch;
   gSubPulse->SetName(name);
+  gSubPulse->GetHistogram()->SetXTitle("sample");
+  gSubPulse->GetHistogram()->SetYTitle("ADC");
 
   hpulse = hRawPulse;  // hpulse,gpulse point to raw by default
   gpulse = gRawPulse;  // we switch to sub for default if ped is applied
@@ -93,13 +95,10 @@ void MbdSig::SetTemplateSize(const Int_t nptsx, const Int_t nptsy, const Double_
   Double_t ybinwid = (1.1 + 0.1) / template_npointsy;  // yscale... should we vary this?
   
   
-    delete h2Template;
+  delete h2Template;
   
+  delete h2Residuals;
   
-  
-    delete h2Residuals;
-  
-
   TString name = "h2Template";
   name += _ch;
   h2Template = new TH2F(name, name, template_npointsx, template_begintime - (xbinwid / 2.), template_endtime + (xbinwid / 2),
@@ -308,6 +307,18 @@ void MbdSig::Remove_Pileup()
   //_verbose = 100;
   _verbose = 0;
 
+  /*
+  if ( (_ch==238&&_evt_counter==7104) || (_ch==255&&_evt_counter==7762) )
+  {
+    _verbose = 100;
+  }
+  */
+
+  if ( _verbose )
+  {
+    std::cout << PHWHERE << " evt ch " << _evt_counter << "\t" << _ch << std::endl;
+  }
+
   if ( (_ch/8)%2 == 0 )   // time ch
   {
     float offset = _pileup_p0*gSubPulse->GetPointY(0);
@@ -333,9 +344,21 @@ void MbdSig::Remove_Pileup()
     fit_pileup->SetRange(-0.1,4.1);
     fit_pileup->SetParameters( _pileup_p0*gSubPulse->GetPointY(0), _pileup_p1, _pileup_p2 );
     
+    // fix par limits
+    double plow{0.};
+    double phigh{0.};
+    fit_pileup->GetParLimits(2,plow,phigh);
+    if ( phigh < _pileup_p2 )
+    {
+      phigh = 2*_pileup_p2;
+      fit_pileup->SetParLimits(2,plow,phigh);
+    }
+
     if ( _verbose )
     {
       gSubPulse->Fit( fit_pileup, "R" );
+      gSubPulse->Draw("ap");
+      PadUpdate();
     }
     else
     {
@@ -918,6 +941,26 @@ void MbdSig::Print()
     gpulse->GetPoint(isamp, x, y);
     std::cout << isamp << "\t" << x << "\t" << y << std::endl;
   }
+}
+
+void MbdSig::DrawWaveform()
+{
+  int orig_verbose = _verbose;
+  if ( _verbose <= 5 )
+  {
+    _verbose = 6;
+  }
+
+  gSubPulse->Draw("ap");
+  gSubPulse->GetHistogram()->SetTitle(gSubPulse->GetName());
+  gPad->SetGridy(1);
+  if ( template_fcn!=nullptr )
+  {
+    template_fcn->Draw("same");  // should check if fit was made
+  }
+  PadUpdate();
+
+  _verbose = orig_verbose;
 }
 
 void MbdSig::PadUpdate() const

@@ -2,7 +2,7 @@ AUTOMAKE_OPTIONS = foreign
 
 AM_CPPFLAGS = \
   -I$(includedir) \
-  -I$(OFFLINE_MAIN)/include  \
+  -isystem$(OFFLINE_MAIN)/include  \
   -isystem`root-config --incdir`
 
 lib_LTLIBRARIES = \
@@ -14,7 +14,8 @@ AM_LDFLAGS = \
   -L$(OFFLINE_MAIN)/lib
 
 libeventplaneinfo_io_la_LIBADD = \
-  -lphool
+  -lphool \
+  -lcentrality_io
 
 libeventplaneinfo_la_LIBADD = \
   libeventplaneinfo_io.la \
@@ -22,10 +23,13 @@ libeventplaneinfo_la_LIBADD = \
   -lmbd_io \
   -lfun4all \
   -lffamodules \
+  -lcalotrigger_io \
+  -lffarawobjects \
   -lcdbobjects \
   -lglobalvertex_io
 
 pkginclude_HEADERS = \
+  EventPlaneCalibration.h \
   Eventplaneinfo.h \
   Eventplaneinfov1.h \
   EventplaneinfoMap.h \
@@ -39,11 +43,8 @@ ROOTDICTS = \
   EventplaneinfoMapv1_Dict.cc
 
 pcmdir = $(libdir)
-nobase_dist_pcm_DATA = \
-  Eventplaneinfo_Dict_rdict.pcm \
-  Eventplaneinfov1_Dict_rdict.pcm \
-  EventplaneinfoMap_Dict_rdict.pcm \
-  EventplaneinfoMapv1_Dict_rdict.pcm
+# more elegant way to create pcm files (without listing them)
+nobase_dist_pcm_DATA = $(ROOTDICTS:.cc=_rdict.pcm)
 
 libeventplaneinfo_io_la_SOURCES = \
   $(ROOTDICTS) \
@@ -53,6 +54,7 @@ libeventplaneinfo_io_la_SOURCES = \
   EventplaneinfoMapv1.cc
 
 libeventplaneinfo_la_SOURCES = \
+  EventPlaneCalibration.cc \
   EventPlaneReco.cc
 
 # Rule for generating table CINT dictionaries.

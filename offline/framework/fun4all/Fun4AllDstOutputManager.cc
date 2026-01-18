@@ -2,6 +2,7 @@
 
 #include "Fun4AllServer.h"
 
+#include <phool/PHCompositeNode.h>
 #include <phool/PHNode.h>
 #include <phool/PHNodeIOManager.h>
 #include <phool/PHNodeIterator.h>
@@ -10,10 +11,9 @@
 
 #include <TSystem.h>
 
-#include <boost/format.hpp>
-
 #include <cstdlib>
 #include <filesystem>
+#include <format>
 #include <iostream>
 #include <string>
 
@@ -38,6 +38,12 @@ int Fun4AllDstOutputManager::AddNode(const std::string &nodename)
 int Fun4AllDstOutputManager::AddRunNode(const std::string &nodename)
 {
   saverunnodes.insert(nodename);
+  return 0;
+}
+
+int Fun4AllDstOutputManager::StripCompositeNode(const std::string &nodename)
+{
+  m_StripCompositeNodes.insert(nodename);
   return 0;
 }
 
@@ -115,6 +121,17 @@ int Fun4AllDstOutputManager::Write(PHCompositeNode *startNode)
   {
     Fun4AllServer *se = Fun4AllServer::instance();
     se->MakeNodesPersistent(startNode);
+    if (!m_StripCompositeNodes.empty())
+    {
+      for (const auto &compnodename : m_StripCompositeNodes)
+      {
+        PHCompositeNode *stripcomp = dynamic_cast<PHCompositeNode *>(nodeiter.findFirst("PHCompositeNode", compnodename));
+        if (stripcomp)
+        {
+          se->MakeNodesTransient(stripcomp);
+        }
+      }
+    }
     if (!stripnodes.empty())
     {
       for (const auto &nodename : stripnodes)
@@ -180,7 +197,6 @@ int Fun4AllDstOutputManager::Write(PHCompositeNode *startNode)
 
 int Fun4AllDstOutputManager::WriteNode(PHCompositeNode *thisNode)
 {
-  delete dstOut;
   if (!m_SaveRunNodeFlag)
   {
     dstOut = nullptr;
@@ -191,6 +207,27 @@ int Fun4AllDstOutputManager::WriteNode(PHCompositeNode *thisNode)
   {
     access_type = PHWrite;
   }
+  else
+  {
+    // This construct prevents a race condition:
+    // files are written every n events, Fun4All closes them and saves the run node but leaves it
+    // up to the DST Output Manager to open the next file on the first write.
+    // The last files is typically closed during the End() which then saves the Run Node. If
+    // the total number of events is a multiple of the number of requested events,
+    // no DST is open (since no events were processed since the last file was closed). Then the End()
+    // will open the last filename again and save the RunNode here. By checking if dstOut is not null
+    // we check if a DST is actually open, but only when m_SaveDstNodeFlag is set (meanes we save the
+    // event wise DST content
+    if (!dstOut)
+    {
+      if (Verbosity() > 0)
+      {
+        std::cout << PHWHERE << " DST file has not been written to yet, not saving the RunNode by itself" << std::endl;
+      }
+      return 0;
+    }
+  }
+  delete dstOut;
 
   if (UsedOutFileName().empty())
   {
@@ -215,6 +252,17 @@ int Fun4AllDstOutputManager::WriteNode(PHCompositeNode *thisNode)
   if (saverunnodes.empty())
   {
     se->MakeNodesPersistent(thisNode);
+    if (!m_StripCompositeNodes.empty())
+    {
+      for (const auto &compnodename : m_StripCompositeNodes)
+      {
+        PHCompositeNode *stripcomp = dynamic_cast<PHCompositeNode *>(nodeiter.findFirst("PHCompositeNode", compnodename));
+        if (stripcomp)
+        {
+          se->MakeNodesTransient(stripcomp);
+        }
+      }
+    }
     if (!striprunnodes.empty())
     {
       for (const auto &nodename : striprunnodes)
@@ -283,8 +331,7 @@ int Fun4AllDstOutputManager::outfile_open_first_write()
     {
       fullpath = p.parent_path();
     }
-    std::string runseg = (boost::format("-%08d-%05d") % runnumber % m_CurrentSegment).str();
-    //    std::string runseg = (boost::format(FileRule()) % runnumber % m_CurrentSegment).str();
+    std::string runseg = std::format("-{:08}-{:05}", runnumber, m_CurrentSegment);
     std::string newfile = fullpath + std::string("/") + m_FileNameStem + runseg + std::string(p.extension());
     OutFileName(newfile);
     m_CurrentSegment++;
@@ -309,4 +356,29 @@ int Fun4AllDstOutputManager::outfile_open_first_write()
 
   dstOut->SetCompressionSetting(m_CompressionSetting);
   return 0;
+}
+
+// this method figures out the last event number to be saved before rolling over
+// an integer div of the current event by the number of events gives the first event we can expect
+// in this process (this is not needed), then adding the number of events we want gives us the last event
+// since want ranges like 1-99999, 100,000 - 199,999 we need to subtract 1
+// from the calculated range.
+// This is just run for the first event - later we just add the number of events to the last event number
+void Fun4AllDstOutputManager::InitializeLastEvent(int eventnumber)
+{
+  if (GetEventNumberRollover() == 0 || m_LastEventInitialized || eventnumber < 0)
+  {
+    return;
+  }
+  m_LastEventInitialized = true;
+  unsigned int firstevent = eventnumber / GetEventNumberRollover();
+  unsigned int newlastevent = firstevent * GetEventNumberRollover() + GetEventNumberRollover() - 1;
+  if (Verbosity() > 1)
+  {
+    std::cout << "event number: " << eventnumber << ", rollover: " << GetEventNumberRollover() << ", multiple: "
+              << eventnumber / GetEventNumberRollover() << ", new last event number "
+              << newlastevent << std::endl;
+  }
+  SetLastEventNumber(firstevent * GetEventNumberRollover() + GetEventNumberRollover() - 1);
+  return;
 }

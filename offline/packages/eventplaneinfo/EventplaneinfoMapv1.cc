@@ -14,7 +14,7 @@ EventplaneinfoMapv1::~EventplaneinfoMapv1()
 void EventplaneinfoMapv1::identify(std::ostream& os) const
 {
   os << "EventplaneinfoMapv1: size = " << _map.size() << std::endl;
-  for (auto& m : _map)
+  for (const auto& m : _map)
   {
     m.second->identify(os);
   }
@@ -53,6 +53,12 @@ Eventplaneinfo* EventplaneinfoMapv1::get(unsigned int id)
 
 Eventplaneinfo* EventplaneinfoMapv1::insert(Eventplaneinfo* clus, const EventplaneinfoMap::EPTYPE id)
 {
-  auto ret = _map.insert(std::make_pair(id, clus));
-  return ret.first->second;
+  auto [iter, inserted] = _map.insert(std::make_pair(id, clus));
+  if (!inserted)
+  {
+    delete iter->second;
+    iter->second = clus;
+  }
+  return iter->second;
 }
+

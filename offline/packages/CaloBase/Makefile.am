@@ -31,6 +31,7 @@ libcalo_io_la_LIBADD = \
   -lphool
 
 pkginclude_HEADERS = \
+  PhotonClusterv1.h \
   RawClusterUtility.h \
   RawCluster.h \
   RawClusterv1.h \
@@ -48,6 +49,7 @@ pkginclude_HEADERS = \
   RawTowerGeomv2.h \
   RawTowerGeomv3.h \
   RawTowerGeomv4.h \
+  RawTowerGeomv5.h \
   RawTowerGeomContainer.h \
   RawTowerGeomContainerv1.h \
   RawTowerGeomContainer_Cylinderv1.h \
@@ -68,6 +70,7 @@ pkginclude_HEADERS = \
   TowerInfoContainerSimv2.h
 
 ROOTDICTS = \
+  PhotonClusterv1_Dict.cc \
   RawCluster_Dict.cc \
   RawClusterv1_Dict.cc \
   RawClusterContainer_Dict.cc \
@@ -82,6 +85,7 @@ ROOTDICTS = \
   RawTowerGeomv2_Dict.cc \
   RawTowerGeomv3_Dict.cc \
   RawTowerGeomv4_Dict.cc \
+  RawTowerGeomv5_Dict.cc \
   RawTowerGeomContainer_Dict.cc \
   RawTowerGeomContainerv1_Dict.cc \
   RawTowerGeomContainer_Cylinderv1_Dict.cc \
@@ -101,41 +105,12 @@ ROOTDICTS = \
   TowerInfoContainerSimv2_Dict.cc
 
 pcmdir = $(libdir)
-nobase_dist_pcm_DATA = \
-  RawCluster_Dict_rdict.pcm \
-  RawClusterv1_Dict_rdict.pcm \
-  RawClusterContainer_Dict_rdict.pcm \
-  RawTower_Dict_rdict.pcm \
-  RawTowerv1_Dict_rdict.pcm \
-  RawTowerv2_Dict_rdict.pcm \
-  RawTowerContainer_Dict_rdict.pcm \
-  RawTowerDeadMap_Dict_rdict.pcm \
-  RawTowerGeom_Dict_rdict.pcm \
-  RawTowerDeadMapv1_Dict_rdict.pcm \
-  RawTowerGeomv1_Dict_rdict.pcm \
-  RawTowerGeomv2_Dict_rdict.pcm \
-  RawTowerGeomv3_Dict_rdict.pcm \
-  RawTowerGeomv4_Dict_rdict.pcm \
-  RawTowerGeomContainer_Dict_rdict.pcm \
-  RawTowerGeomContainerv1_Dict_rdict.pcm \
-  RawTowerGeomContainer_Cylinderv1_Dict_rdict.pcm \
-  TowerInfo_Dict_rdict.pcm \
-  TowerInfov1_Dict_rdict.pcm \
-  TowerInfov2_Dict_rdict.pcm \
-  TowerInfov3_Dict_rdict.pcm \
-  TowerInfov4_Dict_rdict.pcm \
-  TowerInfoSimv1_Dict_rdict.pcm \
-  TowerInfoSimv2_Dict_rdict.pcm \
-  TowerInfoContainer_Dict_rdict.pcm \
-  TowerInfoContainerv1_Dict_rdict.pcm \
-  TowerInfoContainerv2_Dict_rdict.pcm \
-  TowerInfoContainerv3_Dict_rdict.pcm \
-  TowerInfoContainerv4_Dict_rdict.pcm \
-  TowerInfoContainerSimv1_Dict_rdict.pcm \
-  TowerInfoContainerSimv2_Dict_rdict.pcm
+# more elegant way to create pcm files (without listing them)
+nobase_dist_pcm_DATA = $(ROOTDICTS:.cc=_rdict.pcm)
 
 libcalo_io_la_SOURCES = \
   $(ROOTDICTS) \
+  PhotonClusterv1.cc \
   RawCluster.cc \
   RawClusterv1.cc \
   RawClusterContainer.cc \
@@ -150,6 +125,7 @@ libcalo_io_la_SOURCES = \
   RawTowerGeomv2.cc \
   RawTowerGeomv3.cc \
   RawTowerGeomv4.cc \
+  RawTowerGeomv5.cc \
   RawTowerGeomContainer.cc \
   RawTowerGeomContainerv1.cc \
   RawTowerGeomContainer_Cylinderv1.cc \

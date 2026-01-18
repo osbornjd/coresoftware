@@ -22,6 +22,7 @@ class Fun4AllDstOutputManager : public Fun4AllOutputManager
   Fun4AllDstOutputManager &operator=(Fun4AllDstOutputManager const &) = delete;
   int AddNode(const std::string &nodename) override;
   int AddRunNode(const std::string &nodename) override;
+  int StripCompositeNode(const std::string &nodename) override;
   int StripNode(const std::string &nodename) override;
   int StripRunNode(const std::string &nodename) override;
   void SaveRunNode(const int i) override { m_SaveRunNodeFlag = i; }
@@ -34,17 +35,20 @@ class Fun4AllDstOutputManager : public Fun4AllOutputManager
   int WriteNode(PHCompositeNode *thisNode) override;
   const std::string &UsedOutFileName() const { return m_UsedOutFileName; }
   void CompressionSetting(const int i) override { m_CompressionSetting = i; }
-
+  void InitializeLastEvent(int eventnumber) override;
+  
  private:
   int outfile_open_first_write();
   PHNodeIOManager *dstOut{nullptr};
   int m_SaveRunNodeFlag{1};
   int m_SaveDstNodeFlag{1};
   int m_CompressionSetting{505};
+  bool m_LastEventInitialized{false};
   std::string m_FileNameStem;
   std::string m_UsedOutFileName;
   std::set<std::string> savenodes;
   std::set<std::string> saverunnodes;
+  std::set<std::string> m_StripCompositeNodes;
   std::set<std::string> stripnodes;
   std::set<std::string> striprunnodes;
 };

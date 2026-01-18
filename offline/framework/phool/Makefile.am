@@ -71,7 +71,6 @@ pkginclude_HEADERS =  \
   PHFlag.h \
   PHIODataNode.h \
   PHIOManager.h \
-  PHLog.h \
   PHNode.h \
   PHNodeIOManager.h \
   PHNodeIntegrate.h \
@@ -89,11 +88,15 @@ pkginclude_HEADERS =  \
   PHTimeStamp.h \
   PHTypedNodeIterator.h \
   recoConsts.h \
+  RunnumberRange.h \
   sphenix_constants.h
 
 noinst_PROGRAMS = \
   testexternals_phool \
   testexternals_sph_onnx
+
+bin_PROGRAMS = \
+  onnxtest
 
 endif
 
@@ -114,7 +117,10 @@ libsph_onnx_la_LIBADD = \
 BUILT_SOURCES = \
   testexternals.cc
 
+onnxtest_SOURCES = onnxtest.cc
 
+onnxtest_LDADD = \
+  libsph_onnx.la
 
 testexternals_phool_SOURCES = testexternals.cc
 testexternals_sph_onnx_SOURCES = testexternals.cc

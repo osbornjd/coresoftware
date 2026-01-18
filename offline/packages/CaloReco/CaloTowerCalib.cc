@@ -2,7 +2,6 @@
 #include "CaloTowerDefs.h"
 
 #include <calobase/TowerInfo.h>  // for TowerInfo
-#include <calobase/TowerInfo.h>
 #include <calobase/TowerInfoContainer.h>
 #include <calobase/TowerInfoContainerv1.h>
 #include <calobase/TowerInfoContainerv2.h>
@@ -40,8 +39,6 @@ CaloTowerCalib::CaloTowerCalib(const std::string &name)
   , m_dettype(CaloTowerDefs::HCALOUT)
   , m_detector("HCALOUT")
   , m_DETECTOR(TowerInfoContainer::HCAL)
-  , m_fieldname("")
-  , m_runNumber(-1)
 {
   if (Verbosity() > 0)
   {
@@ -66,31 +63,50 @@ int CaloTowerCalib::InitRun(PHCompositeNode *topNode)
 {
   PHNodeIterator nodeIter(topNode);
 
-  EventHeader *evtHeader = findNode::getClass<EventHeader>(topNode, "EventHeader");
-
-  if (evtHeader)
-  {
-    m_runNumber = evtHeader->get_RunNumber();
-  }
-  else
-  {
-    m_runNumber = -1;
-  }
-
   if (m_dettype == CaloTowerDefs::CEMC)
   {
     m_detector = "CEMC";
     m_DETECTOR = TowerInfoContainer::EMCAL;
-    std::string default_time_independent_calib = "cemc_pi0_twrSlope_v1_default";
+  }
+  else if (m_dettype == CaloTowerDefs::HCALIN)
+  {
+    m_detector = "HCALIN";
+    m_DETECTOR = TowerInfoContainer::HCAL;
+  }
+  else if (m_dettype == CaloTowerDefs::HCALOUT)
+  {
+    m_detector = "HCALOUT";
+    m_DETECTOR = TowerInfoContainer::HCAL;
+  }
+  else if (m_dettype == CaloTowerDefs::ZDC)
+  {
+    m_detector = "ZDC";
+    m_DETECTOR = TowerInfoContainer::ZDC;
+  }
+  else if (m_dettype == CaloTowerDefs::SEPD)
+  {
+    m_detector = "SEPD";
+    m_DETECTOR = TowerInfoContainer::SEPD;
+  }
 
-    if (!m_overrideCalibName)
-    {
-      m_calibName = "cemc_pi0_twrSlope_v1";
-    }
-    if (!m_overrideFieldName)
-    {
-      m_fieldname = "Femc_datadriven_qm1_correction";
-    }
+  ///////////////////////////////////////
+  // energy calibration getting from CDB
+  std::string default_time_independent_calib = m_detector+"_calib_ADC_to_ETower_default"; 
+  if (!m_overrideCalibName)
+  {
+    m_calibName = m_detector+"_calib_ADC_to_ETower";
+  }
+  if (!m_overrideFieldName)
+  {
+    m_fieldname = m_detector+"_calib_ADC_to_ETower"; 
+  }
+
+  if (m_giveDirectURL)
+  {
+    cdbttree = new CDBTTree(m_directURL);
+  }
+  else
+  {
     std::string calibdir = CDBInterface::instance()->getUrl(m_calibName);
     if (!calibdir.empty())
     {
@@ -109,122 +125,12 @@ int CaloTowerCalib::InitRun(PHCompositeNode *topNode)
       std::cout << "CaloTowerCalib::::InitRun No specific file for " << m_calibName << " found, using default calib " << default_time_independent_calib << std::endl;
     }
   }
-  else if (m_dettype == CaloTowerDefs::HCALIN)
-  {
-    m_detector = "HCALIN";
-    m_DETECTOR = TowerInfoContainer::HCAL;
 
-    if (!m_overrideCalibName)
-    {
-      m_calibName = "ihcal_abscalib_cosmic";
-    }
-    if (!m_overrideFieldName)
-    {
-      m_fieldname = "ihcal_abscalib_mip";
-    }
-    std::string calibdir = CDBInterface::instance()->getUrl(m_calibName);
-    if (!calibdir.empty())
-    {
-      cdbttree = new CDBTTree(calibdir);
-    }
-    else
-    {
-      std::cout << "CaloTowerCalib::::InitRun No calibration file for domain " << m_calibName << " found" << std::endl;
-      exit(1);
-    }
-  }
-  else if (m_dettype == CaloTowerDefs::HCALOUT)
-  {
-    m_detector = "HCALOUT";
-    m_DETECTOR = TowerInfoContainer::HCAL;
-
-    if (!m_overrideCalibName)
-    {
-      // converts ADC (peak hieght) to energy deposited by a 
-      // minimum ionizing particle in both absorber and active volume. 
-      m_calibName = "HCALOUT_calib_ADC_to_ETower";
-    }
-    if (!m_overrideFieldName)
-    {
-      m_fieldname = "ohcal_abscalib_mip";
-    }
-    std::string calibdir = CDBInterface::instance()->getUrl(m_calibName);
-    if (!calibdir.empty())
-    {
-      cdbttree = new CDBTTree(calibdir);
-    }
-    else
-    {
-      m_calibName = "HCALOUT_calib_ADC_to_ETower_default";
-      calibdir = CDBInterface::instance()->getUrl(m_calibName);
-      if (!calibdir.empty())
-      {
-        cdbttree = new CDBTTree(calibdir);
-      }
-      else
-      {
-        std::cout << "CaloTowerCalib::::InitRun No calibration file for domain " << m_calibName << " found" << std::endl;
-        exit(1);
-      }
-    }
-  }
-  else if (m_dettype == CaloTowerDefs::ZDC)
-  {
-    m_detector = "ZDC";
-    m_DETECTOR = TowerInfoContainer::ZDC;
-
-    if (!m_overrideCalibName)
-    {
-      m_calibName = "data_driven_zdc_calib";
-    }
-    if (!m_overrideFieldName)
-    {
-      m_fieldname = "zdc_calib";
-    }
-    std::string calibdir = CDBInterface::instance()->getUrl(m_calibName);
-    if (!calibdir.empty())
-    {
-      cdbttree = new CDBTTree(calibdir);
-    }
-    else
-    {
-      std::cout << "CaloTowerCalib::::InitRun No calibration file for domain " << m_calibName << " found" << std::endl;
-      exit(1);
-    }
-  }
-
-  else if (m_dettype == CaloTowerDefs::SEPD)
-  {
-    m_detector = "SEPD";
-    m_DETECTOR = TowerInfoContainer::SEPD;
-    if (!m_overrideCalibName)
-    {
-      m_calibName = "noCalibYet";
-    }
-    if (!m_overrideFieldName)
-    {
-      m_fieldname = "noCalibYet";
-    }
-    std::string calibdir = CDBInterface::instance()->getUrl(m_calibName);
-    if (!calibdir.empty())
-    {
-      cdbttree = new CDBTTree(calibdir);
-    }
-    else
-    {
-      std::cout << "CaloTowerCalib::::InitRun No calibration file for domain " << m_calibName << " found" << std::endl;
-      exit(1);
-    }
-  }
-
-  if (m_giveDirectURL)
-  {
-    cdbttree = new CDBTTree(m_directURL);
-  }
+  //////////////////////////////////
   //time calibration getting the CDB
   m_calibName_time = m_detector + "_meanTime";
   m_fieldname_time = "time";
-  std::string calibdir = "";
+  std::string calibdir;
 
   if (m_giveDirectURL_time)
   {
@@ -253,7 +159,8 @@ int CaloTowerCalib::InitRun(PHCompositeNode *topNode)
     }
   }
 
-  //ZS cross calibration getting the CDB
+  ////////////////////////////////////
+  //Zero suppression cross calibration getting the CDB
   m_calibName_ZScrosscalib = m_detector + "_ZSCrossCalib";
   m_fieldname_ZScrosscalib = "ratio";
 
@@ -301,6 +208,7 @@ int CaloTowerCalib::InitRun(PHCompositeNode *topNode)
   try
   {
     CreateNodeTree(topNode);
+    LoadCalib(topNode);
   }
   catch (std::exception &e)
   {
@@ -314,6 +222,30 @@ int CaloTowerCalib::InitRun(PHCompositeNode *topNode)
   return Fun4AllReturnCodes::EVENT_OK;
 }
 
+void CaloTowerCalib::LoadCalib(PHCompositeNode *topNode)
+{
+  TowerInfoContainer *_raw_towers = findNode::getClass<TowerInfoContainer>(topNode, RawTowerNodeName);
+  unsigned int ntowers = _raw_towers->size();
+  m_cdbInfo_vec.resize(ntowers);
+
+  for (unsigned int channel = 0; channel < ntowers; channel++)
+  {
+    unsigned int key = _raw_towers->encode_key(channel);
+
+    m_cdbInfo_vec[channel].calibconst = cdbttree->GetFloatValue(key, m_fieldname);
+
+    if (m_doZScrosscalib)
+    {
+      m_cdbInfo_vec[channel].crosscalibconst = cdbttree_ZScrosscalib->GetFloatValue(key, m_fieldname_ZScrosscalib);
+    }
+
+    if(m_dotimecalib)
+    {
+      m_cdbInfo_vec[channel].meantime = cdbttree_time->GetFloatValue(key, m_fieldname_time);
+    }
+  }
+}
+
 //____________________________________________________________________________..
 int CaloTowerCalib::process_event(PHCompositeNode *topNode)
 {
@@ -323,16 +255,15 @@ int CaloTowerCalib::process_event(PHCompositeNode *topNode)
 
   for (unsigned int channel = 0; channel < ntowers; channel++)
   {
-    unsigned int key = _raw_towers->encode_key(channel);
     TowerInfo *caloinfo_raw = _raw_towers->get_tower_at_channel(channel);
     _calib_towers->get_tower_at_channel(channel)->copy_tower(caloinfo_raw);
     float raw_amplitude = caloinfo_raw->get_energy();
-    float calibconst = cdbttree->GetFloatValue(key, m_fieldname);
+    float calibconst = m_cdbInfo_vec[channel].calibconst;
     bool isZS = caloinfo_raw->get_isZS();
 
     if (isZS && m_doZScrosscalib)
     {
-      float crosscalibconst = cdbttree_ZScrosscalib->GetFloatValue(key, m_fieldname_ZScrosscalib);
+      float crosscalibconst = m_cdbInfo_vec[channel].crosscalibconst;
       if (crosscalibconst == 0) 
       { 
         crosscalibconst = 1; 
@@ -354,9 +285,9 @@ int CaloTowerCalib::process_event(PHCompositeNode *topNode)
       if(!isZS)
       {
       //I realized that there is no point to do timing calibration for the towerinfov1 object since the resolution is not enough...
-      float raw_time = caloinfo_raw->get_time_float();
-      float meantime = cdbttree_time->GetFloatValue(key, m_fieldname_time);
-      _calib_towers->get_tower_at_channel(channel)->set_time_float(raw_time - meantime);
+      float raw_time = caloinfo_raw->get_time();
+      float meantime = m_cdbInfo_vec[channel].meantime;
+      _calib_towers->get_tower_at_channel(channel)->set_time(raw_time - meantime);
       }
     }
   }

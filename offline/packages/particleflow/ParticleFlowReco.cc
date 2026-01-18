@@ -54,7 +54,7 @@ float ParticleFlowReco::calculate_dR(float eta1, float eta2, float phi1, float p
 std::pair<float, float> ParticleFlowReco::get_expected_signature(int trk)
 {
   float response = (0.553437 + 0.0572246 * log(_pflow_TRK_p[trk])) * _pflow_TRK_p[trk];
-  float resolution = sqrt(pow(0.119123, 2) + pow(0.312361, 2) / _pflow_TRK_p[trk]) * _pflow_TRK_p[trk];
+  float resolution = sqrt(pow(0.119123, 2) + (pow(0.312361, 2) / _pflow_TRK_p[trk])) * _pflow_TRK_p[trk];
 
   std::pair<float, float> expected_signature(response, resolution);
 
@@ -64,7 +64,6 @@ std::pair<float, float> ParticleFlowReco::get_expected_signature(int trk)
 //____________________________________________________________________________..
 ParticleFlowReco::ParticleFlowReco(const std::string &name)
   : SubsysReco(name)
-  , _energy_match_Nsigma(1.5)
 {
 }
 
@@ -176,12 +175,17 @@ int ParticleFlowReco::process_event(PHCompositeNode *topNode)
     {
       SvtxTrack *track = iter.second;
 
+      if(_only_crossing_zero && (track->get_crossing() != 0))
+      {
+        continue;
+      }
+
       if (track->get_pt() < 0.5)
       {
         continue;
       }
 
-      if (fabs(track->get_eta()) > 1.1)
+      if (std::fabs(track->get_eta()) > 1.1)
       {
         continue;
       }
@@ -207,8 +211,8 @@ int ParticleFlowReco::process_event(PHCompositeNode *topNode)
       /// phi and eta values at the point of closest approach
       if (cemcstate)
       {
-        _pflow_TRK_EMproj_phi.push_back(atan2(cemcstate->get_y(), cemcstate->get_x()));
-        _pflow_TRK_EMproj_eta.push_back(asinh(cemcstate->get_z() / sqrt(cemcstate->get_x() * cemcstate->get_x() + cemcstate->get_y() * cemcstate->get_y())));
+        _pflow_TRK_EMproj_phi.push_back(std::atan2(cemcstate->get_y(), cemcstate->get_x()));
+        _pflow_TRK_EMproj_eta.push_back(std::asinh(cemcstate->get_z() / std::sqrt((cemcstate->get_x() * cemcstate->get_x()) + (cemcstate->get_y() * cemcstate->get_y()))));
       }
       else
       {
@@ -217,8 +221,8 @@ int ParticleFlowReco::process_event(PHCompositeNode *topNode)
       }
       if (ohstate)
       {
-        _pflow_TRK_HADproj_phi.push_back(atan2(ohstate->get_y(), ohstate->get_x()));
-        _pflow_TRK_HADproj_eta.push_back(asinh(ohstate->get_z() / sqrt(ohstate->get_x() * ohstate->get_x() + ohstate->get_y() * ohstate->get_y())));
+        _pflow_TRK_HADproj_phi.push_back(std::atan2(ohstate->get_y(), ohstate->get_x()));
+        _pflow_TRK_HADproj_eta.push_back(std::asinh(ohstate->get_z() / std::sqrt((ohstate->get_x() * ohstate->get_x()) + (ohstate->get_y() * ohstate->get_y()))));
       }
       else
       {
@@ -242,7 +246,7 @@ int ParticleFlowReco::process_event(PHCompositeNode *topNode)
 
       float cluster_phi = hiter->second->get_phi();
       /// default assume at vx_z = 0
-      float cluster_theta = M_PI / 2.0 - atan2(hiter->second->get_z(), hiter->second->get_r());
+      float cluster_theta = M_PI / 2.0 - std::atan2(hiter->second->get_z(), hiter->second->get_r());
       float cluster_eta = -1 * log(tan(cluster_theta / 2.0));
 
       if (vertex)
@@ -303,7 +307,7 @@ int ParticleFlowReco::process_event(PHCompositeNode *topNode)
 
       float cluster_phi = hiter->second->get_phi();
       // for now, assume event at vx_z = 0
-      float cluster_theta = M_PI / 2.0 - atan2(hiter->second->get_z(), hiter->second->get_r());
+      float cluster_theta = M_PI / 2.0 - std::atan2(hiter->second->get_z(), hiter->second->get_r());
       float cluster_eta = -1 * log(tan(cluster_theta / 2.0));
       if (vertex)
       {
@@ -406,7 +410,7 @@ int ParticleFlowReco::process_event(PHCompositeNode *topNode)
           dphi += 2 * M_PI;
         }
 
-        if (fabs(deta) < 0.025 * 2.5 && fabs(dphi) < 0.025 * 2.5)
+        if (std::fabs(deta) < 0.025 * 2.5 && std::fabs(dphi) < 0.025 * 2.5)
         {
           has_overlap = true;
           break;
@@ -420,7 +424,7 @@ int ParticleFlowReco::process_event(PHCompositeNode *topNode)
           std::cout << " -> possible match to EM " << em << " with dR = " << dR << std::endl;
         }
 
-        _pflow_TRK_addtl_match_EM.at(trk).push_back(std::pair<int, float>(em, dR));
+        _pflow_TRK_addtl_match_EM.at(trk).emplace_back(em, dR);
       }
       else
       {
@@ -442,7 +446,7 @@ int ParticleFlowReco::process_event(PHCompositeNode *topNode)
       }
     }
 
-    if (_pflow_TRK_addtl_match_EM.at(trk).size() > 0)
+    if (!_pflow_TRK_addtl_match_EM.at(trk).empty())
     {
       min_em_index = _pflow_TRK_addtl_match_EM.at(trk).at(0).first;
       min_em_dR = _pflow_TRK_addtl_match_EM.at(trk).at(0).second;
@@ -502,7 +506,7 @@ int ParticleFlowReco::process_event(PHCompositeNode *topNode)
           dphi += 2 * M_PI;
         }
 
-        if (fabs(deta) < 0.1 * 1.5 && fabs(dphi) < 0.1 * 1.5)
+        if (std::fabs(deta) < 0.1 * 1.5 && std::fabs(dphi) < 0.1 * 1.5)
         {
           has_overlap = true;
           break;
@@ -595,7 +599,7 @@ int ParticleFlowReco::process_event(PHCompositeNode *topNode)
           dphi += 2 * M_PI;
         }
 
-        if (fabs(deta) < 0.1 * 1.5 && fabs(dphi) < 0.1 * 1.5)
+        if (std::fabs(deta) < 0.1 * 1.5 && std::fabs(dphi) < 0.1 * 1.5)
         {
           has_overlap = true;
           break;
@@ -700,7 +704,7 @@ int ParticleFlowReco::process_event(PHCompositeNode *topNode)
   for (unsigned int had = 0; had < _pflow_HAD_E.size(); had++)
   {
     // only consider HAD with matched tracks ... others we will deal with later
-    if (_pflow_HAD_match_TRK.at(had).size() == 0)
+    if (_pflow_HAD_match_TRK.at(had).empty())
     {
       continue;
     }
@@ -724,7 +728,7 @@ int ParticleFlowReco::process_event(PHCompositeNode *topNode)
     for (int em : _pflow_HAD_match_EM.at(had))
     {
       // ensure there is at least one track matched to this EM
-      if (_pflow_EM_match_TRK.at(em).size() == 0)
+      if (_pflow_EM_match_TRK.at(em).empty())
       {
         continue;
       }
@@ -786,7 +790,7 @@ int ParticleFlowReco::process_event(PHCompositeNode *topNode)
     // Track + E+HCal PF elements are created
 
     // process compatibility of fit
-    float total_expected_E_err = sqrt(total_expected_E_var);
+    float total_expected_E_err = std::sqrt(total_expected_E_var);
 
     if (Verbosity() > 5)
     {
@@ -854,7 +858,7 @@ int ParticleFlowReco::process_event(PHCompositeNode *topNode)
       // now add in additional EMs until there are none left or it is no longer the case that Sum pT > calo
 
       int n_EM_added = 0;
-      while (additional_EMs_vec.size() != 0 && total_expected_E > total_EMHAD_E)
+      while (!additional_EMs_vec.empty() && total_expected_E > total_EMHAD_E)
       {
         int new_EM = additional_EMs_vec.at(0).first;
 
@@ -941,11 +945,11 @@ int ParticleFlowReco::process_event(PHCompositeNode *topNode)
   for (unsigned int em = 0; em < _pflow_EM_E.size(); em++)
   {
     // only consider EM with matched tracks, but no matched HADs
-    if (_pflow_EM_match_HAD.at(em).size() != 0)
+    if (!_pflow_EM_match_HAD.at(em).empty())
     {
       continue;
     }
-    if (_pflow_EM_match_TRK.at(em).size() == 0)
+    if (_pflow_EM_match_TRK.at(em).empty())
     {
       continue;
     }
@@ -1013,7 +1017,7 @@ int ParticleFlowReco::process_event(PHCompositeNode *topNode)
     }
 
     // process compatibility of fit
-    float total_expected_E_err = sqrt(total_expected_E_var);
+    float total_expected_E_err = std::sqrt(total_expected_E_var);
 
     if (Verbosity() > 5)
     {
@@ -1074,7 +1078,7 @@ int ParticleFlowReco::process_event(PHCompositeNode *topNode)
   for (unsigned int em = 0; em < _pflow_EM_E.size(); em++)
   {
     // only consider EMs withOUT matched tracks ... we have dealt with the matched cases above
-    if (_pflow_EM_match_TRK.at(em).size() != 0)
+    if (!_pflow_EM_match_TRK.at(em).empty())
     {
       continue;
     }
@@ -1112,7 +1116,7 @@ int ParticleFlowReco::process_event(PHCompositeNode *topNode)
   for (unsigned int had = 0; had < _pflow_HAD_E.size(); had++)
   {
     // only consider HADs withOUT matched tracks ... we have dealt with the matched cases above
-    if (_pflow_HAD_match_TRK.at(had).size() != 0)
+    if (!_pflow_HAD_match_TRK.at(had).empty())
     {
       continue;
     }
@@ -1147,7 +1151,7 @@ int ParticleFlowReco::process_event(PHCompositeNode *topNode)
   for (unsigned int trk = 0; trk < _pflow_TRK_p.size(); trk++)
   {
     // only consider TRKs withOUT matched EM or HAD
-    if (_pflow_TRK_match_EM.at(trk).size() != 0 || _pflow_TRK_match_HAD.at(trk).size() != 0)
+    if (!_pflow_TRK_match_EM.at(trk).empty() || !_pflow_TRK_match_HAD.at(trk).empty())
     {
       continue;
     }

@@ -33,20 +33,6 @@ namespace MicromegasDefs
   };
 
   /*!
-   * hitsetkey layout:
-   * Micromegas specific lower 16 bits
-   * 24 - 32  tracker id
-   * 16 - 24  layer
-   * 8 - 16 segmentation type
-   * 0 - 8 tile id
-   */
-  static constexpr unsigned int kBitShiftSegmentation __attribute__((unused)) = 8;
-  static constexpr unsigned int kBitShiftTileId __attribute__((unused)) = 0;
-
-  //! bit shift for hit key
-  static constexpr unsigned int kBitShiftStrip __attribute__((unused)) = 0;
-
-  /*!
    * @brief Generate a hitsetkey for the micromegas
    * @param[in] layer Layer index
    * @param[in] tile tile index
@@ -74,11 +60,15 @@ namespace MicromegasDefs
   /*!
    * @brief Generate a hitkey from strip index inside tile
    * @param[in] strip strip index
+   * @param[in] sample sample index
    */
-  TrkrDefs::hitkey genHitKey(uint16_t strip );
+  TrkrDefs::hitkey genHitKey(uint16_t strip, uint16_t sample = 0 );
 
   //! get strip from hit key
-  uint16_t getStrip(TrkrDefs::hitkey);
+  uint8_t getStrip(TrkrDefs::hitkey);
+
+  //! get sample from hit key
+  uint16_t getSample(TrkrDefs::hitkey);
 
   /*!
    * @brief Get the segmentation type from cluster key

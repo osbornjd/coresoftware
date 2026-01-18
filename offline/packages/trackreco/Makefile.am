@@ -5,7 +5,6 @@ AUTOMAKE_OPTIONS = foreign
 
 # List of shared libraries to produce
 lib_LTLIBRARIES = \
-  libtrack_reco_io.la \
   libtrack_reco.la
 
 AM_CPPFLAGS = \
@@ -13,7 +12,8 @@ AM_CPPFLAGS = \
   -I$(includedir) \
   -isystem$(OFFLINE_MAIN)/include \
   -isystem${G4_MAIN}/include \
-  -isystem$(ROOTSYS)/include
+  -isystem$(ROOTSYS)/include \
+  -fopenmp
 
 AM_LDFLAGS = \
   -L$(libdir) \
@@ -42,8 +42,10 @@ pkginclude_HEADERS = \
   PHActsTrackProjection.h \
   PHActsTrackPropagator.h \
   PHCASeeding.h \
+  PHCASiliconSeeding.h \
   AzimuthalSeeder.h \
   PHCosmicsFilter.h \
+  PHLineLaserReco.h \
   PHCosmicsTrkFitter.h \
   PHCosmicSeeder.h \
   PHCosmicTrackMerger.h \
@@ -56,6 +58,7 @@ pkginclude_HEADERS = \
   PHSiliconTpcTrackMatching.h \
   PHSiliconCosmicSeeding.h \
   PHSimpleVertexFinder.h \
+  PHTrackPruner.h \
   PHTrackCleaner.h \
   PHTrackSelector.h \
   PHRaveVertexing.h \
@@ -76,10 +79,12 @@ pkginclude_HEADERS = \
   PHTruthSiliconAssociation.h \
   PHTruthVertexing.h \
   PrelimDistortionCorrection.h \
+  PrelimDistortionCorrectionAuAu.h \
   SecondaryVertexFinder.h \
   SvtxTrackStateRemoval.h \
   TrackingIterationCounter.h \
-  TpcSeedFilter.h
+  TpcSeedFilter.h \
+  WeightedFitter.h
 
 ROOTDICTS = \
   AssocInfoContainer_Dict.cc \
@@ -89,12 +94,6 @@ ROOTDICTS = \
   nobase_dist_pcm_DATA = \
   AssocInfoContainer_Dict_rdict.pcm \
   AssocInfoContainerv1_Dict_rdict.pcm
-
-libtrack_reco_io_la_SOURCES = \
-  $(ROOTDICTS) \
-  AssocInfoContainerv1.cc \
-  AssocInfoContainer.cc \
-  GPUTPCTrackParam.cxx
 
 ACTS_SOURCES = \
   ActsAlignmentStates.cc \
@@ -121,7 +120,6 @@ AM_CPPFLAGS += -I$(OFFLINE_MAIN)/include/ActsFatras
 ACTS_LIBS = \
   -lActsCore \
   -lActsPluginTGeo \
-  -lActsExamplesCommon \
   -lActsExamplesDetectorTGeo \
   -lActsExamplesFramework
 
@@ -131,8 +129,11 @@ libtrack_reco_la_SOURCES = \
   DSTClusterPruning.cc \
   PH3DVertexing.cc \
   PHCASeeding.cc \
+  PHCASiliconSeeding.cc \
   AzimuthalSeeder.cc \
+  GPUTPCTrackParam.cxx \
   PHCosmicsFilter.cc \
+  PHLineLaserReco.cc \
   PHCosmicSeedCombiner.cc \
   PHCosmicSeeder.cc \
   PHCosmicTrackMerger.cc \
@@ -151,6 +152,7 @@ libtrack_reco_la_SOURCES = \
   PHStreakFinder.cc \
   PHTpcClusterMover.cc \
   PHTpcDeltaZCorrection.cc \
+  PHTrackPruner.cc \
   PHTrackCleaner.cc \
   PHTrackClusterAssociator.cc \
   PHTrackSeeding.cc \
@@ -163,17 +165,18 @@ libtrack_reco_la_SOURCES = \
   PHTruthVertexing.cc \
   PHTruthSiliconAssociation.cc \
   PrelimDistortionCorrection.cc \
+  PrelimDistortionCorrectionAuAu.cc \
   SecondaryVertexFinder.cc \
   SvtxTrackStateRemoval.cc \
   TrackingIterationCounter.cc \
-  TpcSeedFilter.cc
-
-libtrack_reco_io_la_LIBADD = \
-  -lphool
+  TpcSeedFilter.cc \
+  WeightedFitter.cc
 
 libtrack_reco_la_LIBADD = \
-  libtrack_reco_io.la \
-  $(ACTS_LIBS) \
+  -lActsCore \
+  -lActsPluginTGeo \
+  -lActsExamplesDetectorTGeo \
+  -lActsExamplesFramework \
   -lcalo_io \
   -lg4eval \
   -lg4testbench \
@@ -214,15 +217,11 @@ BUILT_SOURCES = \
   testexternals.cc
 
 noinst_PROGRAMS = \
-  testexternals_track_reco \
-  testexternals_track_reco_io
+  testexternals_track_reco
 
 
 testexternals_track_reco_SOURCES = testexternals.cc
 testexternals_track_reco_LDADD = libtrack_reco.la
-
-testexternals_track_reco_io_SOURCES = testexternals.cc
-testexternals_track_reco_io_LDADD = libtrack_reco_io.la
 
 testexternals.cc:
 	echo "//*** this is a generated file. Do not commit, do not edit" > $@

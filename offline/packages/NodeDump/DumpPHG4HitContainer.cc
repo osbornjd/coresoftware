@@ -22,13 +22,14 @@ DumpPHG4HitContainer::DumpPHG4HitContainer(const std::string &NodeName)
 int DumpPHG4HitContainer::process_Node(PHNode *myNode)
 {
   PHG4HitContainer *phg4hitcontainer = nullptr;
-  MyNode_t *thisNode = static_cast<MyNode_t *>(myNode);
+  MyNode_t *thisNode = static_cast<MyNode_t *>(myNode);  // NOLINT(cppcoreguidelines-pro-type-static-cast-downcast)
   if (thisNode)
   {
     phg4hitcontainer = thisNode->getData();
   }
   if (phg4hitcontainer)
   {
+    (*fout).precision(std::numeric_limits<float>::max_digits10);
     PHG4HitContainer::ConstIterator hiter;
     PHG4HitContainer::ConstRange hit_begin_end = phg4hitcontainer->getHits();
     *fout << "size: " << phg4hitcontainer->size() << std::endl;

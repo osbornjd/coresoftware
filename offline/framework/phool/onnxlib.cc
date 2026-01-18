@@ -2,14 +2,33 @@
 
 #include <iostream>
 
-// --------------------------------------------------
-Ort::Session *onnxSession(std::string &modelfile)
+namespace onnxlib
+{
+  int n_input {-1};
+  int n_output {-1};
+}  // namespace onnxlib
+
+Ort::Session *onnxSession(std::string &modelfile, int verbosity)
 {
   Ort::Env env(OrtLoggingLevel::ORT_LOGGING_LEVEL_WARNING, "fit");
   Ort::SessionOptions sessionOptions;
   sessionOptions.SetGraphOptimizationLevel(GraphOptimizationLevel::ORT_ENABLE_EXTENDED);
-
-  return new Ort::Session(env, modelfile.c_str(), sessionOptions);
+  auto *session = new Ort::Session(env, modelfile.c_str(), sessionOptions);
+  auto type_info = session->GetInputTypeInfo(0);
+  auto tensor_info = type_info.GetTensorTypeAndShapeInfo();
+  auto input_dims = tensor_info.GetShape();
+  onnxlib::n_input = input_dims[1];
+  type_info = session->GetOutputTypeInfo(0);
+  tensor_info = type_info.GetTensorTypeAndShapeInfo();
+  auto output_dims = tensor_info.GetShape();
+  onnxlib::n_output = output_dims[1];
+  if (verbosity > 0)
+  {
+    std::cout << "onnxlib: using model " << modelfile << std::endl;
+    std::cout << "Number of Inputs: " << onnxlib::n_input << std::endl;
+    std::cout << "Number of Outputs: " << onnxlib::n_output << std::endl;
+  }
+  return session;
 }
 
 std::vector<float> onnxInference(Ort::Session *session, std::vector<float> &input, int N, int Nsamp, int Nreturn)
@@ -31,11 +50,43 @@ std::vector<float> onnxInference(Ort::Session *session, std::vector<float> &inpu
   inputTensors.push_back(Ort::Value::CreateTensor<float>(memoryInfo, input.data(), inputlen, inputDimsN.data(), inputDimsN.size()));
   outputTensors.push_back(Ort::Value::CreateTensor<float>(memoryInfo, outputTensorValuesN.data(), outputlen, outputDimsN.data(), outputDimsN.size()));
 
+#if ORT_API_VERSION == 12
   std::vector<const char *> inputNames{session->GetInputName(0, allocator)};
   std::vector<const char *> outputNames{session->GetOutputName(0, allocator)};
+#elif ORT_API_VERSION == 22
+  std::vector<const char *> inputNames;
+  std::vector<const char *> outputNames;
 
+  char *name{nullptr};
+  for (const std::string &s : session->GetInputNames())
+  {
+    name = new char[s.size() + 1];
+    sprintf(name, "%s", s.c_str()); //NOLINT(hicpp-vararg)
+    inputNames.push_back(name);
+  }
+  for (const std::string &s : session->GetOutputNames())
+  {
+    name = new char[s.size() + 1];
+    sprintf(name, "%s", s.c_str()); //NOLINT(hicpp-vararg)
+    outputNames.push_back(name);
+  }
+#else
+#define XSTR(x) STR(x)
+#define STR(x) #x
+#pragma message "ORT_API_VERSION " XSTR(ORT_API_VERSION) " not implemented"
+#endif
   session->Run(Ort::RunOptions{nullptr}, inputNames.data(), inputTensors.data(), 1, outputNames.data(), outputTensors.data(), 1);
 
+#if ORT_API_VERSION == 22
+  for (const auto *iter : inputNames)
+  {
+    delete[] iter;
+  }
+  for (const auto *iter : outputNames)
+  {
+    delete[] iter;
+  }
+#endif
   return outputTensorValuesN;
 }
 
@@ -60,8 +111,41 @@ std::vector<float> onnxInference(Ort::Session *session, std::vector<float> &inpu
 
   outputTensors.push_back(Ort::Value::CreateTensor<float>(memoryInfo, outputTensorValues.data(), outputlen, outputDimsN.data(), outputDimsN.size()));
 
+#if ORT_API_VERSION == 12
   std::vector<const char *> inputNames{session->GetInputName(0, allocator)};
   std::vector<const char *> outputNames{session->GetOutputName(0, allocator)};
+#elif ORT_API_VERSION == 22
+  std::vector<const char *> inputNames;
+  std::vector<const char *> outputNames;
+  char *name{nullptr};
+  for (const std::string &s : session->GetInputNames())
+  {
+    name = new char[s.size() + 1];
+    sprintf(name, "%s", s.c_str()); //NOLINT(hicpp-vararg)
+    inputNames.push_back(name);
+  }
+  for (const std::string &s : session->GetOutputNames())
+  {
+    name = new char[s.size() + 1];
+    sprintf(name, "%s", s.c_str()); //NOLINT(hicpp-vararg)
+    outputNames.push_back(name);
+  }
+#else
+#define XSTR(x) STR(x)
+#define STR(x) #x
+#pragma message "ORT_API_VERSION " XSTR(ORT_API_VERSION) " not implemented"
+#endif
   session->Run(Ort::RunOptions{nullptr}, inputNames.data(), inputTensors.data(), 1, outputNames.data(), outputTensors.data(), 1);
+#if ORT_API_VERSION == 22
+  for (const auto *iter : inputNames)
+  {
+    delete[] iter;
+  }
+  for (const auto *iter : outputNames)
+  {
+    delete[] iter;
+  }
+#endif
+
   return outputTensorValues;
 }

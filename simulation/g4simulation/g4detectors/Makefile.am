@@ -94,9 +94,13 @@ pkginclude_HEADERS = \
   PHG4SectorSubsystem.h \
   PHG4SpacalSubsystem.h \
   PHG4SpacalSteppingAction.h \
+  PHG4sPHENIXMagnetSubsystem.h \
   PHG4StepStatusDecode.h \
   PHG4TpcCylinderGeom.h \
   PHG4TpcCylinderGeomContainer.h \
+  PHG4TpcGeom.h \
+  PHG4TpcGeomv1.h \
+  PHG4TpcGeomContainer.h \
   PHG4ZDCDefs.h \
   PHG4ZDCSubsystem.h
 
@@ -130,7 +134,10 @@ ROOTDICTS = \
   PHG4ScintillatorSlatv1_Dict.cc \
   PHG4ScintillatorSlatContainer_Dict.cc \
   PHG4TpcCylinderGeom_Dict.cc \
-  PHG4TpcCylinderGeomContainer_Dict.cc 
+  PHG4TpcCylinderGeomContainer_Dict.cc \
+  PHG4TpcGeom_Dict.cc \
+  PHG4TpcGeomv1_Dict.cc \
+  PHG4TpcGeomContainer_Dict.cc 
 
 pcmdir = $(libdir)
 # more elegant way to create pcm files (without listing them)
@@ -167,8 +174,10 @@ libg4detectors_io_la_SOURCES = \
   PHG4ScintillatorSlatv1.cc \
   PHG4ScintillatorSlatContainer.cc \
   PHG4TpcCylinderGeom.cc \
-  PHG4TpcCylinderGeomContainer.cc 
-
+  PHG4TpcCylinderGeomContainer.cc \
+  PHG4TpcGeom.cc \
+  PHG4TpcGeomv1.cc \
+  PHG4TpcGeomContainer.cc 
 
 libg4detectors_la_SOURCES = \
   BeamLineMagnetDetector.cc \
@@ -237,6 +246,10 @@ libg4detectors_la_SOURCES = \
   PHG4SpacalDisplayAction.cc \
   PHG4SpacalSteppingAction.cc \
   PHG4SpacalSubsystem.cc \
+  PHG4sPHENIXMagnetDetector.cc \
+  PHG4sPHENIXMagnetDisplayAction.cc \
+  PHG4sPHENIXMagnetSteppingAction.cc \
+  PHG4sPHENIXMagnetSubsystem.cc \
   PHG4StepStatusDecode.cc \
   PHG4TrackStatusDecode.cc \
   PHG4ZDCDetector.cc \

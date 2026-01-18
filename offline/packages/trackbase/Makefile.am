@@ -33,8 +33,8 @@ AM_CPPFLAGS = \
 AM_LDFLAGS = \
   -L$(libdir) \
   -L$(OFFLINE_MAIN)/lib \
-  -L$(ROOTSYS)/lib \
-  -L$(OFFLINE_MAIN)/lib64
+  -L$(OFFLINE_MAIN)/lib64 \
+  -L$(ROOTSYS)/lib
 
 
 pkginclude_HEADERS = \
@@ -47,6 +47,7 @@ pkginclude_HEADERS = \
   ActsTrackingGeometry.h \
   alignmentTransformationContainer.h \
   AlignmentTransformation.h \
+  CommonOptions.h \
   CMFlashCluster.h \
   CMFlashClusterContainer.h \
   CMFlashClusterContainerv1.h \
@@ -61,6 +62,7 @@ pkginclude_HEADERS = \
   ClusHitsVerbose.h \
   ClusHitsVerbosev1.h \
   ClusterErrorPara.h \
+  IBaseDetector.h \
   InttDefs.h \
   InttEventInfo.h \
   InttEventInfov1.h \
@@ -68,6 +70,9 @@ pkginclude_HEADERS = \
   LaserClusterContainer.h \
   LaserClusterContainerv1.h \
   LaserClusterv1.h \
+  LaserClusterv2.h \
+  MagneticFieldOptions.h \
+  MaterialWiper.h \
   MvtxDefs.h \
   MvtxEventInfo.h \
   MvtxEventInfov1.h \
@@ -83,6 +88,7 @@ pkginclude_HEADERS = \
   ResidualOutlierFinder.h \
   SpacePoint.h \
   sPHENIXActsDetectorElement.h \
+  TGeoDetectorWithOptions.h \
   TpcDefs.h \
   TpcSeedTrackMap.h \
   TpcSeedTrackMapv1.h \
@@ -145,6 +151,7 @@ ROOTDICTS = \
   LaserClusterContainerv1_Dict.cc \
   LaserCluster_Dict.cc \
   LaserClusterv1_Dict.cc \
+  LaserClusterv2_Dict.cc \
   MvtxEventInfo_Dict.cc \
   MvtxEventInfov1_Dict.cc \
   MvtxEventInfov2_Dict.cc \
@@ -208,7 +215,10 @@ libtrack_la_SOURCES = \
   alignmentTransformationContainer.cc \
   Calibrator.cc \
   ClusterErrorPara.cc \
+  CommonOptions.cc \
+  MagneticFieldOptions.cc \
   sPHENIXActsDetectorElement.cc \
+  TGeoDetectorWithOptions.cc \
   TrackFittingAlgorithmFunctionsGsf.cc \
   TrackFittingAlgorithmFunctionsKalman.cc \
   TrackFitUtils.cc
@@ -229,6 +239,7 @@ libtrack_io_la_SOURCES = \
   InttEventInfov1.cc \
   LaserClusterContainerv1.cc \
   LaserClusterv1.cc \
+  LaserClusterv2.cc \
   MvtxDefs.cc \
   MvtxEventInfo.cc \
   MvtxEventInfov1.cc \
@@ -281,8 +292,11 @@ libtrack_io_la_SOURCES = \
 libtrack_la_LIBADD = \
   libtrack_io.la \
   -lActsCore \
+  -lActsExamplesMagneticField \
   -lActsPluginTGeo \
-  -lffamodules
+  -lActsExamplesDetectorTGeo \
+  -lffamodules \
+  -lboost_program_options
 
 libtrack_io_la_LIBADD = \
   -lphool \

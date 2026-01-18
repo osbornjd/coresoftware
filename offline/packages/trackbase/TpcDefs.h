@@ -25,29 +25,14 @@ namespace TpcDefs
 
   //! in memory representation of TPC ADC data: 10bit ADC value as 16bit signed integer.
   // This is signed to allow pedestal subtraction when needed
-  typedef int16_t ADCDataType;
+  using ADCDataType = int16_t;
 
   //! in memory representation of BCO clock using standard 64bit sPHENIX time stamp precision
-  typedef uint64_t BCODataType;
-
-  // hitsetkey layout:
-  //  Tpc specific lower 16 bits
-  //   24 - 32  tracker id
-  //   16 - 24  layer
-  //   8  - 16  sector id
-  //   0  -  8  side
-  static const unsigned int kBitShiftSectorId __attribute__((unused)) = 8;
-  static const unsigned int kBitShiftSide __attribute__((unused)) = 0;
-
-  // bit shift for hitkey
-  //  16 - 32 pad id
-  //  0  - 16 time bin
-  static const unsigned int kBitShiftPad __attribute__((unused)) = 16;
-  static const unsigned int kBitShiftTBin __attribute__((unused)) = 0;
+  using BCODataType = uint64_t;
 
   // max values for pad and time bin
-  static const uint16_t MAXPAD __attribute__((unused)) = 1024;
-  static const uint16_t MAXTBIN __attribute__((unused)) = 512;
+  static constexpr uint16_t MAXPAD __attribute__((unused)) = 1024;
+  static constexpr uint16_t MAXTBIN __attribute__((unused)) = 512;
 
   /**
    * @brief Get the sector id from hitsetkey
@@ -110,6 +95,18 @@ namespace TpcDefs
    * implicitly and used in the function.
    */
   TrkrDefs::hitsetkey genHitSetKey(const uint8_t lyr, const uint8_t sector, const uint8_t side);
+
+    /**
+   * @brief Generate a hitsetkey for a tpc module
+   * @param[in] region index (0, 1, 2)
+   * @param[in] sector Sector index
+   * @param[in] side Side index
+   * @param[out] hitsetkey
+   *
+   * Generate a hitsetkey for the tpc. The tracker id is known
+   * implicitly and used in the function.
+   */
+  TrkrDefs::hitsetkey genModuleHitSetKey(const uint8_t region, const uint8_t sector, const uint8_t side);
 
   /**
    * @brief Generate a cluster key from indeces

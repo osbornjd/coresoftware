@@ -7,14 +7,12 @@
 
 #include <string>
 
-class PHCompositeNode;
-
 class FlagHandler : public SubsysReco
 {
  public:
   FlagHandler(const std::string &name = "FlagHandler");
 
-  ~FlagHandler() override {}
+  ~FlagHandler() override = default;
 
   /** Create the Flag Node if it does not exist,
       if it exists, read back flags and copy them into recoConsts
@@ -25,6 +23,8 @@ class FlagHandler : public SubsysReco
   int End(PHCompositeNode *topNode) override;
 
   void Print(const std::string &what = "ALL") const override;
+
+  int UpdateRunNode(PHCompositeNode *topNode) override;
 
  private:
 };

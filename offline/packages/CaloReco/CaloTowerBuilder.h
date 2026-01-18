@@ -1,7 +1,7 @@
 // Tell emacs that this is a C++ source
 //  -*- C++ -*-.
-#ifndef CALOTOWERBUILDER_H
-#define CALOTOWERBUILDER_H
+#ifndef CALORECO_CALOTOWERBUILDER_H
+#define CALORECO_CALOTOWERBUILDER_H
 
 #include "CaloTowerDefs.h"
 #include "CaloWaveformProcessing.h"
@@ -29,8 +29,7 @@ class CaloTowerBuilder : public SubsysReco
 
   void CreateNodeTree(PHCompositeNode *topNode);
 
-  int process_data(PHCompositeNode *topNode, std::vector<std::vector<float>> &wv);
-  
+  int process_data(PHCompositeNode *topNode, std::vector<std::vector<float>> &waveforms);
 
   void set_detector_type(CaloTowerDefs::DetectorSystem dettype)
   {
@@ -82,7 +81,7 @@ class CaloTowerBuilder : public SubsysReco
   {
     m_UseOfflinePacketFlag = f;
   }
-  void set_timeFitLim(float low,float high)
+  void set_timeFitLim(float low, float high)
   {
     m_setTimeLim = true;
     m_timeLim_low = low;
@@ -108,20 +107,24 @@ class CaloTowerBuilder : public SubsysReco
     return;
   }
 
+  CaloWaveformProcessing *get_WaveformProcessing() { return WaveformProcessing; }
+
  private:
   int process_sim();
   bool skipChannel(int ich, int pid);
-  bool isSZS(float time, float chi2);
+  static bool isSZS(float time, float chi2);
   CaloWaveformProcessing *WaveformProcessing{nullptr};
   TowerInfoContainer *m_CaloInfoContainer{nullptr};      //! Calo info
   TowerInfoContainer *m_CalowaveformContainer{nullptr};  // waveform from simulation
   CDBTTree *cdbttree = nullptr;
+  CDBTTree *cdbttree_sepd_map = nullptr;
   CDBTTree *cdbttree_tbt_zs = nullptr;
 
   bool m_isdata{true};
   bool m_bdosoftwarezerosuppression{false};
   bool m_UseOfflinePacketFlag{false};
   bool m_dotbtszs{false};
+  bool m_PacketNodesFlag{false};
   int m_packet_low{std::numeric_limits<int>::min()};
   int m_packet_high{std::numeric_limits<int>::min()};
   int m_nsamples{16};
@@ -141,14 +144,12 @@ class CaloTowerBuilder : public SubsysReco
   bool m_dobitfliprecovery{false};
 
   int m_saturation{16383};
-
+  std::string calibdir;
   std::string m_fieldname;
   std::string m_calibName;
   std::string m_directURL;
   std::string m_zsURL;
   std::string m_zs_fieldname{"zs_threshold"};
-
-
 };
 
 #endif  // CALOTOWERBUILDER_H

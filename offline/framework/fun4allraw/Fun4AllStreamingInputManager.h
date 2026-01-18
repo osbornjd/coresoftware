@@ -21,6 +21,8 @@ class PHCompositeNode;
 class SyncObject;
 class TpcRawHit;
 class TH1;
+class TH2;
+
 class Fun4AllStreamingInputManager : public Fun4AllInputManager
 {
  public:
@@ -52,13 +54,13 @@ class Fun4AllStreamingInputManager : public Fun4AllInputManager
   void AddMvtxRawHit(uint64_t bclk, MvtxRawHit *hit);
   void AddTpcRawHit(uint64_t bclk, TpcRawHit *hit);
   void SetInttBcoRange(const unsigned int i);
-  void SetInttNegativeBco(const unsigned int value);
+  void SetInttNegativeBco(const unsigned int i);
   void SetMicromegasBcoRange(const unsigned int i);
-  void SetMicromegasNegativeBco(const unsigned int value);
+  void SetMicromegasNegativeBco(const unsigned int i);
   void SetMvtxBcoRange(const unsigned int i);
-  void SetMvtxNegativeBco(const unsigned int value);
+  void SetMvtxNegativeBco(const unsigned int i);
   void SetTpcBcoRange(const unsigned int i);
-  void SetTpcNegativeBco(const unsigned int value);
+  void SetTpcNegativeBco(const unsigned int i);
   int FillInttPool();
   int FillMicromegasPool();
   int FillMvtxPool();
@@ -138,7 +140,7 @@ class Fun4AllStreamingInputManager : public Fun4AllInputManager
   std::map<int, std::map<int, uint64_t>> m_InttPacketFeeBcoMap;
 
   // QA histos
-  TH1 *h_refbco_mvtx{nullptr};
+  TH1 *h_refbco_mvtx[12]{nullptr};
   TH1 *h_taggedAllFelixes_mvtx{nullptr};
   TH1 *h_taggedAllFelixesAllFees_mvtx{nullptr};
   TH1 *h_tagBcoFelix_mvtx[12]{nullptr};
@@ -147,18 +149,16 @@ class Fun4AllStreamingInputManager : public Fun4AllInputManager
   TH1 *h_bcoLL1Strobediff[12]{nullptr};
   TH1 *h_tagStBcoFelix_mvtx[12]{nullptr};
   TH1 *h_tagBcoFelixAllFees_mvtx[12]{nullptr};
-  TH1 *h_tagStBcoFEE_mvtx{nullptr};
+  TH1 *h_tagStBcoFEE_mvtx[12]{nullptr};
+  TH1 *h_tagL1BcoFEE_mvtx[12]{nullptr};
 
-  TH1 *h_refbco_intt{nullptr};
+  TH1 *h_refbco_intt[8]{nullptr};
   TH1 *h_taggedAll_intt{nullptr};
   TH1 *h_taggedAllFee_intt{nullptr};
   TH1 *h_gl1tagged_intt[8]{nullptr};
   TH1 *h_taggedAllFees_intt[8]{nullptr};
   TH1 *h_gl1taggedfee_intt[8][14]{{nullptr}};
-
-  TH1 *h_gl1tagged_tpc[24][2]{{nullptr}};
-  TH1 *h_refbco_tpc{nullptr};
-  TH1 *h_taggedAll_tpc{nullptr};
+  TH2 *h_bcodiff_intt[8]{nullptr};
 };
 
 #endif /* FUN4ALL_FUN4ALLSTREAMINGINPUTMANAGER_H */

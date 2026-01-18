@@ -8,8 +8,8 @@
 #include <trackbase/TrkrHitSetContainerv1.h>
 #include <trackbase/TrkrHitv2.h>
 
-#include <g4detectors/PHG4TpcCylinderGeom.h>
-#include <g4detectors/PHG4TpcCylinderGeomContainer.h>
+#include <g4detectors/PHG4TpcGeom.h>
+#include <g4detectors/PHG4TpcGeomContainer.h>
 
 #include <ffarawobjects/TpcRawHit.h>
 #include <ffarawobjects/TpcRawHitContainer.h>
@@ -34,6 +34,7 @@
 #include <TNtuple.h>
 #include <TSystem.h>
 
+#include <algorithm>
 #include <cmath>
 #include <cstdint>   // for exit
 #include <cstdlib>   // for exit
@@ -208,11 +209,11 @@ int TpcCombinedRawDataUnpackerDebug::process_event(PHCompositeNode* topNode)
     exit(1);
   }
 
-  PHG4TpcCylinderGeomContainer* geom_container =
-      findNode::getClass<PHG4TpcCylinderGeomContainer>(topNode, "CYLINDERCELLGEOM_SVTX");
+  PHG4TpcGeomContainer* geom_container =
+      findNode::getClass<PHG4TpcGeomContainer>(topNode, "TPCGEOMCONTAINER");
   if (!geom_container)
   {
-    std::cout << PHWHERE << "ERROR: Can't find node CYLINDERCELLGEOM_SVTX" << std::endl;
+    std::cout << PHWHERE << "ERROR: Can't find node TPCGEOMCONTAINER" << std::endl;
     return Fun4AllReturnCodes::ABORTRUN;
   }
 
@@ -234,14 +235,8 @@ int TpcCombinedRawDataUnpackerDebug::process_event(PHCompositeNode* topNode)
     TpcRawHit* tpchit = tpccont->get_hit(i);
     uint64_t gtm_bco = tpchit->get_gtm_bco();
 
-    if (gtm_bco < bco_min)
-    {
-      bco_min = gtm_bco;
-    }
-    if (gtm_bco > bco_max)
-    {
-      bco_max = gtm_bco;
-    }
+    bco_min = std::min(gtm_bco, bco_min);
+    bco_max = std::max(gtm_bco, bco_max);
 
     int fee = tpchit->get_fee();
     int channel = tpchit->get_channel();
@@ -278,9 +273,9 @@ int TpcCombinedRawDataUnpackerDebug::process_event(PHCompositeNode* topNode)
     uint16_t sam = tpchit->get_samples();
     max_time_range = sam;
     varname = "phi";  // + std::to_string(key);
-    double phi = -1 * pow(-1, side) * m_cdbttree->GetDoubleValue(key, varname) + (sector % 12) * M_PI / 6;
-    PHG4TpcCylinderGeom* layergeom = geom_container->GetLayerCellGeom(layer);
-    unsigned int phibin = layergeom->get_phibin(phi);
+    double phi = -1 * pow(-1, side) * m_cdbttree->GetDoubleValue(key, varname) - M_PI/2. + (sector % 12) * M_PI / 6;
+    PHG4TpcGeom* layergeom = geom_container->GetLayerCellGeom(layer);
+    unsigned int phibin = layergeom->get_phibin(phi, side);
     if (m_writeTree)
     {
       float fX[12];
@@ -539,7 +534,7 @@ int TpcCombinedRawDataUnpackerDebug::process_event(PHCompositeNode* topNode)
 
         for (int binx = 1; binx < hist2d->GetNbinsX(); binx++)
         {
-          double timebin = ((TAxis*) hist2d->GetXaxis())->GetBinCenter(binx);
+          double timebin = ( hist2d->GetXaxis())->GetBinCenter(binx);
           std::string histname1d = "h" + std::to_string(hiter.first) + "_" + std::to_string((int) timebin);
           TH1D* hist1d = hist2d->ProjectionY(histname1d.c_str(), binx, binx);
           float local_ped = 0;
@@ -697,11 +692,8 @@ int TpcCombinedRawDataUnpackerDebug::process_event(PHCompositeNode* topNode)
           if ((float(adc) - pedestal_offset - corr) > (hpedwidth2 * m_ped_sig_cut))
           {
             float nuadc = (float(adc) - corr - pedestal_offset);
-            if (nuadc < 0)
-            {
-              nuadc = 0;
-            }
-            hitr->second->setAdc(float(nuadc));
+            nuadc = std::max<float>(nuadc, 0);
+            hitr->second->setAdc(nuadc);
 #ifdef DEBUG
             //	    hitr->second->setAdc(10);
             if (tbin == 383 && layer >= 7 + 32 && fee == 21)

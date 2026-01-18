@@ -8,11 +8,14 @@
 
 #include <iostream>
 #include <limits>
+#include <vector>
 
 class RawTowerGeom : public PHObject
 {
  public:
-  ~RawTowerGeom() override {}
+  ~RawTowerGeom() override = default;
+
+  RawTowerGeom(const RawTowerGeom& /*geom*/) = default;;
 
   void identify(std::ostream& os = std::cout) const override;
 
@@ -72,6 +75,21 @@ class RawTowerGeom : public PHObject
     return;
   }
 
+  virtual void set_vertices(const std::vector<double>&)
+  {
+    PHOOL_VIRTUAL_WARN("set_vertices()");
+    return;
+  }
+
+  virtual void compute_vertices(const std::vector<std::pair<double, double>>&,
+                                const std::pair<double, double>&,
+                                const double&,
+                                const double&)
+  {
+    PHOOL_VIRTUAL_WARN("compute_vertices()");
+    return;
+  }
+
   virtual void set_size_x(double)
   {
     PHOOL_VIRTUAL_WARN("set_size_x()");
@@ -93,67 +111,193 @@ class RawTowerGeom : public PHObject
   virtual double get_center_x() const
   {
     PHOOL_VIRTUAL_WARN("get_center_x()");
-    return std::numeric_limits<float>::signaling_NaN();
+    return std::numeric_limits<float>::quiet_NaN();
   }
 
   virtual double get_center_y() const
   {
     PHOOL_VIRTUAL_WARN("get_center_y()");
-    return std::numeric_limits<float>::signaling_NaN();
+    return std::numeric_limits<float>::quiet_NaN();
   }
 
   virtual double get_center_z() const
   {
     PHOOL_VIRTUAL_WARN("get_center_z()");
-    return std::numeric_limits<float>::signaling_NaN();
+    return std::numeric_limits<float>::quiet_NaN();
+  }
+
+  virtual double get_center_int_x() const
+  {
+    PHOOL_VIRTUAL_WARN("get_center_int_x()");
+    return std::numeric_limits<float>::quiet_NaN();
+  }
+
+  virtual double get_center_int_y() const
+  {
+    PHOOL_VIRTUAL_WARN("get_center_int_y()");
+    return std::numeric_limits<float>::quiet_NaN();
+  }
+
+  virtual double get_center_int_z() const
+  {
+    PHOOL_VIRTUAL_WARN("get_center_int_z()");
+    return std::numeric_limits<float>::quiet_NaN();
+  }
+
+  virtual double get_center_ext_x() const
+  {
+    PHOOL_VIRTUAL_WARN("get_center_ext_x()");
+    return std::numeric_limits<float>::quiet_NaN();
+  }
+
+  virtual double get_center_ext_y() const
+  {
+    PHOOL_VIRTUAL_WARN("get_center_ext_y()");
+    return std::numeric_limits<float>::quiet_NaN();
+  }
+
+  virtual double get_center_ext_z() const
+  {
+    PHOOL_VIRTUAL_WARN("get_center_ext_z()");
+    return std::numeric_limits<float>::quiet_NaN();
+  }
+
+  virtual double get_center_low_eta_x() const
+  {
+    PHOOL_VIRTUAL_WARN("get_center_low_eta_x()");
+    return std::numeric_limits<float>::quiet_NaN();
+  }
+
+  virtual double get_center_low_eta_y() const
+  {
+    PHOOL_VIRTUAL_WARN("get_center_low_eta_y()");
+    return std::numeric_limits<float>::quiet_NaN();
+  }
+
+  virtual double get_center_low_eta_z() const
+  {
+    PHOOL_VIRTUAL_WARN("get_center_low_eta_z()");
+    return std::numeric_limits<float>::quiet_NaN();
+  }
+
+  virtual double get_center_high_eta_x() const
+  {
+    PHOOL_VIRTUAL_WARN("get_center_high_eta_x()");
+    return std::numeric_limits<float>::quiet_NaN();
+  }
+
+  virtual double get_center_high_eta_y() const
+  {
+    PHOOL_VIRTUAL_WARN("get_center_high_eta_y()");
+    return std::numeric_limits<float>::quiet_NaN();
+  }
+
+  virtual double get_center_high_eta_z() const
+  {
+    PHOOL_VIRTUAL_WARN("get_center_high_eta_z()");
+    return std::numeric_limits<float>::quiet_NaN();
+  }
+
+  virtual double get_center_low_phi_x() const
+  {
+    PHOOL_VIRTUAL_WARN("get_center_low_phi_x()");
+    return std::numeric_limits<float>::quiet_NaN();
+  }
+
+  virtual double get_center_low_phi_y() const
+  {
+    PHOOL_VIRTUAL_WARN("get_center_low_phi_y()");
+    return std::numeric_limits<float>::quiet_NaN();
+  }
+
+  virtual double get_center_low_phi_z() const
+  {
+    PHOOL_VIRTUAL_WARN("get_center_low_phi_z()");
+    return std::numeric_limits<float>::quiet_NaN();
+  }
+
+  virtual double get_center_high_phi_x() const
+  {
+    PHOOL_VIRTUAL_WARN("get_center_high_phi_x()");
+    return std::numeric_limits<float>::quiet_NaN();
+  }
+
+  virtual double get_center_high_phi_y() const
+  {
+    PHOOL_VIRTUAL_WARN("get_center_high_phi_y()");
+    return std::numeric_limits<float>::quiet_NaN();
+  }
+
+  virtual double get_center_high_phi_z() const
+  {
+    PHOOL_VIRTUAL_WARN("get_center_high_phi_z()");
+    return std::numeric_limits<float>::quiet_NaN();
+  }
+
+  virtual double get_vertex_x(int) const
+  {
+    PHOOL_VIRTUAL_WARN("get_vertex_x()");
+    return std::numeric_limits<float>::quiet_NaN();
+  }
+
+  virtual double get_vertex_y(int) const
+  {
+    PHOOL_VIRTUAL_WARN("get_vertex_y()");
+    return std::numeric_limits<float>::quiet_NaN();
+  }
+
+  virtual double get_vertex_z(int) const
+  {
+    PHOOL_VIRTUAL_WARN("get_vertex_z()");
+    return std::numeric_limits<float>::quiet_NaN();
   }
 
   virtual double get_size_x() const
   {
     PHOOL_VIRTUAL_WARN("get_size_x()");
-    return std::numeric_limits<float>::signaling_NaN();
+    return std::numeric_limits<float>::quiet_NaN();
   }
 
   virtual double get_size_y() const
   {
     PHOOL_VIRTUAL_WARN("get_size_y()");
-    return std::numeric_limits<float>::signaling_NaN();
+    return std::numeric_limits<float>::quiet_NaN();
   }
 
   virtual double get_size_z() const
   {
     PHOOL_VIRTUAL_WARN("get_size_z()");
-    return std::numeric_limits<float>::signaling_NaN();
+    return std::numeric_limits<float>::quiet_NaN();
   }
 
   virtual double get_volume() const
   {
     PHOOL_VIRTUAL_WARN("get_volume()");
-    return std::numeric_limits<float>::signaling_NaN();
+    return std::numeric_limits<float>::quiet_NaN();
   }
 
   virtual double get_center_radius() const
   {
     PHOOL_VIRTUAL_WARN("get_center_radius()");
-    return std::numeric_limits<float>::signaling_NaN();
+    return std::numeric_limits<float>::quiet_NaN();
   }
 
   virtual double get_eta() const
   {
     PHOOL_VIRTUAL_WARN("get_eta()");
-    return std::numeric_limits<float>::signaling_NaN();
+    return std::numeric_limits<float>::quiet_NaN();
   }
 
   virtual double get_theta() const
   {
     PHOOL_VIRTUAL_WARN("get_theta()");
-    return std::numeric_limits<float>::signaling_NaN();
+    return std::numeric_limits<float>::quiet_NaN();
   }
 
   virtual double get_phi() const
   {
     PHOOL_VIRTUAL_WARN("get_phi()");
-    return std::numeric_limits<float>::signaling_NaN();
+    return std::numeric_limits<float>::quiet_NaN();
   }
 
   virtual void set_tower_type(int)
@@ -167,17 +311,27 @@ class RawTowerGeom : public PHObject
     return -1;
   }
 
+  virtual double get_rotx() const
+  {
+    PHOOL_VIRTUAL_WARN("get_rotx()");
+    return std::numeric_limits<float>::quiet_NaN();
+  }
   virtual double get_roty() const
   {
     PHOOL_VIRTUAL_WARN("get_roty()");
-    return std::numeric_limits<float>::signaling_NaN();
+    return std::numeric_limits<float>::quiet_NaN();
   }
   virtual double get_rotz() const
   {
     PHOOL_VIRTUAL_WARN("get_rotz()");
-    return std::numeric_limits<float>::signaling_NaN();
+    return std::numeric_limits<float>::quiet_NaN();
   }
 
+  virtual void set_rotx(double)
+  {
+    PHOOL_VIRTUAL_WARN("set_rotx()");
+    return;
+  }
   virtual void set_roty(double)
   {
     PHOOL_VIRTUAL_WARN("set_roty()");
@@ -190,7 +344,7 @@ class RawTowerGeom : public PHObject
   }
 
  protected:
-  RawTowerGeom() {}
+  RawTowerGeom() = default;
 
   ClassDefOverride(RawTowerGeom, 2)
 };

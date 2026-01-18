@@ -8,8 +8,8 @@
 
 #include "TpcSpaceChargeMatrixContainerv1.h"
 
-#include <g4detectors/PHG4TpcCylinderGeom.h>
-#include <g4detectors/PHG4TpcCylinderGeomContainer.h>
+#include <g4detectors/PHG4TpcGeom.h>
+#include <g4detectors/PHG4TpcGeomContainer.h>
 
 #include <trackbase/ActsTrackingGeometry.h>
 #include <trackbase/TpcDefs.h>
@@ -31,9 +31,10 @@
 #include <TNtuple.h>
 #include <TVector3.h>
 
-#include <boost/format.hpp>
-
+#include <algorithm>
 #include <cassert>
+#include <cmath>
+#include <format>
 
 namespace
 {
@@ -47,8 +48,8 @@ namespace
       : m_range(range)
     {
     }
-    inline const typename T::first_type& begin() { return m_range.first; }
-    inline const typename T::second_type& end() { return m_range.second; }
+    const typename T::first_type& begin() { return m_range.first; }
+    const typename T::second_type& end() { return m_range.second; }
 
    private:
     T m_range;
@@ -56,14 +57,14 @@ namespace
 
   //! convenience square method
   template <class T>
-  inline constexpr T square(const T& x)
+  constexpr T square(const T& x)
   {
     return x * x;
   }
 
   //! get radius from x and y
   template <class T>
-  inline constexpr T get_r(const T& x, const T& y)
+  constexpr T get_r(const T& x, const T& y)
   {
     return std::sqrt(square(x) + square(y));
   }
@@ -110,34 +111,28 @@ namespace
 
   /// calculate delta_phi between -pi and pi
   template <class T>
-  inline constexpr T delta_phi(const T& phi)
+  constexpr T delta_phi(const T& phi)
   {
     if (phi >= M_PI)
     {
       return phi - 2 * M_PI;
     }
-    else if (phi < -M_PI)
+    if (phi < -M_PI)
     {
       return phi + 2 * M_PI;
     }
-    else
-    {
-      return phi;
-    }
+
+    return phi;
   }
 
   // phi range
-  static constexpr float m_phimin = 0;
-  static constexpr float m_phimax = 2. * M_PI;
+  constexpr float m_phimin = 0;
+  constexpr float m_phimax = 2. * M_PI;
 
   // TODO: could try to get the r and z range from TPC geometry
   // r range
-  static constexpr float m_rmin = 20;
-  static constexpr float m_rmax = 78;
-
-  // z range
-  static constexpr float m_zmin = -105.5;
-  static constexpr float m_zmax = 105.5;
+  constexpr float m_rmin = 20;
+  constexpr float m_rmax = 78;
 
 }  // namespace
 
@@ -199,6 +194,9 @@ int TpcDirectLaserReconstruction::process_event(PHCompositeNode* topNode)
   {
     return res;
   }
+
+  m_zmax = m_tGeometry->get_max_driftlength() + m_tGeometry->get_CM_halfwidth();
+  m_zmin = -m_zmax;
 
   process_tracks();
   return Fun4AllReturnCodes::EVENT_OK;
@@ -276,7 +274,7 @@ void TpcDirectLaserReconstruction::set_grid_dimensions(int phibins, int rbins, i
 //_____________________________________________________________________
 int TpcDirectLaserReconstruction::load_nodes(PHCompositeNode* topNode)
 {
-  m_geom_container = findNode::getClass<PHG4TpcCylinderGeomContainer>(topNode, "CYLINDERCELLGEOM_SVTX");
+  m_geom_container = findNode::getClass<PHG4TpcGeomContainer>(topNode, "TPCGEOMCONTAINER");
   assert(m_geom_container);
 
   // acts geometry
@@ -428,8 +426,8 @@ void TpcDirectLaserReconstruction::create_histograms()
   std::string GEM_bin_label;
   for (int GEMhistiter = 0; GEMhistiter < 8; GEMhistiter++)
   {  // (pos z) laser 1 {0,60}, laser 2 {60,0}, laser 3 {0,-60}, laser 4 {-60,0}, (neg z) laser 5 {0,60}, laser 2 {60,0}, laser 3 {0,-60}, laser 4 {-60,0}
-//    sprintf(GEM_bin_label, "laser %i", GEMhistiter + 1);
-    GEM_bin_label = (boost::format("laser %i") %(GEMhistiter + 1)).str();
+     //    sprintf(GEM_bin_label, "laser %i", GEMhistiter + 1);
+    GEM_bin_label = std::format("laser {}", (GEMhistiter + 1));
     h_GEMs_hit->GetXaxis()->SetBinLabel(GEMhistiter + 1, GEM_bin_label.c_str());
     h_layers_hit->GetXaxis()->SetBinLabel(GEMhistiter + 1, GEM_bin_label.c_str());
   }
@@ -541,9 +539,9 @@ void TpcDirectLaserReconstruction::process_track(SvtxTrack* track)
     const TrkrDefs::hitsetkey& hitsetkey = hitsetitr->first;
     const int side = TpcDefs::getSide(hitsetkey);
 
-    auto hitset = hitsetitr->second;
+    auto* hitset = hitsetitr->second;
     const unsigned int layer = TrkrDefs::getLayer(hitsetkey);
-    const auto layergeom = m_geom_container->GetLayerCellGeom(layer);
+    auto* const layergeom = m_geom_container->GetLayerCellGeom(layer);
     const auto layer_center_radius = layergeom->get_radius();
 
     // maximum drift time.
@@ -563,7 +561,7 @@ void TpcDirectLaserReconstruction::process_track(SvtxTrack* track)
       const unsigned short phibin = TpcDefs::getPad(hitr->first);
       const unsigned short zbin = TpcDefs::getTBin(hitr->first);
 
-      const double phi = layergeom->get_phicenter(phibin);
+      const double phi = layergeom->get_phicenter(phibin, side);
       const double x = layer_center_radius * cos(phi);
       const double y = layer_center_radius * sin(phi);
 
@@ -585,10 +583,7 @@ void TpcDirectLaserReconstruction::process_track(SvtxTrack* track)
                   h_hits->Fill(x,y,z,adc);
                 }
       */
-      if (adc > max_adc)
-      {
-        max_adc = adc;
-      }
+      max_adc = std::max(adc, max_adc);
 
       // calculate dca
       // origin is track origin, direction is track direction
@@ -779,7 +774,7 @@ void TpcDirectLaserReconstruction::process_track(SvtxTrack* track)
       cluspos_map.insert(std::make_pair(layer, cluspos_pair));
       layer_bin_set.insert(layer);
     }  // end looping over hits
-  }    // end looping over hitset
+  }  // end looping over hitset
 
   h_adc_sum->Fill(sum_adc_truth);
   h_num_sum->Fill(sum_n_hits_truth);
@@ -795,7 +790,9 @@ void TpcDirectLaserReconstruction::process_track(SvtxTrack* track)
   }
 
   int maxbin;
-  int deltheta_max, delphi_max, dummy_z;
+  int deltheta_max;
+  int delphi_max;
+  int dummy_z;
 
   float theta_reco = 0;
   float phi_reco = 0;
@@ -1033,9 +1030,9 @@ void TpcDirectLaserReconstruction::process_track(SvtxTrack* track)
     const TrkrDefs::hitsetkey& hitsetkey_2 = hitsetitr->first;
     const int side_2 = TpcDefs::getSide(hitsetkey_2);
 
-    auto hitset_2 = hitsetitr->second;
+    auto* hitset_2 = hitsetitr->second;
     const unsigned int layer_2 = TrkrDefs::getLayer(hitsetkey_2);
-    const auto layergeom_2 = m_geom_container->GetLayerCellGeom(layer_2);
+    auto* const layergeom_2 = m_geom_container->GetLayerCellGeom(layer_2);
     const auto layer_center_radius_2 = layergeom_2->get_radius();
 
     // maximum drift time.
@@ -1052,7 +1049,7 @@ void TpcDirectLaserReconstruction::process_track(SvtxTrack* track)
       const unsigned short phibin_2 = TpcDefs::getPad(hitr->first);
       const unsigned short zbin_2 = TpcDefs::getTBin(hitr->first);
 
-      const double phi_2 = layergeom_2->get_phicenter(phibin_2);
+      const double phi_2 = layergeom_2->get_phicenter(phibin_2, side_2);
       const double x_2 = layer_center_radius_2 * cos(phi_2);
       const double y_2 = layer_center_radius_2 * sin(phi_2);
 
@@ -1094,7 +1091,7 @@ void TpcDirectLaserReconstruction::process_track(SvtxTrack* track)
               }
       */
     }  // end loop over hits again
-  }    // end loop over hitset again
+  }  // end loop over hitset again
 
   h_adc_sum_reco->Fill(sum_adc_reco);
   h_num_sum_reco->Fill(sum_n_hits_reco);
@@ -1142,7 +1139,7 @@ void TpcDirectLaserReconstruction::process_track(SvtxTrack* track)
 
   for (auto layer : layer_bin_set)
   {
-    PHG4TpcCylinderGeom* layergeom = m_geom_container->GetLayerCellGeom(layer);
+    PHG4TpcGeom* layergeom = m_geom_container->GetLayerCellGeom(layer);
     const auto layer_center_radius = layergeom->get_radius();
     const auto layer_inner_radius = layer_center_radius - layergeom->get_thickness() / 2.0;
     const auto layer_outer_radius = layer_center_radius + layergeom->get_thickness() / 2.0;
@@ -1227,14 +1224,8 @@ void TpcDirectLaserReconstruction::process_track(SvtxTrack* track)
       clus_centroid += cluspos * adc;
       wt += adc;
 
-      if (cluspos.z() < zmin)
-      {
-        zmin = cluspos.z();
-      }
-      if (cluspos.z() > zmax)
-      {
-        zmax = cluspos.z();
-      }
+      zmin = std::min(cluspos.z(), zmin);
+      zmax = std::max(cluspos.z(), zmax);
     }
 
     clus_centroid.SetX(clus_centroid.x() / wt);
@@ -1642,7 +1633,7 @@ float TpcDirectLaserReconstruction::GetRelPhi(float xorig, float yorig, float x,
 
   float dx = x - xorig;
   float dy = y - yorig;
-  float relphi = atan2(dy, dx) - phiorig;
+  float relphi = std::atan2(dy, dx) - phiorig;
   if (relphi < 0)
   {
     relphi += 2. * M_PI;
@@ -1693,12 +1684,12 @@ float TpcDirectLaserReconstruction::GetRelTheta(float xorig, float yorig, float 
   float dx = x - xorig;
   float dy = y - yorig;
   float dz = z - zorig;
-  float r = sqrt(dx * dx + dy * dy + dz * dz);
+  float r = std::sqrt(dx * dx + dy * dy + dz * dz);
 
-  float cos_beta = (dx * cos(phiorig) + dy * sin(phiorig)) / r;
+  float cos_beta = (dx * std::cos(phiorig) + dy * std::sin(phiorig)) / r;
   float sin_beta = dz / r;
 
-  float reltheta = acos(cos_beta * cos(thetaorig) + sin_beta * sin(thetaorig)) - M_PI / 2.;
+  float reltheta = std::acos(cos_beta * std::cos(thetaorig) + sin_beta * std::sin(thetaorig)) - M_PI / 2.;
   if (reltheta < 0)
   {
     reltheta += 2. * M_PI;

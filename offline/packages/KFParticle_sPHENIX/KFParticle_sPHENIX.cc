@@ -115,6 +115,11 @@ int KFParticle_sPHENIX::Init(PHCompositeNode *topNode)
     triggeranalyzer = new TriggerAnalyzer();
   }
 
+  if (m_use_PID)
+  {
+    init_dEdx_fits();
+  }
+
   return returnCode;
 }
 
@@ -143,7 +148,7 @@ int KFParticle_sPHENIX::process_event(PHCompositeNode *topNode)
     {
       std::cout << "KFParticle: Event skipped as there are no tracks" << std::endl;
     }
-    return Fun4AllReturnCodes::ABORTEVENT;
+    return Fun4AllReturnCodes::EVENT_OK;
   }
 
   if (!m_use_fake_pv)
@@ -157,7 +162,7 @@ int KFParticle_sPHENIX::process_event(PHCompositeNode *topNode)
         {
           std::cout << "KFParticle: Event skipped as there are no vertices" << std::endl;
         }
-        return Fun4AllReturnCodes::ABORTEVENT;
+        return Fun4AllReturnCodes::EVENT_OK;
       }
     }
     else
@@ -169,10 +174,9 @@ int KFParticle_sPHENIX::process_event(PHCompositeNode *topNode)
         {
           std::cout << "KFParticle: Event skipped as there are no vertices" << std::endl;
         }
-        return Fun4AllReturnCodes::ABORTEVENT;
+        return Fun4AllReturnCodes::EVENT_OK;
       }
     }
-
   }
   
   createDecay(topNode, mother, vertex_kfparticle, daughters, intermediates, nPVs);
@@ -201,11 +205,11 @@ int KFParticle_sPHENIX::process_event(PHCompositeNode *topNode)
 
       if (m_save_output)
       {
-        fillBranch(topNode, mother[i], vertex_kfparticle[i], daughters[i], intermediates[i], nPVs, multiplicity);
+        fillBranch(topNode, mother[i], vertex_kfparticle[i], daughters[i], intermediates[i]);
       }
       if (m_save_dst)
       {
-        fillParticleNode(topNode, mother[i], daughters[i], intermediates[i]);
+        fillParticleNode(topNode, mother[i], vertex_kfparticle[i], daughters[i], intermediates[i]);
       }
 
       if (Verbosity() >= VERBOSITY_SOME)

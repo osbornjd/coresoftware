@@ -16,21 +16,6 @@ AM_LDFLAGS = \
   -L$(ROOTSYS)/lib \
   -L$(OPT_SPHENIX)/lib
 
-if USE_ONLINE
-
-lib_LTLIBRARIES = \
-  libintt.la
-
-pkginclude_HEADERS = \
-  InttFelixMap.h \
-  InttMapping.h
-
-libintt_la_SOURCES = \
-  InttFelixMap.cc \
-  InttMapping.cc
-
-else
-
 lib_LTLIBRARIES = \
   libintt_io.la \
   libintt.la
@@ -44,9 +29,7 @@ pkginclude_HEADERS = \
   InttClusterizer.h \
   InttCombinedRawDataDecoder.h \
   InttDacMap.h \
-  InttFeeMap.h \
   InttFelixMap.h \
-  InttMap.h \
   InttMapping.h \
   InttOdbcQuery.h \
   InttSurveyMap.h \
@@ -70,12 +53,8 @@ ROOTDICTS = \
   InttVertexv1_Dict.cc
 
 pcmdir = $(libdir)
-nobase_dist_pcm_DATA = \
-  CylinderGeomIntt_Dict_rdict.pcm \
-  InttVertexMap_Dict_rdict.pcm \
-  InttVertexMapv1_Dict_rdict.pcm \
-  InttVertex_Dict_rdict.pcm \
-  InttVertexv1_Dict_rdict.pcm
+# more elegant way to create pcm files (without listing them)
+nobase_dist_pcm_DATA = $(ROOTDICTS:.cc=_rdict.pcm)
 
 # sources for intt library
 libintt_la_SOURCES = \
@@ -86,11 +65,9 @@ libintt_la_SOURCES = \
   InttClusterizer.cc \
   InttCombinedRawDataDecoder.cc \
   InttDacMap.cc \
-  InttFeeMap.cc \
   InttFelixMap.cc \
   InttMapping.cc \
   InttOdbcQuery.cc \
-  InttMap.cc \
   InttSurveyMap.cc \
   InttVertexUtil.cc \
   InttXYVertexFinder.cc \
@@ -103,6 +80,7 @@ libintt_la_LIBADD = \
   -lActsCore \
   -lcdbobjects \
   -lCLHEP \
+  -lffamodules \
   -lffarawobjects \
   -lodbc++ \
   -lphg4hit \
@@ -122,8 +100,6 @@ libintt_io_la_LIBADD = \
   -lg4detectors_io \
   -lphool \
   -lglobalvertex_io
-
-endif
 
 # Rule for generating table CINT dictionaries.
 %_Dict.cc: %.h %LinkDef.h

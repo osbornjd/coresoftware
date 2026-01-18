@@ -5,6 +5,8 @@
 
 #include "Fun4AllInputManager.h"
 
+#include <phool/PHNodeIOManager.h>
+
 #include <map>
 #include <string>
 
@@ -24,6 +26,7 @@ class Fun4AllDstInputManager : public Fun4AllInputManager
   int SyncIt(const SyncObject *mastersync) override;
   int BranchSelect(const std::string &branch, const int iflag) override;
   int setBranches() override;
+  void CacheSize(uint64_t size) { m_IManager->CacheSize(size); }
   virtual int setSyncBranches(PHNodeIOManager *iman);
   void Print(const std::string &what = "ALL") const override;
   int PushBackEvents(const int i) override;
@@ -44,20 +47,20 @@ class Fun4AllDstInputManager : public Fun4AllInputManager
   std::string fullfilename;
 
  private:
-  PHCompositeNode *dstNode {nullptr};
-  PHCompositeNode *m_RunNode {nullptr};
-  PHCompositeNode *m_RunNodeCopy {nullptr};
-  PHCompositeNode *m_RunNodeSum {nullptr};
-  PHNodeIOManager *m_IManager {nullptr};
-  SyncObject *syncobject {nullptr};
-  int m_ReadRunTTree {1};
-  int events_total {0};
-  int events_thisfile {0};
-  int events_skipped_during_sync {0};
-  int m_HaveSyncObject {0};
+  PHCompositeNode *dstNode{nullptr};
+  PHCompositeNode *m_RunNode{nullptr};
+  PHCompositeNode *m_RunNodeCopy{nullptr};
+  PHCompositeNode *m_RunNodeSum{nullptr};
+  PHNodeIOManager *m_IManager{nullptr};
+  SyncObject *syncobject{nullptr};
+  int m_ReadRunTTree{1};
+  int events_total{0};
+  int events_thisfile{0};
+  int events_skipped_during_sync{0};
+  int m_HaveSyncObject{0};
   std::map<const std::string, int> branchread;
   std::string syncbranchname;
-  std::string RunNode {"RUN"};
+  std::string RunNode{"RUN"};
 };
 
 #endif /* __FUN4ALLDSTINPUTMANAGER_H__ */

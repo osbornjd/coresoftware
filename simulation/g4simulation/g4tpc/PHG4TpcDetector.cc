@@ -3,14 +3,18 @@
 #include "PHG4TpcDisplayAction.h"
 
 #include <g4detectors/PHG4CellDefs.h>
-#include <g4detectors/PHG4TpcCylinderGeom.h>
-#include <g4detectors/PHG4TpcCylinderGeomContainer.h>
+#include <g4detectors/PHG4TpcGeomv1.h>
+#include <g4detectors/PHG4TpcGeomContainer.h>
 
 #include <phparameter/PHParameters.h>
 
 #include <g4main/PHG4Detector.h>       // for PHG4Detector
 #include <g4main/PHG4DisplayAction.h>  // for PHG4DisplayAction
 #include <g4main/PHG4Subsystem.h>
+
+#include <cdbobjects/CDBTTree.h>
+
+#include <ffamodules/CDBInterface.h>
 
 #include <phool/PHCompositeNode.h>
 #include <phool/PHIODataNode.h>
@@ -54,20 +58,25 @@ PHG4TpcDetector::PHG4TpcDetector(PHG4Subsystem *subsys, PHCompositeNode *Node, P
   , m_OuterCageRadius(m_Params->get_double_param("gas_outer_radius") * cm + m_Params->get_double_param("cage_layer_9_thickness") * cm + m_Params->get_double_param("cage_layer_8_thickness") * cm + m_Params->get_double_param("cage_layer_7_thickness") * cm + m_Params->get_double_param("cage_layer_6_thickness") * cm + m_Params->get_double_param("cage_layer_5_thickness") * cm + m_Params->get_double_param("cage_layer_4_thickness") * cm + m_Params->get_double_param("cage_layer_3_thickness") * cm + m_Params->get_double_param("cage_layer_2_thickness") * cm + m_Params->get_double_param("cage_layer_1_thickness") * cm)
 {
 }
-
+//_______________________________________________________________
+PHG4TpcDetector::~PHG4TpcDetector()
+{
+  delete m_cdbttree;
+  delete m_G4UserLimits;
+}
 //_______________________________________________________________
 int PHG4TpcDetector::IsInTpc(G4VPhysicalVolume *volume) const
 {
   if (m_ActiveFlag)
   {
-    if (m_ActiveVolumeSet.find(volume) != m_ActiveVolumeSet.end())
+    if (m_ActiveVolumeSet.contains(volume))
     {
       return 1;
     }
   }
   if (m_AbsorberActiveFlag)
   {
-    if (m_AbsorberVolumeSet.find(volume) != m_AbsorberVolumeSet.end())
+    if (m_AbsorberVolumeSet.contains(volume))
     {
       return -1;
     }
@@ -91,7 +100,7 @@ void PHG4TpcDetector::ConstructMe(G4LogicalVolume *logicWorld)
   // 9th layer cu
 
   double steplimits = m_Params->get_double_param("steplimits") * cm;
-  if (std::isfinite(steplimits))
+  if (std::isfinite(steplimits) && steplimits > 0)
   {
     m_G4UserLimits = new G4UserLimits(steplimits);
   }
@@ -120,7 +129,8 @@ void PHG4TpcDetector::ConstructMe(G4LogicalVolume *logicWorld)
 void PHG4TpcDetector::CreateTpcGasMixture()
 {
   G4double density;
-  G4int ncomponents, natoms;
+  G4int ncomponents;
+  G4int natoms;
 
   G4double tpcGasTemperature = (273.15 + m_Params->get_double_param("TPC_gas_temperature")) * kelvin;
   G4double tpcGasPressure = m_Params->get_double_param("TPC_gas_pressure") * atmosphere;
@@ -132,10 +142,10 @@ void PHG4TpcDetector::CreateTpcGasMixture()
   G4Material *N2 = new G4Material("N2", density = 1.165 * mg / cm3, ncomponents = 1, kStateGas, tpcGasTemperature, tpcGasPressure);
   N2->AddElement(G4NistManager::Instance()->FindOrBuildElement("N"), natoms = 2);
 
-  //Create isobutane as only butane is in the standard G4Material list (they have different densities)
-  //https://geant4-userdoc.web.cern.ch/UsersGuides/ForApplicationDeveloper/html/Appendix/materialNames.html
+  // Create isobutane as only butane is in the standard G4Material list (they have different densities)
+  // https://geant4-userdoc.web.cern.ch/UsersGuides/ForApplicationDeveloper/html/Appendix/materialNames.html
   G4Material *isobutane = new G4Material("isobutane", density = 2.59 * mg / cm3, ncomponents = 2, kStateGas, tpcGasTemperature, tpcGasPressure);
-  isobutane->AddElement(G4NistManager::Instance()->FindOrBuildElement("C"), natoms = 4); //Could use AddElement(PHG4Detector::GetDetectorElement("C", true), 4); instead?
+  isobutane->AddElement(G4NistManager::Instance()->FindOrBuildElement("C"), natoms = 4);  // Could use AddElement(PHG4Detector::GetDetectorElement("C", true), 4); instead?
   isobutane->AddElement(G4NistManager::Instance()->FindOrBuildElement("H"), natoms = 10);
 
   double Ne_frac = m_Params->get_double_param("Ne_frac");
@@ -150,13 +160,9 @@ void PHG4TpcDetector::CreateTpcGasMixture()
   const double N2_den = N2->GetDensity();
   const double isobutane_den = isobutane->GetDensity();
 
-  const double sphenix_tpc_gas_den = (Ne_den * Ne_frac)
-                                   + (Ar_den * Ar_frac)
-                                   + (CF4_den * CF4_frac)
-                                   + (N2_den * N2_frac)
-                                   + (isobutane_den * isobutane_frac);
+  const double sphenix_tpc_gas_den = (Ne_den * Ne_frac) + (Ar_den * Ar_frac) + (CF4_den * CF4_frac) + (N2_den * N2_frac) + (isobutane_den * isobutane_frac);
 
-  G4Material *sPHENIX_tpc_gas = new G4Material("sPHENIX_TPC_Gas", sphenix_tpc_gas_den, ncomponents = 5, kStateGas);//, tpcGasTemperature, tpcGasPressure);
+  G4Material *sPHENIX_tpc_gas = new G4Material("sPHENIX_TPC_Gas", sphenix_tpc_gas_den, ncomponents = 5, kStateGas);  //, tpcGasTemperature, tpcGasPressure);
   sPHENIX_tpc_gas->AddMaterial(G4NistManager::Instance()->FindOrBuildMaterial("G4_Ne"), (Ne_den * Ne_frac) / sphenix_tpc_gas_den);
   sPHENIX_tpc_gas->AddMaterial(G4NistManager::Instance()->FindOrBuildMaterial("G4_Ar"), (Ar_den * Ar_frac) / sphenix_tpc_gas_den);
   sPHENIX_tpc_gas->AddMaterial(CF4, (CF4_den * CF4_frac) / sphenix_tpc_gas_den);
@@ -481,7 +487,8 @@ void PHG4TpcDetector::CreateCompositeMaterial(
   assert(materialName.size() == thickness.size());
 
   // sum up the areal density and total thickness so we can divvy it out
-  double totalArealDensity = 0, totalThickness = 0;
+  double totalArealDensity = 0;
+  double totalThickness = 0;
   for (std::vector<double>::size_type i = 0; i < thickness.size(); i++)
   {
     tempmat = GetDetectorMaterial(materialName[i]);
@@ -513,16 +520,37 @@ void PHG4TpcDetector::CreateCompositeMaterial(
 //_______________________________________________________________
 void PHG4TpcDetector::add_geometry_node()
 {
-  // create PHG4TpcCylinderGeomContainer and put on node tree
-  const std::string geonode_name = "CYLINDERCELLGEOM_SVTX";
-  auto geonode = findNode::getClass<PHG4TpcCylinderGeomContainer>(topNode(), geonode_name);
+  // create PHG4TpcGeomContainer and put on node tree
+  const std::string geonode_name = "TPCGEOMCONTAINER";
+  auto *geonode = findNode::getClass<PHG4TpcGeomContainer>(topNode(), geonode_name);
   if (!geonode)
   {
-    geonode = new PHG4TpcCylinderGeomContainer;
+    geonode = new PHG4TpcGeomContainer;
     PHNodeIterator iter(topNode());
-    auto runNode = dynamic_cast<PHCompositeNode *>(iter.findFirst("PHCompositeNode", "RUN"));
-    auto newNode = new PHIODataNode<PHObject>(geonode, geonode_name, "PHObject");
-    runNode->addNode(newNode);
+    auto *runNode = dynamic_cast<PHCompositeNode *>(iter.findFirst("PHCompositeNode", "RUN"));
+    PHNodeIterator runiter(runNode);
+    PHCompositeNode *geomNode = dynamic_cast<PHCompositeNode *>(runiter.findFirst("PHCompositeNode", "RECO_TRACKING_GEOMETRY"));
+    if(!geomNode)
+      {
+        geomNode = new PHCompositeNode("RECO_TRACKING_GEOMETRY");
+        runNode->addNode(geomNode);
+      }
+    auto *newNode = new PHIODataNode<PHObject>(geonode, geonode_name, "PHObject");
+    geomNode->addNode(newNode);
+  }
+
+  m_cdb = CDBInterface::instance();
+  std::string calibdir = m_cdb->getUrl("TPC_FEE_CHANNEL_MAP");
+
+  if (!calibdir.empty())
+  {
+    m_cdbttree = new CDBTTree(calibdir);
+    m_cdbttree->LoadCalibrations();
+  }
+  else
+  {
+    std::cout << "PHG4TpcPadPlaneReadout::InitRun no TPC_FEE_CHANNEL_MAP found" << std::endl;
+    exit(1);
   }
 
   const std::array<int, 3> NTpcLayers =
@@ -535,62 +563,104 @@ void PHG4TpcDetector::add_geometry_node()
   MinLayer[1] = MinLayer[0] + NTpcLayers[0];
   MinLayer[2] = MinLayer[1] + NTpcLayers[1];
 
-  const std::array<double, 3> MinRadius =
-      {{m_Params->get_double_param("tpc_minradius_inner"),
-        m_Params->get_double_param("tpc_minradius_mid"),
-        m_Params->get_double_param("tpc_minradius_outer")}};
-
-  const std::array<double, 3> MaxRadius =
-      {{
-          m_Params->get_double_param("tpc_maxradius_inner"),
-          m_Params->get_double_param("tpc_maxradius_mid"),
-          m_Params->get_double_param("tpc_maxradius_outer"),
-      }};
-
   const std::array<double, 5> Thickness =
       {{
-          0.687,
-          1.012,
-          1.088,
-          0.534,
-          0.595,
+          0.56598621677629212,
+          1.0206889851687158,
+          1.0970475085472556,
+          0.5630547309825637,
+          0.56891770257002054,
       }};
 
-  const double drift_velocity = m_Params->get_double_param("drift_velocity");
+  const double drift_velocity_sim = m_Params->get_double_param("drift_velocity_sim");
   const double tpc_adc_clock = m_Params->get_double_param("tpc_adc_clock");
-  const double MaxZ = m_Params->get_double_param("maxdriftlength");
+  const double maxdriftlength = m_Params->get_double_param("maxdriftlength");
   const double TBinWidth = tpc_adc_clock;
   const double extended_readout_time = m_Params->get_double_param("extended_readout_time");
-  const double MaxT = extended_readout_time + 2. * MaxZ / drift_velocity;  // allows for extended time readout
+  const double MaxT = extended_readout_time + 2. * maxdriftlength / drift_velocity_sim;  // allows for extended time readout
   const double MinT = 0;
   const int NTBins = (int) ((MaxT - MinT) / TBinWidth) + 1;
 
   std::cout << PHWHERE << "MaxT " << MaxT << " TBinWidth " << TBinWidth << " extended readout time "
-            << extended_readout_time << " NTBins = " << NTBins << " drift velocity " << drift_velocity << std::endl;
-
-  const std::array<double, 3> SectorPhi =
-      {{m_Params->get_double_param("tpc_sector_phi_inner"),
-        m_Params->get_double_param("tpc_sector_phi_mid"),
-        m_Params->get_double_param("tpc_sector_phi_outer")}};
+            << extended_readout_time << " NTBins = " << NTBins << " drift velocity sim " << drift_velocity_sim << std::endl;
 
   const std::array<int, 3> NPhiBins =
       {{m_Params->get_int_param("ntpc_phibins_inner"),
         m_Params->get_int_param("ntpc_phibins_mid"),
         m_Params->get_int_param("ntpc_phibins_outer")}};
 
-  const std::array<double, 3> PhiBinWidth =
-      {{SectorPhi[0] * 12 / (double) NPhiBins[0],
-        SectorPhi[1] * 12 / (double) NPhiBins[1],
-        SectorPhi[2] * 12 / (double) NPhiBins[2]}};
-
   // should move to a common file
   static constexpr int NSides = 2;
   static constexpr int NSectors = 12;
+  static constexpr int NLayers = 16 * 3;
 
   std::array<std::vector<double>, NSides> sector_R_bias;
   std::array<std::vector<double>, NSides> sector_Phi_bias;
   std::array<std::vector<double>, NSides> sector_min_Phi;
   std::array<std::vector<double>, NSides> sector_max_Phi;
+  std::array<std::vector<double>, NLayers> pad_phi;
+  std::array<std::vector<double>, NLayers> pad_R;
+  std::array<double, NLayers> layer_radius{};
+  std::array<double, NLayers> phi_bin_width_cdb{};
+  std::array<std::array<std::array<double, 3>, NSectors>, NSides> sec_max_phi{};
+  std::array<std::array<std::array<double, 3>, NSectors>, NSides> sec_min_phi{};
+  int Nfee = 26;
+  int Nch = 256;
+
+  for (int f = 0; f < Nfee; f++)
+  {
+    for (int ch = 0; ch < Nch; ch++)
+    {
+      unsigned int key = 256 * (f) + ch;
+      std::string varname = "layer";
+      int l = m_cdbttree->GetIntValue(key, varname);
+      if (l > 6)
+      {
+        int v_layer = l - 7;
+        std::string phiname = "phi";
+        pad_phi[v_layer].push_back(m_cdbttree->GetDoubleValue(key, phiname));
+        std::string rname = "R";
+        pad_R[v_layer].push_back(m_cdbttree->GetDoubleValue(key, rname));
+      }
+    }
+  }
+
+  for (size_t layer = 0; layer < NLayers; layer++)
+  {
+    layer_radius[layer] = 0;
+    for (int pad = 0; pad < (int) pad_R[(int) layer].size(); pad++)
+    {
+      layer_radius[(int) layer] += pad_R[(int) layer][pad];
+    }
+
+    layer_radius[(int) layer] = layer_radius[(int) layer] / pad_R[(int) layer].size();
+    layer_radius[(int) layer] = layer_radius[(int) layer] / 10.;
+
+    auto min_phi_iter = std::min_element(pad_phi[layer].begin(), pad_phi[layer].end());
+    auto max_phi_iter = std::max_element(pad_phi[layer].begin(), pad_phi[layer].end());
+    double min_phi = static_cast<double>(*min_phi_iter);
+    double max_phi = static_cast<double>(*max_phi_iter);
+    min_phi = min_phi - M_PI / 2.;
+    max_phi = max_phi - M_PI / 2.;
+    phi_bin_width_cdb[layer] = std::abs(max_phi - min_phi) / (NPhiBins[(int) (layer / 16)] / 12 - 1);  // NOLINT(bugprone-integer-division)
+    double SectorPhi = std::abs(max_phi - min_phi) + phi_bin_width_cdb[layer];
+    for (int zside = 0; zside < 2; zside++)
+    {
+      for (int isector = 0; isector < NSectors; isector++)  // 12 sectors
+      {
+        if (zside == 0)
+        {
+          sec_min_phi[zside][isector][(int) layer / 16] = M_PI - 2 * M_PI / 12 * (isector + 1) + (-(max_phi) -phi_bin_width_cdb[layer] / 2.);
+          sec_max_phi[zside][isector][(int) layer / 16] = sec_min_phi[zside][isector][(int) layer / 16] + SectorPhi;
+        }
+        if (zside == 1)
+        {
+          sec_max_phi[zside][isector][(int) layer / 16] = M_PI - 2 * M_PI / 12 * (isector + 1) + (max_phi + phi_bin_width_cdb[layer] / 2.);
+          sec_min_phi[zside][isector][(int) layer / 16] = sec_max_phi[zside][isector][(int) layer / 16] - SectorPhi;
+        }
+      }
+    }
+  }
 
   for (int iregion = 0; iregion < 3; ++iregion)
   {
@@ -609,50 +679,27 @@ void PHG4TpcDetector::add_geometry_node()
         sector_R_bias[zside].push_back(0);
         sector_Phi_bias[zside].push_back(0);
 
-        double sec_gap = (2 * M_PI - SectorPhi[iregion] * 12) / 12;
-        double sec_max_phi = M_PI - SectorPhi[iregion] / 2 - sec_gap - 2 * M_PI / 12 * isector;  // * (isector+1) ;
-        double sec_min_phi = sec_max_phi - SectorPhi[iregion];
-        sector_min_Phi[zside].push_back(sec_min_phi);
-        sector_max_Phi[zside].push_back(sec_max_phi);
+        sector_min_Phi[zside].push_back(sec_min_phi[zside][isector][iregion]);
+        sector_max_Phi[zside].push_back(sec_max_phi[zside][isector][iregion]);
       }  // isector
     }
-
-    double sum_r = 0;
-    for (int layer = MinLayer[iregion]; layer < MinLayer[iregion] + NTpcLayers[iregion]; ++layer)
-    {
-      double r_length = Thickness[iregion];
-      if (iregion == 0 && layer > 0)
-      {
-        if (layer % 2 == 0)
-        {
-          r_length = Thickness[4];
-        }
-        else
-        {
-          r_length = Thickness[3];
-        }
-      }
-      sum_r += r_length;
-    }
-    const double pad_space = (MaxRadius[iregion] - MinRadius[iregion] - sum_r) / (NTpcLayers[iregion] - 1);
-    double current_r = MinRadius[iregion];
 
     for (int layer = MinLayer[iregion]; layer < MinLayer[iregion] + NTpcLayers[iregion]; ++layer)
     {
       if (Verbosity())
       {
         std::cout << " layer " << layer << " MinLayer " << MinLayer[iregion] << " region " << iregion
-                  << " radius " << MinRadius[iregion] + ((double) (layer - MinLayer[iregion]) + 0.5) * Thickness[iregion]
+                  << " radius " << layer_radius[layer - 7]
                   << " thickness " << Thickness[iregion]
                   << " NTBins " << NTBins << " tmin " << MinT << " tstep " << TBinWidth
-                  << " phibins " << NPhiBins[iregion] << " phistep " << PhiBinWidth[iregion] << std::endl;
+                  << " phibins " << NPhiBins[iregion] << " phistep " << phi_bin_width_cdb[layer] << std::endl;
       }
 
-      auto layerseggeo = new PHG4TpcCylinderGeom;
+      auto *layerseggeo = new PHG4TpcGeomv1;
       layerseggeo->set_layer(layer);
 
       double r_length = Thickness[iregion];
-      if (iregion == 0 && layer > 0)
+      if (iregion == 0)
       {
         if (layer % 2 == 0)
         {
@@ -663,18 +710,28 @@ void PHG4TpcDetector::add_geometry_node()
           r_length = Thickness[3];
         }
       }
-      layerseggeo->set_thickness(r_length);
-      layerseggeo->set_radius(current_r + r_length / 2);
-      layerseggeo->set_binning(PHG4CellDefs::sizebinning);
-      layerseggeo->set_zbins(NTBins);
-      layerseggeo->set_zmin(MinT);
-      layerseggeo->set_zstep(TBinWidth);
-      layerseggeo->set_phibins(NPhiBins[iregion]);
-      layerseggeo->set_phistep(PhiBinWidth[iregion]);
-      layerseggeo->set_r_bias(sector_R_bias);
-      layerseggeo->set_phi_bias(sector_Phi_bias);
-      layerseggeo->set_sector_min_phi(sector_min_Phi);
-      layerseggeo->set_sector_max_phi(sector_max_Phi);
+      int v_layer = layer - 7;
+      if (v_layer >= 0)
+      {
+        layerseggeo->set_thickness(r_length);
+        layerseggeo->set_radius(layer_radius[v_layer]);
+        layerseggeo->set_binning(PHG4CellDefs::sizebinning);
+        layerseggeo->set_zbins(NTBins);
+        layerseggeo->set_zmin(MinT);
+        layerseggeo->set_zstep(TBinWidth);
+        layerseggeo->set_phibins(NPhiBins[iregion]);
+        layerseggeo->set_phistep(phi_bin_width_cdb[v_layer]);
+        layerseggeo->set_r_bias(sector_R_bias);
+        layerseggeo->set_phi_bias(sector_Phi_bias);
+        layerseggeo->set_sector_min_phi(sector_min_Phi);
+        layerseggeo->set_sector_max_phi(sector_max_Phi);
+	// capture the z geometry setup in the layergeom
+	layerseggeo->set_max_driftlength(m_Params->get_double_param("maxdriftlength"));
+	layerseggeo->set_CM_halfwidth(m_Params->get_double_param("CM_halfwidth"));
+	layerseggeo->set_adc_clock(m_Params->get_double_param("tpc_adc_clock"));
+	layerseggeo->set_extended_readout_time(m_Params->get_double_param("extended_readout_time"));
+	layerseggeo->set_drift_velocity_sim(m_Params->get_double_param("drift_velocity_sim"));	
+      }
 
       // Chris Pinkenburg: greater causes huge memory growth which causes problems
       // on our farm. If you need to increase this - TALK TO ME first
@@ -686,8 +743,6 @@ void PHG4TpcDetector::add_geometry_node()
         gSystem->Exit(1);
       }
       geonode->AddLayerCellGeom(layerseggeo);
-
-      current_r += r_length + pad_space;
     }
   }
 }

@@ -1,18 +1,20 @@
-#ifndef ONNXLIB_H
-#define ONNXLIB_H
+#ifndef PHOOL_ONNXLIB_H
+#define PHOOL_ONNXLIB_H
 
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wshadow"
-#pragma GCC diagnostic ignored "-Wpedantic"
+#include <onnxruntime_c_api.h>
 #include <onnxruntime_cxx_api.h>
-#pragma GCC diagnostic pop
-
 // This is a stub for some ONNX code refactoring
 
-Ort::Session *onnxSession(std::string &modelfile);
+Ort::Session *onnxSession(std::string &modelfile, int verbosity = 0);
 
 std::vector<float> onnxInference(Ort::Session *session, std::vector<float> &input, int N, int Nsamp, int Nreturn);
 
 std::vector<float> onnxInference(Ort::Session *session, std::vector<float> &input, int N, int Nx, int Ny, int Nz, int Nreturn);
+
+namespace onnxlib
+{
+  extern int n_input;
+  extern int n_output;
+}  // namespace onnxlib
 
 #endif

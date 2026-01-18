@@ -110,14 +110,14 @@ class EmcCluster : public TObject
   /// Returns the EmcCluster total energy
   float GetTotalEnergy();
   /// Returns EmcCluster 1-st (pxcg,pycg) and 2-d momenta (pxx,pxy,pyy)
-  void GetMoments(float& pxcg, float& pycg,
+  void GetMoments(float& x, float& y,
                   float& pxx, float& pxy, float& pyy);
   /// Returns the EmcCluster corrected position in Sector (SM) frame
   void GetCorrPos(float& xc, float& yc);
   /// Returns the EmcCluster position in PHENIX global coord system
-  void GetGlobalPos(float& xg, float& yg, float& zg);
+  void GetGlobalPos(float& xA, float& yA, float& zA);
   /// Splits the Cluster onto SubClusters; returns list of clusters and list of peak towers corresponding to subclusters
-  int GetSubClusters(std::vector<EmcCluster>& sClList, std::vector<EmcModule>& ppeaks, bool dosubclustersplitting);
+  int GetSubClusters(std::vector<EmcCluster>& PkList, std::vector<EmcModule>& ppeaks, bool dosubclustersplitting);
   float GetProb(float& chi2, int& ndf);
 
  protected:
@@ -132,45 +132,6 @@ class EmcCluster : public TObject
 
  public:
   // MV 2002/02/28 moved these functions here from #define's
-
-  static int max(int a, int b)
-  {
-    return a > b ? a : b;
-  }
-  static float max(float a, float b)
-  {
-    return a > b ? a : b;
-  }
-  static double max(double a, double b)
-  {
-    return a > b ? a : b;
-  }
-
-  static int min(int a, int b)
-  {
-    return a < b ? a : b;
-  }
-  static float min(float a, float b)
-  {
-    return a < b ? a : b;
-  }
-  static double min(double a, double b)
-  {
-    return a < b ? a : b;
-  }
-
-  static int ABS(int x)
-  {
-    return abs(x);
-  }
-  static float ABS(float x)
-  {
-    return fabsf(x);
-  }
-  static double ABS(double x)
-  {
-    return fabs(x);
-  }
 
   static int lowint(float x)
   {

@@ -32,6 +32,8 @@ class MbdSig
   void SetY(const Float_t *y, const int invert = 1);
   void SetXY(const Float_t *x, const Float_t *y, const int invert = 1);
 
+  int  GetNSamples() { return _nsamples; }
+
   void SetCalib(MbdCalib *mcal);
 
   TH1 *GetHist() { return hpulse; }
@@ -114,6 +116,7 @@ class MbdSig
 
   void WritePedHist();
 
+  void DrawWaveform();      /// Draw Subtracted Waveform
   void PadUpdate() const;
   void Print();
   void Verbose(const int v) { _verbose = v; }

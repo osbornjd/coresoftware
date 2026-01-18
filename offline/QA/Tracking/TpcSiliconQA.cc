@@ -20,8 +20,9 @@
 #include <TH1.h>
 #include <TH2.h>
 
-#include <iomanip>
 #include <boost/format.hpp>
+#include <cmath>
+#include <iomanip>
 
 //____________________________________________________________________________..
 TpcSiliconQA::TpcSiliconQA(const std::string& name)
@@ -40,16 +41,16 @@ int TpcSiliconQA::InitRun(PHCompositeNode* /*topNode*/)
 //____________________________________________________________________________..
 int TpcSiliconQA::process_event(PHCompositeNode* topNode)
 {
-  auto hm = QAHistManagerDef::getHistoManager();
+  auto* hm = QAHistManagerDef::getHistoManager();
   assert(hm);
 
-  auto silseedmap = findNode::getClass<TrackSeedContainer>(topNode, "SiliconTrackSeedContainer");
+  auto* silseedmap = findNode::getClass<TrackSeedContainer>(topNode, "SiliconTrackSeedContainer");
   if (!silseedmap)
   {
     std::cout << "Silicon seed map not found, aborting event" << std::endl;
     return Fun4AllReturnCodes::ABORTEVENT;
   }
-  auto tpcseedmap = findNode::getClass<TrackSeedContainer>(topNode, "TpcTrackSeedContainer");
+  auto* tpcseedmap = findNode::getClass<TrackSeedContainer>(topNode, "TpcTrackSeedContainer");
   if (!tpcseedmap)
   {
     std::cout << "TPC seed map not found, aborting event" << std::endl;
@@ -88,6 +89,11 @@ int TpcSiliconQA::process_event(PHCompositeNode* topNode)
       m_tpcseedz = position.z();
       m_tpcseedphi = tpcseed->get_phi();
       m_tpcseedeta = tpcseed->get_eta();
+
+    if(std::fabs(m_tpcseedx - m_silseedx) < 2 && std::fabs(m_tpcseedy - m_silseedy) < 2)
+    {
+      h_tpcsilicon_corr->Fill(m_silseedphi-m_tpcseedphi, m_silseedeta-m_tpcseedeta);
+    }
 
       h_phiDiff[0]->Fill(m_tpcseedphi - m_silseedphi);
       h_etaDiff[0]->Fill(m_tpcseedeta - m_silseedeta);
@@ -180,10 +186,13 @@ std::string TpcSiliconQA::getHistoPrefix() const
 
 void TpcSiliconQA::createHistos()
 {
-  auto hm = QAHistManagerDef::getHistoManager();
+  auto* hm = QAHistManagerDef::getHistoManager();
   assert(hm);
 
-  std::stringstream stream1, stream2, stream3, stream4;
+  std::stringstream stream1;
+  std::stringstream stream2;
+  std::stringstream stream3;
+  std::stringstream stream4;
   stream1 << std::fixed << std::setprecision(2) << m_xcut;
   stream2 << std::fixed << std::setprecision(2) << m_ycut;
   stream3 << std::fixed << std::setprecision(2) << m_etacut;
@@ -191,13 +200,13 @@ void TpcSiliconQA::createHistos()
 
   std::vector<std::string> cutNames = {"", "_xyCut", "_etaCut", "_phiCut", "North", "South", "NorthAllCuts", "SouthAllCuts"};
   std::vector<std::string> cutVals = {"All Track Seeds",
-                         std::string("|xdiff| < " + stream1.str() + "cm , |ydiff| < " + stream2.str() + "cm"),
-                         std::string("xy cuts and |etadiff| < " + stream3.str()),
-                         std::string("xy, eta cuts and |phidiff| < " + stream4.str()),
-                         "All Track Seeds (North Only)",
-                         "All Track Seeds (South Only)",
-                         "North All Cuts (x,y,eta,phi)",
-                         "South All Cuts (x,y,eta,phi)"};
+                                      std::string("|xdiff| < " + stream1.str() + "cm , |ydiff| < " + stream2.str() + "cm"),
+                                      std::string("xy cuts and |etadiff| < " + stream3.str()),
+                                      std::string("xy, eta cuts and |phidiff| < " + stream4.str()),
+                                      "All Track Seeds (North Only)",
+                                      "All Track Seeds (South Only)",
+                                      "North All Cuts (x,y,eta,phi)",
+                                      "South All Cuts (x,y,eta,phi)"};
 
   {
     h_crossing = new TH1F(std::string(getHistoPrefix() + "crossing").c_str(),
@@ -261,6 +270,11 @@ void TpcSiliconQA::createHistos()
     hm->registerHisto(h_zDiff[i]);
     i++;
   }
+
+  h_tpcsilicon_corr = new TH2F(std::string(getHistoPrefix() + "tpcsiletaphi").c_str(),
+                               ";#phi_{sil}-#phi_{TPC} [rad]; #eta_{sil}-#eta_{TPC}", 40, -0.5, 0.5, 40, -0.5, 0.5);
+                               hm->registerHisto(h_tpcsilicon_corr);
+
 
   return;
 }

@@ -3,6 +3,7 @@
 #include "Fun4AllDstOutputManager.h"
 #include "Fun4AllHistoBinDefs.h"
 #include "Fun4AllHistoManager.h"  // for Fun4AllHistoManager
+#include "Fun4AllInputManager.h"
 #include "Fun4AllMemoryTracker.h"
 #include "Fun4AllMonitoring.h"
 #include "Fun4AllOutputManager.h"
@@ -127,9 +128,9 @@ void Fun4AllServer::InitAll()
   {
     gSystem->IgnoreSignal((ESignals) i);
   }
+  m_saved_cout_state.copyfmt(std::cout); // save current state
   Fun4AllMonitoring::instance()->Snapshot("StartUp");
-  std::string histomanagername;
-  histomanagername = Name() + "HISTOS";
+  std::string histomanagername = Name() + "HISTOS";
   ServerHistoManager = new Fun4AllHistoManager(histomanagername);
   registerHistoManager(ServerHistoManager);
   double uplim = NFRAMEWORKBINS - 0.5;
@@ -244,6 +245,7 @@ int Fun4AllServer::registerSubsystem(SubsysReco *subsystem, const std::string &t
               << subsystem->Name() << std::endl;
     exit(1);
   }
+  std::cout.copyfmt(m_saved_cout_state); // restore cout to default formatting
   gROOT->cd(currdir.c_str());
   if (iret)
   {
@@ -267,7 +269,7 @@ int Fun4AllServer::registerSubsystem(SubsysReco *subsystem, const std::string &t
   std::string timer_name;
   timer_name = subsystem->Name() + "_" + topnodename;
   PHTimer timer(timer_name);
-  if (timer_map.find(timer_name) == timer_map.end())
+  if (!timer_map.contains(timer_name))
   {
     timer_map.insert(make_pair(timer_name, timer));
   }
@@ -420,8 +422,7 @@ tryagain:
       std::cout << "Could not find module " << *striter
                 << ", removing it from list of event selector modules" << std::endl;
       manager->EventSelector()->erase(striter);
-      // NOLINTNEXTLINE(hicpp-avoid-goto)
-      goto tryagain;
+      goto tryagain;  // NOLINT(hicpp-avoid-goto)
     }
   }
   return 0;
@@ -446,8 +447,7 @@ Fun4AllServer::getOutputManager(const std::string &name)
   return nullptr;
 }
 
-Fun4AllHistoManager *
-Fun4AllServer::getHistoManager(const std::string &name)
+Fun4AllHistoManager *Fun4AllServer::getHistoManager(const std::string &name)
 {
   std::vector<Fun4AllHistoManager *>::iterator iter;
   for (iter = HistoManager.begin(); iter != HistoManager.end(); ++iter)
@@ -577,6 +577,7 @@ int Fun4AllServer::process_event()
       ffamemtracker->Snapshot("Fun4AllServerProcessEvent");
 #endif
       int retcode = Subsystem.first->process_event(Subsystem.second);
+      std::cout.copyfmt(m_saved_cout_state); // restore cout to default formatting
 #ifdef FFAMEMTRACKER
       ffamemtracker->Snapshot("Fun4AllServerProcessEvent");
 #endif
@@ -675,8 +676,6 @@ int Fun4AllServer::process_event()
   }
 
   gROOT->cd(currdir.c_str());
-  bool writing = false;
-  int segment = std::numeric_limits<int>::min();
   //  mainIter.print();
   if (!OutputManager.empty() && !eventbad)  // there are registered IO managers and
   // the event is not flagged bad
@@ -704,67 +703,86 @@ int Fun4AllServer::process_event()
         std::cout << PHWHERE << " FATAL: Someone changed the number of Output Nodes on the fly, from " << OutNodeCount << " to " << newcount << std::endl;
         exit(1);
       }
-      std::vector<Fun4AllOutputManager *>::iterator iterOutMan;
-
-      for (iterOutMan = OutputManager.begin(); iterOutMan != OutputManager.end(); ++iterOutMan)
+      for (auto *iterOutMan : OutputManager)
       {
-        if (!(*iterOutMan)->DoNotWriteEvent(&RetCodes))
+        if (!iterOutMan->DoNotWriteEvent(&RetCodes))
         {
           if (Verbosity() >= VERBOSITY_MORE)
           {
-            std::cout << "Writing Event for " << (*iterOutMan)->Name() << std::endl;
+            std::cout << "Writing Event for " << iterOutMan->Name() << std::endl;
           }
 #ifdef FFAMEMTRACKER
           ffamemtracker->Snapshot("Fun4AllServerOutputManager");
-          ffamemtracker->Start((*iterOutMan)->Name(), "OutputManager");
+          ffamemtracker->Start(iterOutMan->Name(), "OutputManager");
 #endif
-          (*iterOutMan)->WriteGeneric(dstNode);
-#ifdef FFAMEMTRACKER
-          ffamemtracker->Stop((*iterOutMan)->Name(), "OutputManager");
-          ffamemtracker->Snapshot("Fun4AllServerOutputManager");
-#endif
-          if ((*iterOutMan)->EventsWritten() >= (*iterOutMan)->GetNEvents())
+	  iterOutMan->InitializeLastEvent(eventnumber); // only executed once, returns immediately for all subsequent calls
+          if (eventnumber > iterOutMan->LastEventNumber())
           {
             if (Verbosity() > 0)
             {
-              std::cout << PHWHERE << (*iterOutMan)->Name() << " wrote " << (*iterOutMan)->EventsWritten()
-                        << " events, closing " << (*iterOutMan)->OutFileName() << std::endl;
+              std::cout << PHWHERE << iterOutMan->Name() << " wrote " << iterOutMan->EventsWritten()
+                        << " events, closing " << iterOutMan->OutFileName() << std::endl;
             }
+            UpdateRunNode();
             PHNodeIterator nodeiter(TopNode);
             PHCompositeNode *runNode = dynamic_cast<PHCompositeNode *>(nodeiter.findFirst("PHCompositeNode", "RUN"));
             MakeNodesTransient(runNode);  // make all nodes transient by default
-            (*iterOutMan)->WriteNode(runNode);
-            (*iterOutMan)->RunAfterClosing();
-            segment = (*iterOutMan)->Segment();
-            writing = true;
+            iterOutMan->WriteNode(runNode);
+            iterOutMan->RunAfterClosing();
+            iterOutMan->UpdateLastEvent();
+          }
+          // save runnode, open new file, write
+          iterOutMan->WriteGeneric(dstNode);
+#ifdef FFAMEMTRACKER
+          ffamemtracker->Stop(iterOutMan->Name(), "OutputManager");
+          ffamemtracker->Snapshot("Fun4AllServerOutputManager");
+#endif
+          if (iterOutMan->EventsWritten() >= iterOutMan->GetNEvents())
+          {
+            if (Verbosity() > 0)
+            {
+              std::cout << PHWHERE << iterOutMan->Name() << " wrote " << iterOutMan->EventsWritten()
+                        << " events, closing " << iterOutMan->OutFileName() << std::endl;
+            }
+            UpdateRunNode();
+            PHNodeIterator nodeiter(TopNode);
+            PHCompositeNode *runNode = dynamic_cast<PHCompositeNode *>(nodeiter.findFirst("PHCompositeNode", "RUN"));
+            MakeNodesTransient(runNode);  // make all nodes transient by default
+            iterOutMan->WriteNode(runNode);
+            iterOutMan->RunAfterClosing();
           }
         }
         else
         {
           if (Verbosity() >= VERBOSITY_MORE)
           {
-            std::cout << "Not Writing Event for " << (*iterOutMan)->Name() << std::endl;
+            std::cout << "Not Writing Event for " << iterOutMan->Name() << std::endl;
           }
         }
       }
     }
   }
-  if (!HistoManager.empty() && !eventbad && writing)
+  // saving the histograms using the same scheme as the DSTs
+  if (!HistoManager.empty() && !eventbad)
   {
-    for (const auto &histit : HistoManager)
+    // kludge to save at the correct event. This is called after the event processing. Normally it would be fine to check for == eventnumber
+    // but if that event is missing we would overshoot. If there is more than one event missing this will overshoot, but there is only so much
+    // one can do
+    int eventnumber_plus1 = eventnumber+1;
+    
+    for (auto &histit : HistoManager)
     {
-      if ((*histit).dumpHistoSegments())
+      histit->InitializeLastEvent(eventnumber_plus1);
+      if (eventnumber_plus1 > histit->LastEventNumber())
       {
-        if (Verbosity() > 0)
-        {
-          std::cout << PHWHERE << (*histit).Name() << " wrote events, closing " << (*histit).OutFileName() << std::endl;
-        }
-        // This is -1 because the segment is initially determined in the first event of a
-        // segment from the DST, then incremented. So it is always 1 ahead of the histos
-        (*histit).segment(segment - 1);
-        (*histit).dumpHistos();
-        (*histit).RunAfterClosing();
-        (*histit).Reset();
+	histit->dumpHistos();
+//	histit->RunAfterClosing();
+        histit->UpdateLastEvent();
+	histit->Reset();
+	if (Verbosity() > 0)
+	{
+	  std::cout << PHWHERE << "saving " << histit->Name() << " wrote events, closing " << histit->LastClosedFileName() << std::endl;
+	}
       }
     }
   }
@@ -791,8 +809,6 @@ int Fun4AllServer::process_event()
 
 int Fun4AllServer::ResetNodeTree()
 {
-  std::vector<std::string> ResetNodeList;
-  ResetNodeList.emplace_back("DST");
   PHNodeReset reset;
   reset.Verbosity(Verbosity() > 2 ? Verbosity() - 2 : 0);  // one lower verbosity level than Fun4AllServer
   std::map<std::string, PHCompositeNode *>::const_iterator iter;
@@ -823,10 +839,9 @@ int Fun4AllServer::Reset()
     }
     i += (*iter).first->Reset((*iter).second);
   }
-  std::vector<Fun4AllHistoManager *>::iterator hiter;
-  for (hiter = HistoManager.begin(); hiter != HistoManager.end(); ++hiter)
+  for (auto *hiter : HistoManager)
   {
-    (*hiter)->Reset();
+    hiter->Reset();
   }
   return i;
 }
@@ -886,6 +901,7 @@ int Fun4AllServer::BeginRun(const int runno)
   for (iter = Subsystems.begin(); iter != Subsystems.end(); ++iter)
   {
     iret = BeginRunSubsystem(*iter);
+    std::cout.copyfmt(m_saved_cout_state); // restore cout to default formatting
   }
   for (; !NewSubsystems.empty(); NewSubsystems.pop_front())
   {
@@ -979,6 +995,7 @@ int Fun4AllServer::CountOutNodesRecursive(PHCompositeNode *startNode, const int 
   {
     if ((thisNode->getType() == "PHCompositeNode"))
     {
+      // NOLINTNEXTLINE(cppcoreguidelines-pro-type-static-cast-downcast)
       icnt = CountOutNodesRecursive(static_cast<PHCompositeNode *>(thisNode), icnt);  // if this is a CompositeNode do this trick again
     }
     else
@@ -1003,6 +1020,7 @@ int Fun4AllServer::MakeNodesTransient(PHCompositeNode *startNode)
   {
     if ((thisNode->getType() == "PHCompositeNode"))
     {
+      // NOLINTNEXTLINE(cppcoreguidelines-pro-type-static-cast-downcast)
       MakeNodesTransient(static_cast<PHCompositeNode *>(thisNode));  // if this is a CompositeNode do this trick again
     }
     else
@@ -1013,8 +1031,7 @@ int Fun4AllServer::MakeNodesTransient(PHCompositeNode *startNode)
   return 0;
 }
 
-// NOLINTNEXTLINE(misc-no-recursion)
-int Fun4AllServer::MakeNodesPersistent(PHCompositeNode *startNode)
+int Fun4AllServer::MakeNodesPersistent(PHCompositeNode *startNode)  // NOLINT(misc-no-recursion)
 {
   PHNodeIterator nodeiter(startNode);
   PHPointerListIterator<PHNode> iterat(nodeiter.ls());
@@ -1023,6 +1040,7 @@ int Fun4AllServer::MakeNodesPersistent(PHCompositeNode *startNode)
   {
     if ((thisNode->getType() == "PHCompositeNode"))
     {
+      // NOLINTNEXTLINE(cppcoreguidelines-pro-type-static-cast-downcast)
       MakeNodesPersistent(static_cast<PHCompositeNode *>(thisNode));  // if this is a CompositeNode do this trick again
     }
     else
@@ -1077,6 +1095,7 @@ int Fun4AllServer::EndRun(const int runno)
                 << (*iter).first->Name() << std::endl;
       exit(1);
     }
+    std::cout.copyfmt(m_saved_cout_state); // restore cout to default formatting
   }
   gROOT->cd(currdir.c_str());
 
@@ -1129,6 +1148,7 @@ int Fun4AllServer::End()
                 << (*iter).first->Name() << std::endl;
       exit(1);
     }
+    std::cout.copyfmt(m_saved_cout_state); // restore cout to default formatting
   }
   gROOT->cd(currdir.c_str());
   PHNodeIterator nodeiter(TopNode);
@@ -1152,7 +1172,23 @@ int Fun4AllServer::End()
   // close output files (check for existing output managers is
   // done inside outfileclose())
   outfileclose();
-
+  for (auto &histit : HistoManager)
+  {
+    if (histit->ApplyFileRule())
+    {
+      if (! histit->isEmpty())
+      {
+	histit->dumpHistos();
+      }
+      else
+      {
+	if (Verbosity() > 0)
+	{
+	  std::cout << "only empty histos in " << histit->Name() << std::endl;
+	}
+      }
+    }
+  }
   if (ScreamEveryEvent)
   {
     std::cout << "*******************************************************************************" << std::endl;
@@ -1355,6 +1391,11 @@ PHCompositeNode *Fun4AllServer::getNode(const std::string &name, const std::stri
 
 int Fun4AllServer::registerInputManager(Fun4AllInputManager *InManager)
 {
+  if (Verbosity() > 1)
+  {
+    std::cout << "Registering Input Manager " << InManager->Name()
+	      << std::endl;
+  }
   int iret = defaultSyncManager->registerInputManager(InManager);
   return iret;
 }
@@ -1774,4 +1815,14 @@ void Fun4AllServer::PrintMemoryTracker(const std::string &name)
   std::cout << "PrintMemoryTracker called with " << name << " is disabled" << std::endl;
 #endif
   return;
+}
+
+int Fun4AllServer::UpdateRunNode()
+{
+  int iret{Fun4AllReturnCodes::EVENT_OK};
+  for (auto &Subsystem : Subsystems)
+  {
+    iret += Subsystem.first->UpdateRunNode(Subsystem.second);
+  }
+  return iret;
 }

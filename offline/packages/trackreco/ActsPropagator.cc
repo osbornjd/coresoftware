@@ -10,12 +10,11 @@
 
 #include <globalvertex/SvtxVertex.h>
 #include <globalvertex/SvtxVertexMap.h>
-
+#include <Acts/Propagator/VoidNavigator.hpp>
 #include <Acts/EventData/ParticleHypothesis.hpp>
 #include <Acts/Geometry/GeometryIdentifier.hpp>
 #include <Acts/MagneticField/ConstantBField.hpp>
 #include <Acts/MagneticField/MagneticFieldProvider.hpp>
-#include <Acts/Propagator/detail/VoidPropagatorComponents.hpp>
 #include <Acts/Surfaces/PerigeeSurface.hpp>
 
 ActsPropagator::SurfacePtr
@@ -100,7 +99,7 @@ ActsPropagator::propagateTrack(const Acts::BoundTrackParameters& params,
                                const unsigned int sphenixLayer)
 {
   unsigned int actsvolume, actslayer;
-  if (!checkLayer(sphenixLayer, actsvolume, actslayer) or !m_geometry)
+  if (!checkLayer(sphenixLayer, actsvolume, actslayer) || !m_geometry)
   {
     return Acts::Result<BoundTrackParamPair>::failure(std::error_code(0, std::generic_category()));
   }
@@ -218,7 +217,7 @@ ActsPropagator::FastPropagator ActsPropagator::makeFastPropagator()
 
   std::shared_ptr<const Acts::Logger> logger = Acts::getDefaultLogger("ActsPropagator", logLevel);
 
-  return ActsPropagator::FastPropagator(stepper, Acts::detail::VoidNavigator(),
+  return ActsPropagator::FastPropagator(stepper, Acts::VoidNavigator(),
                                         logger);
 }
 ActsPropagator::SphenixPropagator ActsPropagator::makePropagator()
@@ -300,7 +299,7 @@ bool ActsPropagator::checkLayer(const unsigned int& sphenixlayer,
     if (srf != nullptr) {
       auto layer = srf->geometryId().layer();
       auto volume = srf->geometryId().volume();
-      if(volume == actsvolume and layer == actslayer)
+      if(volume == actsvolume && layer == actslayer)
 	{
 	  foundlayer = true;
 	  foundvolume = true;
@@ -308,7 +307,7 @@ bool ActsPropagator::checkLayer(const unsigned int& sphenixlayer,
 	}
     } });
 
-  if (!foundlayer or !foundvolume)
+  if (!foundlayer || !foundvolume)
   {
     std::cout << "trackreco::ActsPropagator::checkLayer Could not identify Acts volume and layer to propagate to. Can't continue. "
               << std::endl;

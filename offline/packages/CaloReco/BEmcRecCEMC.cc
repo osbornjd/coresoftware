@@ -5,9 +5,11 @@
 
 #include <cmath>
 #include <iostream>
+#include <Math/Vector3D.h>   // for TVector3 used in calculateIncidence
+#include <algorithm>    // for std::max
+using ROOT::Math::XYZVector;
 
 BEmcRecCEMC::BEmcRecCEMC()
-//  : _emcprof(nullptr)
 {
   Name("BEmcRecCEMC");
   SetCylindricalGeometry();
@@ -25,7 +27,7 @@ void BEmcRecCEMC::GetImpactThetaPhi(float xg, float yg, float zg, float& theta, 
   phi = 0;
 
   //  float theta = atan(sqrt(xg*xg + yg*yg)/fabs(zg-fVz));
-  float rg = std::sqrt(xg * xg + yg * yg);
+  float rg = std::sqrt((xg * xg) + (yg * yg));
   float theta_twr;
   if (std::fabs(zg) <= 15)
   {
@@ -235,13 +237,216 @@ float BEmcRecCEMC::GetProb(vector<EmcModule> HitList, float et, float xg, float 
 }
 */
 
-void BEmcRecCEMC::CorrectShowerDepth(float E, float xA, float yA, float zA, float& xC, float& yC, float& zC)
+bool BEmcRecCEMC::calculateIncidence(float x, float y,
+                                     float& a_phi_sgn, float& a_eta_sgn)
 {
-  /*
-  xC = xA;
-  yC = yA;
-  zC = zA;
-  */
+  // ────────────────────────────────────────────────────────────────────────────
+  // Step 1) Owner tower in "tower units"
+  // ────────────────────────────────────────────────────────────────────────────
+  const int ix = EmcCluster::lowint(x + 0.5F);
+  const int iy = EmcCluster::lowint(y + 0.5F);
+
+  TowerGeom g{};
+  if (!GetTowerGeometry(ix, iy, g))
+  {
+    return false;  // need detailed geometry
+  }
+
+  // Sub-cell offsets δ ∈ (−0.5, +0.5]
+  const float dx = x - ix;
+  const float dy = y - iy;
+
+  // ────────────────────────────────────────────────────────────────────────────
+  // Step 2) Front-surface point F in cm:
+  //         F = C + δx * eφ_geom + δy * eη_geom
+  // ────────────────────────────────────────────────────────────────────────────
+  const XYZVector C(g.Xcenter, g.Ycenter, g.Zcenter);
+  const XYZVector ephi_geom(g.dX[0], g.dY[0], g.dZ[0]);
+  const XYZVector eeta_geom(g.dX[1], g.dY[1], g.dZ[1]);
+
+  if (std::sqrt(ephi_geom.Mag2()) < 1e-9 || std::sqrt(eeta_geom.Mag2()) < 1e-9)
+  {
+    return false;
+  }
+
+  const XYZVector F = C + dx * ephi_geom + dy * eeta_geom;
+
+  // ────────────────────────────────────────────────────────────────────────────
+  // Step 3) Unit ray from vertex to the front surface
+  // ────────────────────────────────────────────────────────────────────────────
+  const XYZVector V(0., 0., fVz);
+  XYZVector pF = F - V;
+  const double pFmag = std::sqrt(pF.Mag2());
+  if (!(pFmag > 0.0))
+  {
+    return false;
+  }
+  pF *= (1.0 / pFmag);
+
+  // Helper: from a basis {un,uphi,ueta} and ray pF, compute projections
+  // and signed incidence angles (no cosines returned).
+  auto basis_to_incidence =
+    [&](const XYZVector& un_b, const XYZVector& uphi_b, const XYZVector& ueta_b,
+        double& pn_b, double& pph_b, double& pet_b,
+        double& aphi_b, double& aeta_b) -> bool
+  {
+    pn_b  = pF.Dot(un_b);
+    pph_b = pF.Dot(uphi_b);
+    pet_b = pF.Dot(ueta_b);
+
+    const double apn_b      = std::max(1e-12, std::fabs(pn_b));
+    const double aphi_mag_b = std::atan2(std::fabs(pph_b), apn_b);
+    const double aeta_mag_b = std::atan2(std::fabs(pet_b), apn_b);
+
+    const double sgn_phi_b = (pph_b >= 0.0) ? +1.0 : -1.0;
+    const double sgn_eta_b = (pet_b >= 0.0) ? +1.0 : -1.0;
+
+    aphi_b = sgn_phi_b * aphi_mag_b;
+    aeta_b = sgn_eta_b * aeta_mag_b;
+
+    return (std::isfinite(aphi_b) && std::isfinite(aeta_b));
+  };
+
+  // ────────────────────────────────────────────────────────────────────────────
+  // Step 4) MECHANICAL frame from RawTowerGeomv5 rotations
+  // ────────────────────────────────────────────────────────────────────────────
+  XYZVector un_mech;
+  XYZVector uphi_mech;
+  XYZVector ueta_mech;
+  {
+    const double rx = g.rotX;
+    const double ry = g.rotY;
+    const double rz = g.rotZ;
+
+    const double cx = std::cos(rx);
+    const double sx = std::sin(rx);
+    const double cy = std::cos(ry);
+    const double sy = std::sin(ry);
+    const double cz = std::cos(rz);
+    const double sz = std::sin(rz);
+
+    auto applyRot = [&](const XYZVector& v) -> XYZVector
+    {
+      // Apply Rz * Ry * Rx to local vector v (column-vector convention).
+      double vx = v.X();
+      double vy = v.Y();
+      double vz = v.Z();
+
+      // Rx
+      const double vx1 = vx;
+      const double vy1 =  cx * vy - sx * vz;
+      const double vz1 =  sx * vy + cx * vz;
+
+      // Ry
+      const double vx2 =  cy * vx1 + sy * vz1;
+      const double vy2 =  vy1;
+      const double vz2 = -sy * vx1 + cy * vz1;
+
+      // Rz
+      const double vx3 =  cz * vx2 - sz * vy2;
+      const double vy3 =  sz * vx2 + cz * vy2;
+      const double vz3 =  vz2;
+
+      return XYZVector(vx3, vy3, vz3);
+    };
+
+    // Local axes: ẑ = bar axis, x̂/ŷ = transverse directions
+    XYZVector u_axis = applyRot(XYZVector(0., 0., 1.)); // tower "z" axis
+    const XYZVector u_x    = applyRot(XYZVector(1., 0., 0.)); // tower "x" axis
+    const XYZVector u_y    = applyRot(XYZVector(0., 1., 0.)); // tower "y" axis
+
+    // Normalize axis and enforce outward direction
+    const double amag = std::sqrt(u_axis.Mag2());
+    if (!(amag > 0.0))
+    {
+      return false;
+    }
+
+    u_axis *= (1.0 / amag);
+    if (u_axis.Dot(C) < 0.0)
+    {
+      u_axis = -u_axis;
+    }
+
+    un_mech = u_axis;
+
+    // φ̂: project rotated local x̂ into plane ⟂ axis; normalize
+    uphi_mech = u_x - un_mech * u_x.Dot(un_mech);
+    const double uphim = std::sqrt(uphi_mech.Mag2());
+    if (!(uphim > 0.0))
+    {
+      return false;
+    }
+    uphi_mech *= (1.0 / uphim);
+
+    // η̂: start from rotated local ŷ, orthogonalize to {un,uphi}; normalize
+    ueta_mech = u_y
+              - un_mech   * u_y.Dot(un_mech)
+              - uphi_mech * u_y.Dot(uphi_mech);
+    const double uetam = std::sqrt(ueta_mech.Mag2());
+    if (!(uetam > 0.0))
+    {
+      return false;
+    }
+    ueta_mech *= (1.0 / uetam);
+
+    // Ensure right-handed triad
+    if (un_mech.Cross(uphi_mech).Dot(ueta_mech) < 0.0)
+    {
+      ueta_mech = -ueta_mech;
+    }
+
+    // Align mechanical φ-axis sign with geometric φ tangent if available
+    XYZVector uphi_ref = ephi_geom;
+    const double refMag = std::sqrt(uphi_ref.Mag2());
+    if (refMag > 0.0)
+    {
+      uphi_ref *= (1.0 / refMag);
+      if (uphi_mech.Dot(uphi_ref) < 0.0)
+      {
+        uphi_mech = -uphi_mech;
+        ueta_mech = -ueta_mech;
+      }
+    }
+  }
+
+  // ────────────────────────────────────────────────────────────────────────────
+  // Step 5) Compute incidence in the mechanical frame
+  // ────────────────────────────────────────────────────────────────────────────
+  double pn   = 0.0;
+  double pph  = 0.0;
+  double pet  = 0.0;
+  double aphi = 0.0;
+  double aeta = 0.0;
+
+  if (!basis_to_incidence(un_mech, uphi_mech, ueta_mech,
+                          pn, pph, pet,
+                          aphi, aeta))
+  {
+    return false;
+  }
+
+  a_phi_sgn = static_cast<float>(aphi);
+  a_eta_sgn = static_cast<float>(aeta);
+
+  m_lastAlphaPhiSigned = a_phi_sgn;
+  m_lastAlphaEtaSigned = a_eta_sgn;
+
+  const bool ok =
+      (std::isfinite(a_phi_sgn) && std::isfinite(a_eta_sgn));
+
+  return ok;
+}
+
+void BEmcRecCEMC::CorrectShowerDepth(int ix, int iy, float E, float xA, float yA, float zA, float& xC, float& yC, float& zC)
+{
+  if (!m_UseCorrectShowerDepth)
+  {
+    xC = xA;
+    yC = yA;
+    zC = zA;
+    return;
+  }
 
   float logE = log(0.1);
   if (E > 0.1)
@@ -249,37 +454,77 @@ void BEmcRecCEMC::CorrectShowerDepth(float E, float xA, float yA, float zA, floa
     logE = std::log(E);
   }
 
+  float phi = 0;
   // Rotate by phi (towers are tilted by a fixed angle in phi by ~9 deg?)
   // Just tuned from sim data
-  float phi = 0.002 - 0.001 * logE;
+  if (m_UseDetailedGeometry)
+  {
+    phi = 0.0033 - 0.0010 * logE;
+  }
+  else
+  {
+    phi = 0.0016 - 0.0010 * logE;
+  }
   xC = xA * std::cos(phi) - yA * std::sin(phi);
   yC = xA * std::sin(phi) + yA * std::cos(phi);
 
   // Correction in z
-  // Just tuned for sim data ... don't fully understand why it works like that
-  float rA = std::sqrt(xA * xA + yA * yA);
-  //  float theta_twr = GetTowerTheta(xA,yA,zA);
+  float rA = std::sqrt((xA * xA) + (yA * yA));
   float theta_twr;
-  if (std::fabs(zA) <= 15)
+  if (m_UseDetailedGeometry)
   {
-    theta_twr = 0;
-  }
-  else if (zA > 15)
-  {
-    theta_twr = std::atan2(zA - 15, rA);
+    // Read the angle right from the detailed RawTowerGeom objects
+    TowerGeom geom0;
+    GetTowerGeometry(ix, iy, geom0);
+    theta_twr = M_PI / 2 + geom0.rotX;
   }
   else
   {
-    theta_twr = std::atan2(zA + 15, rA);
+    // Use the approximate default tower angles array.
+    theta_twr = M_PI / 2 - angles[iy];
   }
 
   float theta_tr = std::atan2(zA - fVz, rA);
-  float L = -1.3 + 0.7 * logE;  // Shower CG in long. direction
+
+  // Shower CG in long. direction
+  // Different tuning for the approximate and detailed geometry
+  float L = 0;
+  if (m_UseDetailedGeometry)
+  {
+    L = -2.67787 + 0.924138 * logE;
+  }
+  else
+  {
+    L = -1.79968 + 0.837322 * logE;
+  }
   float dz = L * std::sin(theta_tr - theta_twr) / std::cos(theta_twr);
 
-  dz -= fVz * 0.10;
+  if (!m_UseDetailedGeometry)
+  {
+    // Not strictly speaking a "shower depth correction" but rather a baseline correction
+    // The factor 0.10 accounts for the fact that the approximate geometry
+    // is projected at 93.5cm, which is roughly 90 % of the actual average EMCal radius (~ 105 cm)
+    dz -= fVz * 0.10;
+  }
 
   zC = zA - dz;
+
+  // zvtx-dependent pseudorapidity-correction
+  // At large zvtx (> 20 cm), the sawtooth shape of the EMCal is no longer projective wrt collision point,
+  // it introduces a bias which can be approximately corrected with the linear formula below
+  if (m_UseDetailedGeometry && std::abs(fVz) > 20)
+  {
+    float eta = std::asinh((zC - fVz) / rA);
+    if (fVz > 0)
+    {
+      eta -= slopes_[iy] * (fVz - 20);
+    }
+    else
+    {
+      eta -= slopes_[fNy - iy - 1] * (fVz + 20);
+    }
+    zC = fVz + rA * std::sinh(eta);
+  }
 
   return;
 }
@@ -330,58 +575,34 @@ void BEmcRecCEMC::CorrectPosition(float Energy, float x, float y,
   // Everything here is in tower units.
   // (x,y) - CG position, (xc,yc) - corrected position
 
-  float xZero, yZero, bx, by;
-  float t, x0, y0;
-  int ix0, iy0;
+  float bx;
+  float by;
+  float x0;
+  float y0;
+  int ix0;
+  int iy0;
 
-  xc = x;
-  yc = y;
+  if (!m_UseCorrectPosition)
+  {
+    xc = x;
+    yc = y;
+    return;
+  }
 
   if (Energy < 0.01)
   {
     return;
   }
-  /*
-  float xA, yA, zA;
-  Tower2Global(Energy, x, y, xA, yA, zA);
-  zA -= fVz;
-  float sinTx = xA / sqrt(xA * xA + zA * zA);
-  float sinTy = yA / sqrt(yA * yA + zA * zA);
-  */
-  float sinTx = 0;
-  float sinTy = 0;
 
-  float sin2Tx = sinTx * sinTx;
-  float sin2Ty = sinTy * sinTy;
+  bx = 0.15;
+  by = 0.15;
 
-  if (sinTx > 0)
-  {
-    xZero = -0.417 * sinTx - 1.500 * sin2Tx;
-  }
-  else
-  {
-    xZero = -0.417 * sinTx + 1.500 * sin2Tx;
-  }
-
-  if (sinTy > 0)
-  {
-    yZero = -0.417 * sinTy - 1.500 * sin2Ty;
-  }
-  else
-  {
-    yZero = -0.417 * sinTy + 1.500 * sin2Ty;
-  }
-
-  t = 0.98 + 0.98 * std::sqrt(Energy);
-  bx = 0.15 + t * sin2Tx;
-  by = 0.15 + t * sin2Ty;
-
-  x0 = x + xZero;
+  x0 = x;
   ix0 = EmcCluster::lowint(x0 + 0.5);
 
-  if (EmcCluster::ABS(x0 - ix0) <= 0.5)
+  if (std::abs(x0 - ix0) <= 0.5)
   {
-    x0 = (ix0 - xZero) + bx * asinh(2. * (x0 - ix0) * sinh(0.5 / bx));
+    x0 = ix0 + bx * asinh(2. * (x0 - ix0) * sinh(0.5 / bx));
   }
   else
   {
@@ -392,14 +613,25 @@ void BEmcRecCEMC::CorrectPosition(float Energy, float x, float y,
 
   // Correct for phi bias within module of 8 towers
 // NOLINTNEXTLINE(bugprone-incorrect-roundings)
-  int ix8 = int(x + 0.5) / 8;
-  float x8 = x + 0.5 - ix8 * 8 - 4;  // from -4 to +4
-  float dx = 0.10 * x8 / 4.;
-  if (std::fabs(x8) > 3.3)
+  int ix8 = int(x + 0.5) / 8; // that is hokey - suggest lroundf(x)
+  float x8 = x + 0.5 - (ix8 * 8) - 4;  // from -4 to +4
+  float dx = 0;
+  if (m_UseDetailedGeometry)
   {
-    dx = 0;  // Don't correct near the module edge
+    // Don't know why there is a different factor for each tower of the sector
+    // Just tuned from MC
+// NOLINTNEXTLINE(bugprone-incorrect-roundings)
+    int local_ix8 = int(x+0.5) - ix8 * 8; // that is hokey - suggest lroundf(x)
+    dx = factor_[local_ix8] * x8 / 4.;
   }
-  //  dx = 0;
+  else
+  {
+    dx = 0.10 * x8 / 4.;
+    if (std::fabs(x8) > 3.3)
+    {
+      dx = 0;  // Don't correct near the module edge
+    }
+  }
 
   xc = x0 - dx;
   while (xc < -0.5)
@@ -411,12 +643,12 @@ void BEmcRecCEMC::CorrectPosition(float Energy, float x, float y,
     xc -= float(fNx);
   }
 
-  y0 = y + yZero;
+  y0 = y;
   iy0 = EmcCluster::lowint(y0 + 0.5);
 
-  if (EmcCluster::ABS(y0 - iy0) <= 0.5)
+  if (std::abs(y0 - iy0) <= 0.5)
   {
-    y0 = (iy0 - yZero) + by * asinh(2. * (y0 - iy0) * sinh(0.5 / by));
+    y0 = iy0 + by * std::asinh(2. * (y0 - iy0) * sinh(0.5 / by));
   }
   else
   {
@@ -426,74 +658,3 @@ void BEmcRecCEMC::CorrectPosition(float Energy, float x, float y,
   }
   yc = y0;
 }
-
-/*
-void BEmcRecCEMC::CorrectPosition(float Energy, float x, float y,
-                                  float* pxc, float* pyc)
-{
-  // Corrects the Shower Center of Gravity for the systematic error due to
-  // the limited tower size and angle shift
-  //
-  // Everything here is in cell units.
-  // (x,y) - CG position, (*pxc,*pyc) - corrected position
-
-  float xShift, yShift, xZero, yZero, bx, by;
-  float t, x0, y0;
-  int ix0, iy0;
-  //  int signx, signy;
-
-  const float Xrad = 0.3;  // !!!!! Need to put correct value
-  const float Remc = 90.;  // EMCal inner radius. !!!!! Should be obtained from geometry container
-
-  *pxc = x;
-  *pyc = y;
-  //  return;
-
-  SetProfileParameters(0, Energy, x, y);
-  // if( fSinTx >= 0 ) signx =  1;
-  // else 	   signx = -1;
-  // if( fSinTy >= 0 ) signy =  1;
-  // else 	   signy = -1;
-  t = 5.0 + 1.0 * log(Energy);         // In Rad Length units
-  t *= (Xrad / Remc / GetModSizex());  // !!!!!
-  xShift = t * fSinTx;
-  yShift = t * fSinTy;
-  // xZero=xShift-(0.417*EmcCluster::ABS(fSinTx)+1.500*fSinTx*fSinTx)*signx;
-  // yZero=yShift-(0.417*EmcCluster::ABS(fSinTy)+1.500*fSinTy*fSinTy)*signy;
-  xZero = xShift;                  // ...Somehow this works better !!!!!
-  yZero = yShift;                  // ...Somehow this works better !!!!!
-  t = 0.98 + 0.98 * sqrt(Energy);  // !!!!! Still from PHENIX
-  bx = 0.15 + t * fSinTx * fSinTx;
-  by = 0.15 + t * fSinTy * fSinTy;
-
-  x0 = x;
-  x0 = x0 - xShift + xZero;
-  ix0 = EmcCluster::lowint(x0 + 0.5);
-  if (EmcCluster::ABS(x0 - ix0) <= 0.5)
-  {
-    x0 = (ix0 - xZero) + bx * asinh(2. * (x0 - ix0) * sinh(0.5 / bx));
-    *pxc = x0;
-  }
-  else
-  {
-    *pxc = x - xShift;
-    std::cout << "????? Something wrong in CorrectPosition: x = "
-         << x << " dx = " << x0 - ix0 << std::endl;
-  }
-
-  y0 = y;
-  y0 = y0 - yShift + yZero;
-  iy0 = EmcCluster::lowint(y0 + 0.5);
-  if (EmcCluster::ABS(y0 - iy0) <= 0.5)
-  {
-    y0 = (iy0 - yZero) + by * asinh(2. * (y0 - iy0) * sinh(0.5 / by));
-    *pyc = y0;
-  }
-  else
-  {
-    *pyc = y - yShift;
-    std::cout << "????? Something wrong in CorrectPosition: y = "
-         << y << " dy = " << y0 - iy << std::endl;
-  }
-}
-*/

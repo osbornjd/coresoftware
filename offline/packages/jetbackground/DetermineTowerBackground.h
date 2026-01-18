@@ -13,6 +13,7 @@
 #include <jetbase/Jet.h>
 #include <string>
 #include <vector>
+#include <array>
 
 // forward declarations
 class PHCompositeNode;
@@ -37,13 +38,17 @@ class DetermineTowerBackground : public SubsysReco
   void SetBackgroundOutputName(const std::string &name) { _backgroundName = name; }
   void SetSeedType(int seed_type) { _seed_type = seed_type; }
   void SetFlow(int do_flow) { _do_flow = do_flow; };
-
+  void SetOverwriteCaloV2(std::string &url)
+  {
+    m_overwrite_average_calo_v2 = true;
+    m_overwrite_average_calo_v2_path = url;
+  }
   void SetSeedJetD(float D) { _seed_jet_D = D; };
   void SetSeedJetPt(float pt) { _seed_jet_pt = pt; };
-  void set_towerinfo(bool use_towerinfo)
-  {
-    m_use_towerinfo = use_towerinfo;
-  }
+  void SetSeedMaxConst(float max_const) { _seed_max_const = max_const; };
+
+  void UseReweighting(bool do_reweight ) {  _do_reweight = do_reweight; }
+
   void set_towerNodePrefix(const std::string &prefix)
   {
     m_towerNodePrefix = prefix;
@@ -51,9 +56,17 @@ class DetermineTowerBackground : public SubsysReco
   }
 
  private:
+
   int CreateNode(PHCompositeNode *topNode);
   void FillNode(PHCompositeNode *topNode);
 
+  int LoadCalibrations();
+
+  std::vector<float> _CENTRALITY_V2;
+  std::string m_calibName = "JET_AVERAGE_CALO_V2_SEPD_PSI2";
+  bool m_overwrite_average_calo_v2{false};
+  std::string m_overwrite_average_calo_v2_path;
+  
   int _do_flow{0};
   float _v2{0};
   float _Psi2{0};
@@ -64,6 +77,7 @@ class DetermineTowerBackground : public SubsysReco
   int _HCAL_NETA{-1};
   int _HCAL_NPHI{-1};
 
+  
   std::vector<std::vector<float> > _EMCAL_E;
   std::vector<std::vector<float> > _IHCAL_E;
   std::vector<std::vector<float> > _OHCAL_E;
@@ -77,10 +91,16 @@ class DetermineTowerBackground : public SubsysReco
   std::vector<float> _FULLCALOFLOW_PHI_E;
   std::vector<float> _FULLCALOFLOW_PHI_VAL;
 
+  bool _do_reweight{true}; // flag to indicate if reweighting is used
+  std::vector<float> _EMCAL_PHI_WEIGHTS;
+  std::vector<float> _IHCAL_PHI_WEIGHTS;
+  std::vector<float> _OHCAL_PHI_WEIGHTS;
+
   std::string _backgroundName{"TestTowerBackground"};
 
   int _seed_type{0};
-  float _seed_jet_D{3.0};
+  float _seed_jet_D{4.0};
+  float _seed_max_const{3.0};
   float _seed_jet_pt{7.0};
 
   std::vector<float> _seed_eta;
@@ -89,7 +109,8 @@ class DetermineTowerBackground : public SubsysReco
   Jet::PROPERTY _index_SeedD{};
   Jet::PROPERTY _index_SeedItr{};
 
-  bool m_use_towerinfo{false};
+  bool _is_flow_failure{false};
+  bool _reweight_failed{false};
 
   std::string m_towerNodePrefix{"TOWERINFO_CALIB"};
   std::string EMTowerName;

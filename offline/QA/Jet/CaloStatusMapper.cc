@@ -1,46 +1,34 @@
-/// ===========================================================================
-/*! \file   CaloStatusMapperLinkDef.h
- *  \author Derek Anderson
- *  \date   05.22.2024
- *
- *  A Fun4All QA module to plot no. of towers per event
- *  and vs. eta, phi as a function of status.
- */
-/// ===========================================================================
-
-#define CLUSTERSTATUSMAPPER_CC
-
-// module definition
+// module definitions
 #include "CaloStatusMapper.h"
 
 // calo base
 #include <calobase/TowerInfo.h>
+#include <calobase/TowerInfoContainer.h>
 
 // calo trigger
 #include <calotrigger/TriggerAnalyzer.h>
 
-// f4a libraries
-#include <fun4all/Fun4AllReturnCodes.h>
+// f4a includes
 #include <fun4all/Fun4AllHistoManager.h>
+#include <fun4all/Fun4AllReturnCodes.h>
 
-// phool libraries
+// phool includes
+#include <phool/PHCompositeNode.h>
 #include <phool/getClass.h>
 #include <phool/phool.h>
-#include <phool/PHCompositeNode.h>
 
 // qa utilities
 #include <qautils/QAHistManagerDef.h>
 
-// root libraries
+// root includes
 #include <TH1.h>
 #include <TH2.h>
+#include <TStyle.h>
 
-// c++ utiilites
-#include <algorithm>
+// c++ includes
 #include <cassert>
+#include <cstddef>
 #include <iostream>
-
-
 
 // ctor/dtor ==================================================================
 
@@ -50,7 +38,6 @@
 CaloStatusMapper::CaloStatusMapper(const std::string& modulename, const bool debug)
   : SubsysReco(modulename)
 {
-
   // print debug message
   if (debug && (Verbosity() > 1))
   {
@@ -62,8 +49,6 @@ CaloStatusMapper::CaloStatusMapper(const std::string& modulename, const bool deb
 
 }  // end ctor(std::string&, bool)
 
-
-
 // ----------------------------------------------------------------------------
 //! Module constructor accepting a configuration
 // ----------------------------------------------------------------------------
@@ -71,7 +56,6 @@ CaloStatusMapper::CaloStatusMapper(const Config& config)
   : SubsysReco(config.moduleName)
   , m_config(config)
 {
-
   // print debug message
   if (m_config.debug && (Verbosity() > 1))
   {
@@ -80,14 +64,11 @@ CaloStatusMapper::CaloStatusMapper(const Config& config)
 
 }  // end ctor(Config&)
 
-
-
 // ----------------------------------------------------------------------------
 //! Module destructor
 // ----------------------------------------------------------------------------
 CaloStatusMapper::~CaloStatusMapper()
 {
-
   // print debug message
   if (m_config.debug && (Verbosity() > 1))
   {
@@ -97,8 +78,6 @@ CaloStatusMapper::~CaloStatusMapper()
 
 }  // end dtor
 
-
-
 // fun4all methods ============================================================
 
 // ----------------------------------------------------------------------------
@@ -106,7 +85,6 @@ CaloStatusMapper::~CaloStatusMapper()
 // ----------------------------------------------------------------------------
 int CaloStatusMapper::Init(PHCompositeNode* /*topNode*/)
 {
-
   if (m_config.debug)
   {
     std::cout << "CaloStatusMapper::Init(PHCompositeNode*) Initializing" << std::endl;
@@ -126,14 +104,11 @@ int CaloStatusMapper::Init(PHCompositeNode* /*topNode*/)
 
 }  // end 'Init(PHCompositeNode*)'
 
-
-
 // ----------------------------------------------------------------------------
 //! Grab inputs and fills histograms
 // ----------------------------------------------------------------------------
 int CaloStatusMapper::process_event(PHCompositeNode* topNode)
 {
-
   if (m_config.debug)
   {
     std::cout << "CaloStatusMapper::process_event(PHCompositeNode* topNode) Processing Event" << std::endl;
@@ -153,50 +128,71 @@ int CaloStatusMapper::process_event(PHCompositeNode* topNode)
   // grab input nodes
   GrabNodes(topNode);
 
+  float sumCaloE = 0;
+
   // loop over input nodes
   for (size_t iNode = 0; iNode < m_inNodes.size(); ++iNode)
   {
-
     // grab node name & make status base
     const std::string nodeName = m_config.inNodeNames[iNode].first;
     const std::string statBase = MakeBaseName("Status", nodeName);
+    const std::string energyBase = MakeBaseName("TowerE", nodeName);
+
+    float totalE = 0;
 
     // loop over towers
     TowerInfoContainer* towers = m_inNodes[iNode];
     for (size_t iTower = 0; iTower < towers->size(); ++iTower)
     {
-
       // grab eta, phi indices
       const int32_t key = towers->encode_key(iTower);
       const int32_t iEta = towers->getTowerEtaBin(key);
       const int32_t iPhi = towers->getTowerPhiBin(key);
 
       // get status
-      const auto tower = towers->get_tower_at_channel(iTower);
+      auto* const tower = towers->get_tower_at_channel(iTower);
       const auto status = CaloStatusMapperDefs::GetTowerStatus(tower);
       if (status == CaloStatusMapperDefs::Stat::Unknown)
       {
         std::cout << PHWHERE << ": Warning! Tower has an unknown status!\n"
                   << "  channel = " << iTower << ", key = " << key << "\n"
                   << "  node = " << m_config.inNodeNames[iNode].first
-                  << std::endl; 
+                  << std::endl;
         continue;
-      } 
+      }
 
       // make base eta/phi hist name
       const std::string statLabel = CaloStatusMapperDefs::StatLabels().at(status);
+
+      // if not doing optional histograms, skip these status
+      if (!m_config.doOptHist && CaloStatusMapperDefs::IsStatusSkippable(statLabel))
+      {
+        continue;
+      }
+
       const std::string perEtaBase = MakeBaseName("NPerEta", nodeName, statLabel);
       const std::string perPhiBase = MakeBaseName("NPerPhi", nodeName, statLabel);
       const std::string phiEtaBase = MakeBaseName("PhiVsEta", nodeName, statLabel);
 
       // fill histograms accordingly
       m_hists[statBase]->Fill(status);
+      m_hists[statBase]->AddBinContent(m_totalBin[statBase], 1.0);
       m_hists[perEtaBase]->Fill(iEta);
       m_hists[perPhiBase]->Fill(iPhi);
       m_hists[phiEtaBase]->Fill(iEta, iPhi);
 
+      float towerE = tower->get_energy();
+      totalE += towerE;
     }  // end tower loop
+
+    // fill total tower energy
+    m_hists[energyBase]->Fill(totalE);
+
+    sumCaloE += totalE;
   }  // end node loop
+
+  // fill all calo total energy plot
+  allCaloEnergy->Fill(sumCaloE);
 
   // increment event no. and return
   ++m_nEvent;
@@ -204,35 +200,35 @@ int CaloStatusMapper::process_event(PHCompositeNode* topNode)
 
 }  // end 'process_event(PHCompositeNode*)'
 
-
-
 // ----------------------------------------------------------------------------
 //! Run final calculations
 // ----------------------------------------------------------------------------
 int CaloStatusMapper::End(PHCompositeNode* /*topNode*/)
 {
-
   if (m_config.debug)
   {
     std::cout << "CaloStatusMapper::End(PHCompositeNode* topNode) This is the End..." << std::endl;
   }
 
   // normalize avg. status no.s
-  for (const auto& nodeName : m_config.inNodeNames)
+  if (m_config.doNorm)
   {
-    const std::string statBase = MakeBaseName("Status", nodeName.first);
-    m_hists[statBase]->Scale(1. / (double) m_nEvent);
+    for (const auto& nodeName : m_config.inNodeNames)
+    {
+      const std::string statBase = MakeBaseName("Status", nodeName.first);
+      m_hists[statBase]->Scale(1. / (double) m_nEvent);
+    }
   }
 
   // register hists and exit
-  for (const auto& hist : m_hists) {
+  for (const auto& hist : m_hists)
+  {
     m_manager->registerHisto(hist.second);
   }
+  m_manager->registerHisto(allCaloEnergy);
   return Fun4AllReturnCodes::EVENT_OK;
 
 }  // end 'End(PHCompositeNode*)'
-
-
 
 // private methods ============================================================
 
@@ -241,13 +237,13 @@ int CaloStatusMapper::End(PHCompositeNode* /*topNode*/)
 // ----------------------------------------------------------------------------
 void CaloStatusMapper::InitHistManager()
 {
-
   // print debug message
   if (m_config.debug && (Verbosity() > 0))
   {
     std::cout << "CaloStatusMapper::InitHistManager() Initializing histogram manager" << std::endl;
   }
 
+  gStyle->SetOptTitle(0);
   m_manager = QAHistManagerDef::getHistoManager();
   if (!m_manager)
   {
@@ -258,14 +254,11 @@ void CaloStatusMapper::InitHistManager()
 
 }  // end 'InitHistManager()'
 
-
-
 // ----------------------------------------------------------------------------
 //! Build histograms
 // ----------------------------------------------------------------------------
 void CaloStatusMapper::BuildHistograms()
 {
-
   // print debug message
   if (m_config.debug && (Verbosity() > 0))
   {
@@ -274,26 +267,76 @@ void CaloStatusMapper::BuildHistograms()
 
   // instantiate histogram definitions
   const CaloStatusMapperDefs::EMCalHistDef emHistDef;
-  const CaloStatusMapperDefs::HCalHistDef  hcHistDef;
+  const CaloStatusMapperDefs::HCalHistDef hcHistDef;
+
+  const CaloStatusMapperDefs::EMCalHistDef_pp emHistDef_pp;
+  const CaloStatusMapperDefs::HCalHistDef_pp hcHistDef_pp;
+
+  // make total calo energy hist
+  const std::string caloEBase = MakeBaseName("TowerE", "towerinfo_calib_allcalo");
+  const std::string caloEName = JetQADefs::MakeQAHistName(caloEBase, m_config.moduleName, m_config.histTag);
+  if (!m_config.inPPMode)
+  {
+    allCaloEnergy = new TH1F(caloEName.data(), "All Calo Tower Energy Sum; Tower E [GeV]", 320, -200, 3000);
+  }
+  else
+  {
+    allCaloEnergy = new TH1F(caloEName.data(), "All Calo Tower Energy Sum; Tower E [GeV]", 210, -10, 200);
+  }
 
   // loop over input node names
   for (const auto& nodeName : m_config.inNodeNames)
   {
-
     // make status hist name
     const std::string statBase = MakeBaseName("Status", nodeName.first);
-    const std::string statName = CaloStatusMapperDefs::MakeQAHistName(statBase, m_config.moduleName, m_config.histTag);
+    const std::string statName = JetQADefs::MakeQAHistName(statBase, m_config.moduleName, m_config.histTag);
 
     // create status hist
     //   - n.b. calo type doesn't matter here
     m_hists[statBase] = emHistDef.MakeStatus1D(statName);
 
+    // make tower energy hist name
+    const std::string energyBase = MakeBaseName("TowerE", nodeName.first);
+    const std::string energyName = JetQADefs::MakeQAHistName(energyBase, m_config.moduleName, m_config.histTag);
+
+    // create energy hist
+    switch (nodeName.second)
+    {
+    case CaloStatusMapperDefs::Calo::HCal:
+      if (!m_config.inPPMode)
+      {
+        m_hists[energyBase] = hcHistDef.MakeEnergy1D(energyName);
+      }
+      else
+      {
+        m_hists[energyBase] = hcHistDef_pp.MakeEnergy1D(energyName);
+      }
+      break;
+    case CaloStatusMapperDefs::Calo::EMCal:
+      [[fallthrough]];
+    default:
+      if (!m_config.inPPMode)
+      {
+        m_hists[energyBase] = emHistDef.MakeEnergy1D(energyName);
+      }
+      else
+      {
+        m_hists[energyBase] = emHistDef_pp.MakeEnergy1D(energyName);
+      }
+      break;
+    }
+
     // loop over status labels
     for (const auto& statLabel : CaloStatusMapperDefs::StatLabels())
     {
-
       // set relevant bin label for status histogram
       m_hists[statBase]->GetXaxis()->SetBinLabel(statLabel.first + 1, statLabel.second.data());
+
+      // if not doing optional histograms, skip these status
+      if (!m_config.doOptHist && CaloStatusMapperDefs::IsStatusSkippable(statLabel.second))
+      {
+        continue;
+      }
 
       // make base eta/phi hist name
       const std::string perEtaBase = MakeBaseName("NPerEta", nodeName.first, statLabel.second);
@@ -301,41 +344,42 @@ void CaloStatusMapper::BuildHistograms()
       const std::string phiEtaBase = MakeBaseName("PhiVsEta", nodeName.first, statLabel.second);
 
       // make full eta/phi hist name
-      const std::string namePerEta = CaloStatusMapperDefs::MakeQAHistName(perEtaBase, m_config.moduleName, m_config.histTag);
-      const std::string namePerPhi = CaloStatusMapperDefs::MakeQAHistName(perPhiBase, m_config.moduleName, m_config.histTag);
-      const std::string namePhiEta = CaloStatusMapperDefs::MakeQAHistName(phiEtaBase, m_config.moduleName, m_config.histTag);
+      const std::string namePerEta = JetQADefs::MakeQAHistName(perEtaBase, m_config.moduleName, m_config.histTag);
+      const std::string namePerPhi = JetQADefs::MakeQAHistName(perPhiBase, m_config.moduleName, m_config.histTag);
+      const std::string namePhiEta = JetQADefs::MakeQAHistName(phiEtaBase, m_config.moduleName, m_config.histTag);
 
       // make eta/phi hists
       switch (nodeName.second)
       {
-        case CaloStatusMapperDefs::Calo::HCal:
-          m_hists[perEtaBase] = hcHistDef.MakeEta1D(namePerEta);
-          m_hists[perPhiBase] = hcHistDef.MakePhi1D(namePerPhi);
-          m_hists[phiEtaBase] = hcHistDef.MakePhiEta2D(namePhiEta);
-          break;
-        case CaloStatusMapperDefs::Calo::EMCal:
-          [[fallthrough]];
-        default:
-          m_hists[perEtaBase] = emHistDef.MakeEta1D(namePerEta);
-          m_hists[perPhiBase] = emHistDef.MakePhi1D(namePerPhi);
-          m_hists[phiEtaBase] = emHistDef.MakePhiEta2D(namePhiEta);
-          break;
+      case CaloStatusMapperDefs::Calo::HCal:
+        m_hists[perEtaBase] = hcHistDef.MakeEta1D(namePerEta);
+        m_hists[perPhiBase] = hcHistDef.MakePhi1D(namePerPhi);
+        m_hists[phiEtaBase] = hcHistDef.MakePhiEta2D(namePhiEta);
+        break;
+      case CaloStatusMapperDefs::Calo::EMCal:
+        [[fallthrough]];
+      default:
+        m_hists[perEtaBase] = emHistDef.MakeEta1D(namePerEta);
+        m_hists[perPhiBase] = emHistDef.MakePhi1D(namePerPhi);
+        m_hists[phiEtaBase] = emHistDef.MakePhiEta2D(namePhiEta);
+        break;
       }
 
     }  // end status loop
+
+    int totalBin = m_hists[statBase]->GetNbinsX();
+    m_hists[statBase]->GetXaxis()->SetBinLabel(totalBin, "N_{Total}");
+    m_totalBin[statBase] = totalBin;
   }  // end node loop
   return;
 
 }  // end 'BuildHistograms()'
-
-
 
 // ----------------------------------------------------------------------------
 //! Grab input nodes
 // ----------------------------------------------------------------------------
 void CaloStatusMapper::GrabNodes(PHCompositeNode* topNode)
 {
-
   // print debug message
   if (m_config.debug && (Verbosity() > 0))
   {
@@ -346,11 +390,9 @@ void CaloStatusMapper::GrabNodes(PHCompositeNode* topNode)
   m_inNodes.clear();
 
   // loop over nodes to grab
-  for (auto inNodeName : m_config.inNodeNames)
+  for (const auto& inNodeName : m_config.inNodeNames)
   {
-    m_inNodes.push_back(
-      findNode::getClass<TowerInfoContainer>(topNode, inNodeName.first)
-    );
+    m_inNodes.push_back(findNode::getClass<TowerInfoContainer>(topNode, inNodeName.first));
     if (!m_inNodes.back())
     {
       std::cerr << PHWHERE << ":" << " PANIC! Not able to grab node " << inNodeName.first << "! Aborting!" << std::endl;
@@ -361,17 +403,14 @@ void CaloStatusMapper::GrabNodes(PHCompositeNode* topNode)
 
 }  // end 'GrabNodes(PHCompositeNode*)'
 
-
-
 // ----------------------------------------------------------------------------
 //! Make base histogram name
 // ----------------------------------------------------------------------------
 std::string CaloStatusMapper::MakeBaseName(
-  const std::string& base,
-  const std::string& node,
-  const std::string& stat) const
+    const std::string& base,
+    const std::string& node,
+    const std::string& stat) const
 {
-
   if (m_config.debug && (Verbosity() > 2))
   {
     std::cout << "CaloStatusMapper::MakeBaseName(std::string& x 3) Making base histogram name" << std::endl;

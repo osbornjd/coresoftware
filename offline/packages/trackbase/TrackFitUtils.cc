@@ -6,11 +6,9 @@
 #include "TrkrClusterContainerv4.h"
 #include "TrkrDefs.h"  // for cluskey, getTrkrId, tpcId
 
-#include <math.h>
-#include <trackbase/MvtxDefs.h>
-
 #include <Acts/Definitions/Algebra.hpp>
 #include <Acts/Definitions/Units.hpp>
+
 #include <algorithm>
 #include <cmath>
 #include <cstdint>
@@ -109,8 +107,10 @@ Acts::Vector3 TrackFitUtils::surface_3Dline_intersection(const TrkrDefs::cluskey
   float const z2 = (y2 - yzint) / yzslope;
 
   Acts::Vector3 v1(x1, y1, z1), v2(x2, y2, z2);
-  Acts::Vector3 const surfcenter = surf->center(geometry->geometry().getGeoContext()) / Acts::UnitConstants::cm;
-  Acts::Vector3 const surfnorm = surf->normal(geometry->geometry().getGeoContext()) / Acts::UnitConstants::cm;
+
+  Acts::Vector3 surfcenter = surf->center(geometry->geometry().getGeoContext()) / Acts::UnitConstants::cm;
+  Acts::Vector3 surfnorm = surf->normal(geometry->geometry().getGeoContext(), Acts::Vector3(1,1,1), Acts::Vector3(1,1,1)) / Acts::UnitConstants::cm;
+
   Acts::Vector3 u = v2 - v1;
   float const dot = surfnorm.dot(u);
 
@@ -627,7 +627,7 @@ std::vector<float> TrackFitUtils::fitClusters(std::vector<Acts::Vector3>& global
   {
     unsigned int const trkrid = TrkrDefs::getTrkrId(cluskey_vec[ivec]);
 
-    if (trkrid != TrkrDefs::inttId and cluskey_vec[ivec] != 0)
+    if (trkrid != TrkrDefs::inttId && cluskey_vec[ivec] != 0)
     {
       global_vec_noINTT.push_back(global_vec[ivec]);
     }
@@ -653,8 +653,9 @@ std::vector<float> TrackFitUtils::fitClusters(std::vector<Acts::Vector3>& global
 }
 
 //_________________________________________________________________________________
-std::vector<float> TrackFitUtils::fitClustersZeroField(std::vector<Acts::Vector3>& global_vec,
-                                                       const std::vector<TrkrDefs::cluskey> &cluskey_vec, bool use_intt, bool mvtx_east, bool mvtx_west)
+std::vector<float> TrackFitUtils::fitClustersZeroField(const std::vector<Acts::Vector3>& global_vec,
+                                                       const std::vector<TrkrDefs::cluskey>& cluskey_vec, bool use_intt, bool mvtx_east, bool mvtx_west)
+
 {
   std::vector<float> fitpars;
   std::tuple<double, double> xy_fit_pars;
@@ -689,7 +690,7 @@ std::vector<float> TrackFitUtils::fitClustersZeroField(std::vector<Acts::Vector3
         global_vec_noINTT.push_back(global_vec[ivec]);
       }
     }
-    else if (trkrid != TrkrDefs::inttId and cluskey_vec[ivec] != 0)
+    else if (trkrid != TrkrDefs::inttId && cluskey_vec[ivec] != 0)
     {
       global_vec_noINTT.push_back(global_vec[ivec]);
     }
@@ -838,8 +839,9 @@ Acts::Vector3 TrackFitUtils::get_helix_surface_intersection(const Surface& surf,
 {
   // we want the point where the helix intersects the plane of the surface
   // get the plane of the surface
-  Acts::Vector3 const sensorCenter = surf->center(_tGeometry->geometry().getGeoContext()) * 0.1;  // convert to cm
-  Acts::Vector3 sensorNormal = -surf->normal(_tGeometry->geometry().getGeoContext());
+  Acts::Vector3 sensorCenter = surf->center(_tGeometry->geometry().getGeoContext()) * 0.1;  // convert to cm
+  Acts::Vector3 sensorNormal = -surf->normal(_tGeometry->geometry().getGeoContext(), Acts::Vector3(1, 1, 1), Acts::Vector3(1, 1, 1));
+
   sensorNormal /= sensorNormal.norm();
 
   // there are analytic solutions for a line-plane intersection.

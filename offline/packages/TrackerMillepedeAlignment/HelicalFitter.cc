@@ -6,10 +6,6 @@
 #include <tpc/TpcClusterZCrossingCorrection.h>
 
 /// Tracking includes
-#include <fun4all/SubsysReco.h>
-#include <math.h>
-#include <phool/PHIODataNode.h>
-#include <phparameter/PHParameterInterface.h>
 #include <trackbase/ActsSurfaceMaps.h>
 #include <trackbase/InttDefs.h>
 #include <trackbase/MvtxDefs.h>
@@ -34,20 +30,24 @@
 #include <globalvertex/SvtxVertex.h>
 #include <globalvertex/SvtxVertexMap.h>
 
-#include <Acts/Definitions/Algebra.hpp>
-#include <Acts/Definitions/Units.hpp>
+#include <phparameter/PHParameterInterface.h>
 
 #include <fun4all/Fun4AllReturnCodes.h>
+#include <fun4all/SubsysReco.h>
 
 #include <phool/PHCompositeNode.h>
+#include <phool/PHIODataNode.h>
 #include <phool/getClass.h>
 #include <phool/phool.h>
+
+#include <Acts/Definitions/Algebra.hpp>
+#include <Acts/Definitions/Units.hpp>
 
 #include <TFile.h>
 #include <TNtuple.h>
 
 #include <climits>  // for UINT_MAX
-#include <cmath>    // for fabs, sqrt
+#include <cmath>    // for std::abs, sqrt
 #include <fstream>
 #include <iostream>  // for operator<<, basic_ostream
 #include <memory>
@@ -318,7 +318,7 @@ int HelicalFitter::process_event(PHCompositeNode* /*unused*/)
       {
         continue;  // discard incomplete seeds
       }
-      if (fabs(tracklet->get_eta()) > m_eta_cut)
+      if (std::abs(tracklet->get_eta()) > m_eta_cut)
       {
         continue;
       }
@@ -372,7 +372,7 @@ int HelicalFitter::process_event(PHCompositeNode* /*unused*/)
       auto trackseed = std::make_unique<TrackSeed_v2>();
       for (auto& ckey : cluskey_vec)
       {
-        if (TrkrDefs::getTrkrId(ckey) == TrkrDefs::TrkrId::mvtxId or
+        if (TrkrDefs::getTrkrId(ckey) == TrkrDefs::TrkrId::mvtxId ||
             TrkrDefs::getTrkrId(ckey) == TrkrDefs::TrkrId::inttId)
         {
           trackseed->insert_cluster_key(ckey);
@@ -397,9 +397,9 @@ int HelicalFitter::process_event(PHCompositeNode* /*unused*/)
         if (Verbosity() > 1)
         {
           std::cout << " Track " << trackid << " dy/dx " << fitpars[0] << " y intercept " << fitpars[1]
-                    << " dx/dz " << fitpars[2] << " Z0 " << fitpars[3] << " eta " << tracklet->get_eta() << " phi " << tracklet->get_phi() << std::endl;
+                    << " dz/dx " << fitpars[2] << " Z0 " << fitpars[3] << " eta " << tracklet->get_eta() << " phi " << tracklet->get_phi() << std::endl;
         }
-        if (fabs(tracklet->get_eta()) > m_eta_cut)
+        if (std::abs(tracklet->get_eta()) > m_eta_cut)
         {
           continue;
         }
@@ -519,7 +519,7 @@ int HelicalFitter::process_event(PHCompositeNode* /*unused*/)
       }
       continue;
     }
-    if (fabs(newTrack.get_eta()) > m_eta_cut)
+    if (std::abs(newTrack.get_eta()) > m_eta_cut)
     {
       continue;
     }
@@ -777,14 +777,14 @@ int HelicalFitter::process_event(PHCompositeNode* /*unused*/)
         // get the local parameters using the ideal transforms
         alignmentTransformationContainer::use_alignment = false;
         Acts::Vector3 ideal_center = surf->center(_tGeometry->geometry().getGeoContext()) * 0.1;
-        Acts::Vector3 ideal_norm = -surf->normal(_tGeometry->geometry().getGeoContext());
+        Acts::Vector3 ideal_norm = -surf->normal(_tGeometry->geometry().getGeoContext(),Acts::Vector3(1,1,1), Acts::Vector3(1,1,1));
         Acts::Vector3 const ideal_local(xloc, zloc, 0.0);  // cm
         Acts::Vector3 ideal_glob = surf->transform(_tGeometry->geometry().getGeoContext()) * (ideal_local * Acts::UnitConstants::cm);
         ideal_glob /= Acts::UnitConstants::cm;
         alignmentTransformationContainer::use_alignment = true;
 
         Acts::Vector3 sensorCenter = surf->center(_tGeometry->geometry().getGeoContext()) * 0.1;  // cm
-        Acts::Vector3 sensorNormal = -surf->normal(_tGeometry->geometry().getGeoContext());
+        Acts::Vector3 sensorNormal = -surf->normal(_tGeometry->geometry().getGeoContext(), Acts::Vector3(1,1,1), Acts::Vector3(1,1,1));
         unsigned int sector = TpcDefs::getSectorId(cluskey_vec[ivec]);
         unsigned int const side = TpcDefs::getSide(cluskey_vec[ivec]);
         unsigned int subsurf = cluster->getSubSurfKey();
@@ -906,29 +906,31 @@ int HelicalFitter::process_event(PHCompositeNode* /*unused*/)
 
     Acts::Vector3 event_vtx(averageVertex(0), averageVertex(1), averageVertex(2));
 
-    for (const auto& [vtxkey, vertex] : *m_vertexmap)
+    if (m_vertexmap)
     {
-      for (auto trackiter = vertex->begin_tracks(); trackiter != vertex->end_tracks(); ++trackiter)
+      for (const auto& [vtxkey, vertex] : *m_vertexmap)
       {
-        SvtxTrack* vtxtrack = m_trackmap->get(*trackiter);
-        if (vtxtrack)
+        for (auto trackiter = vertex->begin_tracks(); trackiter != vertex->end_tracks(); ++trackiter)
         {
-          unsigned int const vtxtrackid = vtxtrack->get_id();
-          if (trackid == vtxtrackid)
+          SvtxTrack* vtxtrack = m_trackmap->get(*trackiter);
+          if (vtxtrack)
           {
-            event_vtx(0) = vertex->get_x();
-            event_vtx(1) = vertex->get_y();
-            event_vtx(2) = vertex->get_z();
-            if (Verbosity() > 0)
+            unsigned int const vtxtrackid = vtxtrack->get_id();
+            if (trackid == vtxtrackid)
             {
-              std::cout << "     setting event_vertex for trackid " << trackid << " to vtxid " << vtxkey
-                        << " vtx " << event_vtx(0) << "  " << event_vtx(1) << "  " << event_vtx(2) << std::endl;
+              event_vtx(0) = vertex->get_x();
+              event_vtx(1) = vertex->get_y();
+              event_vtx(2) = vertex->get_z();
+              if (Verbosity() > 0)
+              {
+                std::cout << "     setting event_vertex for trackid " << trackid << " to vtxid " << vtxkey
+                          << " vtx " << event_vtx(0) << "  " << event_vtx(1) << "  " << event_vtx(2) << std::endl;
+              }
             }
           }
         }
       }
     }
-
 
     // The residual for the vtx case is (event vtx - track vtx)
     // that is -dca
@@ -1093,7 +1095,7 @@ Acts::Vector3 HelicalFitter::get_helix_surface_intersection(const Surface& surf,
   // we want the point where the helix intersects the plane of the surface
   // get the plane of the surface
   Acts::Vector3 const sensorCenter = surf->center(_tGeometry->geometry().getGeoContext()) * 0.1;  // convert to cm
-  Acts::Vector3 sensorNormal = -surf->normal(_tGeometry->geometry().getGeoContext());
+  Acts::Vector3 sensorNormal = -surf->normal(_tGeometry->geometry().getGeoContext(), Acts::Vector3(1, 1, 1), Acts::Vector3(1, 1, 1));
   sensorNormal /= sensorNormal.norm();
 
   // there are analytic solutions for a line-plane intersection.
@@ -1112,7 +1114,7 @@ Acts::Vector3 HelicalFitter::get_line_surface_intersection(const Surface& surf, 
   // we want the point where the helix intersects the plane of the surface
   // get the plane of the surface
   Acts::Vector3 const sensorCenter = surf->center(_tGeometry->geometry().getGeoContext()) * 0.1;  // convert to cm
-  Acts::Vector3 sensorNormal = -surf->normal(_tGeometry->geometry().getGeoContext());
+  Acts::Vector3 sensorNormal = -surf->normal(_tGeometry->geometry().getGeoContext(), Acts::Vector3(1, 1, 1), Acts::Vector3(1, 1, 1));
   sensorNormal /= sensorNormal.norm();
 
   /*
@@ -1150,7 +1152,7 @@ Acts::Vector3 HelicalFitter::get_helix_surface_intersection(const Surface& surf,
 
   // get the plane of the surface
   Acts::Vector3 const sensorCenter = surf->center(_tGeometry->geometry().getGeoContext()) * 0.1;  // convert to cm
-  Acts::Vector3 sensorNormal = -surf->normal(_tGeometry->geometry().getGeoContext());
+  Acts::Vector3 sensorNormal = -surf->normal(_tGeometry->geometry().getGeoContext(), Acts::Vector3(1, 1, 1), Acts::Vector3(1, 1, 1));
   sensorNormal /= sensorNormal.norm();
 
   // there are analytic solutions for a line-plane intersection.
@@ -1203,7 +1205,7 @@ std::pair<Acts::Vector3, Acts::Vector3> HelicalFitter::get_line_tangent(const st
 
   float const arb_phi = atan2(arb_point(1), arb_point(0));
   Acts::Vector3 tangent = arb_point2 - arb_point;  // direction of line
-  if (fabs(arb_phi - phi) > M_PI / 2)
+  if (std::abs(arb_phi - phi) > M_PI / 2)
   {
     tangent = arb_point - arb_point2;  // direction of line
   }
@@ -1947,7 +1949,7 @@ void HelicalFitter::get_projectionXY(const Surface& surf, const std::pair<Acts::
   // We need the three unit vectors in the sensor local frame, transformed to the global frame
   //====================================================================
   // sensorNormal is the Z vector in the global frame
-  Acts::Vector3 const Z = -surf->normal(_tGeometry->geometry().getGeoContext());
+  Acts::Vector3 const Z = -surf->normal(_tGeometry->geometry().getGeoContext(), Acts::Vector3(1, 1, 1), Acts::Vector3(1, 1, 1));
   // get surface X and Y unit vectors in global frame
   // transform Xlocal = 1.0 to global, subtract the surface center, normalize to 1
   Acts::Vector3 const xloc(1.0, 0.0, 0.0);  // local coord unit vector in x

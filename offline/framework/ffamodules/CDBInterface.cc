@@ -25,7 +25,7 @@
 #include <utility>   // for pair
 #include <vector>    // for vector
 
-CDBInterface *CDBInterface::__instance = nullptr;
+CDBInterface *CDBInterface::__instance{nullptr};
 
 CDBInterface *CDBInterface::instance()
 {
@@ -55,6 +55,13 @@ CDBInterface::~CDBInterface()
 //____________________________________________________________________________..
 int CDBInterface::End(PHCompositeNode *topNode)
 {
+  int iret = UpdateRunNode(topNode);PHNodeIterator iter(topNode);
+  return iret;
+}
+
+//____________________________________________________________________________..
+int CDBInterface::UpdateRunNode(PHCompositeNode *topNode)
+{
   PHNodeIterator iter(topNode);
   PHCompositeNode *runNode = dynamic_cast<PHCompositeNode *>(iter.findFirst("PHCompositeNode", "RUN"));
   CdbUrlSave *cdburls = findNode::getClass<CdbUrlSave>(runNode, "CdbUrl");
@@ -75,11 +82,11 @@ int CDBInterface::End(PHCompositeNode *topNode)
     // not possible using for range loops, iterator gets invalidated
     for (auto itr = m_UrlVector.cbegin(); itr != m_UrlVector.cend();)
     {
-      if (tmp_set.find(*itr) != tmp_set.end())
+      if (tmp_set.contains(*itr))
       {
-        if (Verbosity())
+        if (Verbosity() > 2)
         {
-          std::cout << PHWHERE << " removing already saved: domain " << std::get<0>(*itr)
+          std::cout << PHWHERE << " cleaning duplicately saved: domain " << std::get<0>(*itr)
                     << ", url: " << std::get<1>(*itr)
                     << ", timestamp: " << std::get<2>(*itr) << std::endl;
         }
@@ -91,7 +98,7 @@ int CDBInterface::End(PHCompositeNode *topNode)
       }
     }
   }
-  for (auto &tuple : m_UrlVector)
+  for (const auto &tuple : m_UrlVector)
   {
     cdburls->AddUrl(tuple);
   }
@@ -105,7 +112,7 @@ int CDBInterface::End(PHCompositeNode *topNode)
 //____________________________________________________________________________..
 void CDBInterface::Print(const std::string & /* what */) const
 {
-  for (auto &iter : m_UrlVector)
+  for (const auto &iter : m_UrlVector)
   {
     std::cout << "domain: " << std::get<0>(iter)
               << ", url: " << std::get<1>(iter)
@@ -119,6 +126,7 @@ std::string CDBInterface::getUrl(const std::string &domain, const std::string &f
   {
     return "";
   }
+  std::string domain_noconst = domain;
   recoConsts *rc = recoConsts::instance();
   if (!rc->FlagExist("CDB_GLOBALTAG"))
   {
@@ -140,30 +148,51 @@ std::string CDBInterface::getUrl(const std::string &domain, const std::string &f
   if (Verbosity() > 0)
   {
     std::cout << "Global Tag: " << rc->get_StringFlag("CDB_GLOBALTAG")
-              << ", domain: " << domain
+              << ", domain: " << domain_noconst
               << ", timestamp: " << timestamp;
   }
-  std::string return_url = cdbclient->getCalibration(domain, timestamp);
-  if (Verbosity() > 0)
+  std::string return_url = cdbclient->getCalibration(domain_noconst, timestamp);
+  if (return_url.empty())
   {
-    if (return_url.empty())
+    if (!disable_default)
     {
-      std::cout << "... reply: no file found" << std::endl;
+      std::string domain_copy = domain_noconst;
+      domain_noconst = domain_noconst + "_default";
+      return_url = cdbclient->getCalibration(domain_noconst, timestamp);
+      if (return_url.empty())
+      {
+        if (Verbosity() > 0)
+        {
+          std::cout << "... reply: no file found for "
+                    << domain_copy << " or " << domain_noconst << std::endl;
+        }
+        return_url = filename;
+      }
     }
     else
+    {
+      if (Verbosity() > 0)
+      {
+        std::cout << "... reply: no file found for "
+                  << domain_noconst << std::endl;
+      }
+    }
+  }
+  if (Verbosity() > 0)
+  {
+    if (!return_url.empty())
     {
       std::cout << "... reply: " << return_url << std::endl;
     }
   }
-  if (return_url.empty())
+  if (! return_url.empty())
   {
-    return_url = filename;
-  }
-  auto pret = m_UrlVector.insert(make_tuple(domain, return_url, timestamp));
-  if (!pret.second && Verbosity() > 1)
-  {
-    std::cout << PHWHERE << "not adding again " << domain << ", url: " << return_url
-              << ", time stamp: " << timestamp << std::endl;
+    auto pret = m_UrlVector.insert(make_tuple(domain_noconst, return_url, timestamp));
+    if (!pret.second && Verbosity() > 1)
+    {
+      std::cout << PHWHERE << "not adding again " << domain_noconst << ", url: " << return_url
+		<< ", time stamp: " << timestamp << std::endl;
+    }
   }
   return return_url;
 }

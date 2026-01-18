@@ -13,8 +13,8 @@
 #include <fun4all/Fun4AllReturnCodes.h>
 #include <fun4all/SubsysReco.h>  // for SubsysReco
 
-#include <g4detectors/PHG4TpcCylinderGeom.h>
-#include <g4detectors/PHG4TpcCylinderGeomContainer.h>
+#include <g4detectors/PHG4TpcGeom.h>
+#include <g4detectors/PHG4TpcGeomContainer.h>
 
 #include <Acts/Definitions/Units.hpp>
 #include <Acts/Surfaces/Surface.hpp>
@@ -33,6 +33,7 @@
 
 #include <TFile.h>
 
+#include <algorithm>
 #include <array>
 #include <cmath>  // for sqrt, cos, sin
 #include <iostream>
@@ -46,7 +47,7 @@
 namespace
 {
   template <class T>
-  inline constexpr T square(const T &x)
+  constexpr T square(const T &x)
   {
     return x * x;
   }
@@ -57,7 +58,7 @@ namespace
 
   struct thread_data
   {
-    PHG4TpcCylinderGeom *layergeom = nullptr;
+    PHG4TpcGeom *layergeom = nullptr;
     TrkrHitSet *hitset = nullptr;
     ActsGeometry *tGeometry = nullptr;
     unsigned int layer = 0;
@@ -142,25 +143,13 @@ namespace
 
       int iphi = iter.second.first + my_data.phioffset;
       int iz = iter.second.second + my_data.zoffset;
-      if (iphi > phibinhi)
-      {
-        phibinhi = iphi;
-      }
-      if (iphi < phibinlo)
-      {
-        phibinlo = iphi;
-      }
-      if (iz > zbinhi)
-      {
-        zbinhi = iz;
-      }
-      if (iz < zbinlo)
-      {
-        zbinlo = iz;
-      }
+      phibinhi = std::max(iphi, phibinhi);
+      phibinlo = std::min(iphi, phibinlo);
+      zbinhi = std::max(iz, zbinhi);
+      zbinlo = std::min(iz, zbinlo);
 
       // update phi sums
-      double phi_center = my_data.layergeom->get_phicenter(iphi);
+      double phi_center = my_data.layergeom->get_phicenter(iphi, my_data.side);
       phi_sum += phi_center * adc;
       phi2_sum += square(phi_center) * adc;
 
@@ -205,7 +194,7 @@ namespace
     clusz -= (clusz < 0) ? my_data.par0_neg : my_data.par0_pos;
 
     // create cluster and fill
-    auto clus = new TrkrClusterv3;
+    auto *clus = new TrkrClusterv3;
     clus->setAdc(adc_sum);
 
     /// Get the surface key to find the surface from the map
@@ -231,7 +220,7 @@ namespace
     Acts::Vector3 center = surface->center(my_data.tGeometry->geometry().getGeoContext()) / Acts::UnitConstants::cm;
 
     /// no conversion needed, only used in acts
-    const Acts::Vector3 normal = surface->normal(my_data.tGeometry->geometry().getGeoContext());
+    const Acts::Vector3 normal = surface->normal(my_data.tGeometry->geometry().getGeoContext(), Acts::Vector3(1,1,1), Acts::Vector3(1,1,1));
     const double clusRadius = std::sqrt(square(clusx) + square(clusy));
     const double rClusPhi = clusRadius * clusphi;
     const double surfRadius = sqrt(center(0) * center(0) + center(1) * center(1));
@@ -280,7 +269,7 @@ namespace
 
   void *ProcessSector(void *threadarg)
   {
-    auto my_data = (struct thread_data *) threadarg;
+    auto *my_data = (struct thread_data *) threadarg;
 
     const auto &pedestal = my_data->pedestal;
     const auto &phibins = my_data->phibins;
@@ -332,11 +321,11 @@ namespace
           all_hit_map.insert(std::make_pair(adc, thisHit));
         }
         // adcval[phibin][zbin] = (unsigned short) adc;
-        adcval[phibin][zbin] = (unsigned short) adc;
+        adcval[phibin][zbin] = adc;
       }
     }
 
-    while (all_hit_map.size() > 0)
+    while (!all_hit_map.empty())
     {
       auto iter = all_hit_map.rbegin();
       if (iter == all_hit_map.rend())
@@ -369,7 +358,7 @@ TpcSimpleClusterizer::TpcSimpleClusterizer(const std::string &name)
 {
 }
 
-bool TpcSimpleClusterizer::is_in_sector_boundary(int phibin, int sector, PHG4TpcCylinderGeom *layergeom) const
+bool TpcSimpleClusterizer::is_in_sector_boundary(int phibin, int sector, PHG4TpcGeom *layergeom) const
 {
   bool reject_it = false;
 
@@ -413,7 +402,7 @@ int TpcSimpleClusterizer::InitRun(PHCompositeNode *topNode)
   }
 
   // Create the Cluster node if required
-  auto trkrclusters = findNode::getClass<TrkrClusterContainer>(dstNode, "TRKR_CLUSTER");
+  auto *trkrclusters = findNode::getClass<TrkrClusterContainer>(dstNode, "TRKR_CLUSTER");
   if (!trkrclusters)
   {
     PHNodeIterator dstiter(dstNode);
@@ -431,7 +420,7 @@ int TpcSimpleClusterizer::InitRun(PHCompositeNode *topNode)
     DetNode->addNode(TrkrClusterContainerNode);
   }
 
-  auto clusterhitassoc = findNode::getClass<TrkrClusterHitAssoc>(topNode, "TRKR_CLUSTERHITASSOC");
+  auto *clusterhitassoc = findNode::getClass<TrkrClusterHitAssoc>(topNode, "TRKR_CLUSTERHITASSOC");
   if (!clusterhitassoc)
   {
     PHNodeIterator dstiter(dstNode);
@@ -492,11 +481,11 @@ int TpcSimpleClusterizer::process_event(PHCompositeNode *topNode)
     return Fun4AllReturnCodes::ABORTRUN;
   }
 
-  PHG4TpcCylinderGeomContainer *geom_container =
-      findNode::getClass<PHG4TpcCylinderGeomContainer>(topNode, "CYLINDERCELLGEOM_SVTX");
+  PHG4TpcGeomContainer *geom_container =
+      findNode::getClass<PHG4TpcGeomContainer>(topNode, "TPCGEOMCONTAINER");
   if (!geom_container)
   {
-    std::cout << PHWHERE << "ERROR: Can't find node CYLINDERCELLGEOM_SVTX" << std::endl;
+    std::cout << PHWHERE << "ERROR: Can't find node TPCGEOMCONTAINER" << std::endl;
     return Fun4AllReturnCodes::ABORTRUN;
   }
 
@@ -546,7 +535,7 @@ int TpcSimpleClusterizer::process_event(PHCompositeNode *topNode)
     unsigned int layer = TrkrDefs::getLayer(hitsetitr->first);
     int side = TpcDefs::getSide(hitsetitr->first);
     unsigned int sector = TpcDefs::getSectorId(hitsetitr->first);
-    PHG4TpcCylinderGeom *layergeom = geom_container->GetLayerCellGeom(layer);
+    PHG4TpcGeom *layergeom = geom_container->GetLayerCellGeom(layer);
 
     // instanciate new thread pair, at the end of thread vector
     thread_pair_t &thread_pair = threads.emplace_back();
@@ -614,7 +603,7 @@ int TpcSimpleClusterizer::process_event(PHCompositeNode *topNode)
       const auto ckey = TrkrDefs::genClusKey(hitsetkey, index);
 
       // get cluster
-      auto cluster = data.cluster_vector[index];
+      auto *cluster = data.cluster_vector[index];
 
       // insert in map
       m_clusterlist->addClusterSpecifyKey(ckey, cluster);

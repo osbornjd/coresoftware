@@ -24,7 +24,7 @@ class TTree;
 class PHNodeIOManager : public PHIOManager
 {
  public:
-  PHNodeIOManager() {}
+  PHNodeIOManager() = default;
   PHNodeIOManager(const std::string &, const PHAccessType = PHReadOnly);
   PHNodeIOManager(const std::string &, const std::string &, const PHAccessType = PHReadOnly);
   PHNodeIOManager(const std::string &, const PHAccessType, const PHTreeType);
@@ -54,8 +54,12 @@ class PHNodeIOManager : public PHIOManager
   void BufferSize(const int size) { buffersize = size; }
   int SplitLevel() const { return splitlevel; }
   int BufferSize() const { return buffersize; }
+  int CacheSize() const { return m_cacheSize; }
+  void CacheSize(uint64_t size) { m_cacheSize = size;}
+  
+  void DisableReadCache();
 
- private:
+private:
   int FillBranchMap();
   PHCompositeNode *reconstructNodeTree(PHCompositeNode *);
   bool readEventFromFile(size_t requestedEvent);
@@ -64,6 +68,7 @@ class PHNodeIOManager : public PHIOManager
   TFile *file{nullptr};
   TTree *tree{nullptr};
   std::string TreeName{"T"};
+  uint64_t m_cacheSize = std::numeric_limits<uint64_t>::max();
   int accessMode{PHReadOnly};
   int m_CompressionSetting{505};  // ZSTD
   int isFunctionalFlag{0};        // flag to tell if that object initialized properly

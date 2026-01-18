@@ -362,10 +362,13 @@ std::pair<double, double> ClusterCDFCalculator::GetCDF(const std::vector<double>
     ibin = henbins_photon->FindFixBin(clusterenergy) - 1;
     if (ibin < 0)
     {
-      std::cout << "ClusterCDFCalculator::GetCDF fatal error: histogram bin below 0... set prob. both to -1." << std::endl;
+      if (Verbosity() > 0) 
+      {
+        std::cout << "ClusterCDFCalculator::GetCDF histogram bin below 0... set prob. both to -1." << std::endl;
+      }
       return std::make_pair(-1, -1);
     }
-    else if (ibin >= henbins_photon->GetNbinsX())
+    if (ibin >= henbins_photon->GetNbinsX())
     {
       ibin = henbins_photon->GetNbinsX() - 1;
     }
@@ -380,7 +383,7 @@ std::pair<double, double> ClusterCDFCalculator::GetCDF(const std::vector<double>
   std::vector<double> inputenergies;
   for (int is = 0; is < towersize; ++is)
   {
-    if (indices.count(is))
+    if (indices.count(is)) //NOLINT(readability-container-contains)
     {
       inputenergies.push_back(energies.at(is));
     }
@@ -437,11 +440,11 @@ std::unordered_set<int> ClusterCDFCalculator::getSubsetIndices(int _gridsize, in
   {
     for (int j = -halfSubset; j <= halfSubset; ++j)
     {
-      int row = center / _gridsize + i;
-      int col = center % _gridsize + j;
+      int row = (center / _gridsize) + i;
+      int col = (center % _gridsize) + j;
       if (row >= 0 && row < _gridsize && col >= 0 && col < _gridsize)
       {
-        indices.insert(row * _gridsize + col);
+        indices.insert((row * _gridsize) + col);
       }
     }
   }

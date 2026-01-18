@@ -49,22 +49,22 @@ void TpcGlobalPositionWrapper::loadNodes( PHCompositeNode* topNode )
 Acts::Vector3 TpcGlobalPositionWrapper::applyDistortionCorrections(Acts::Vector3 global) const
 {
   // apply distortion corrections
-  if (m_dcc_module_edge)
+  if (m_enable_module_edge_corr && m_dcc_module_edge)
   {
     global = m_distortionCorrection.get_corrected_position(global, m_dcc_module_edge);
   }
 
-  if (m_dcc_static)
+  if (m_enable_static_corr && m_dcc_static)
   {
     global = m_distortionCorrection.get_corrected_position(global, m_dcc_static);
   }
 
-  if (m_dcc_average)
+  if (m_enable_average_corr && m_dcc_average)
   {
     global = m_distortionCorrection.get_corrected_position(global, m_dcc_average);
   }
 
-  if (m_dcc_fluctuation)
+  if (m_enable_fluctuation_corr && m_dcc_fluctuation)
   {
     global = m_distortionCorrection.get_corrected_position(global, m_dcc_fluctuation);
   }
@@ -92,15 +92,20 @@ Acts::Vector3 TpcGlobalPositionWrapper::getGlobalPositionDistortionCorrected(con
     // verify crossing validity
     if(crossing == SHRT_MAX)
     {
-      std::cout << "TpcGlobalPositionWrapper::getGlobalPositionDistortionCorrected - invalid crossing." << std::endl;
+      if(!m_suppressCrossing)
+      {
+        std::cout << "TpcGlobalPositionWrapper::getGlobalPositionDistortionCorrected - invalid crossing." << std::endl;
+      }
       return global;
     }
 
     // apply crossing correction
     global.z() = TpcClusterZCrossingCorrection::correctZ(global.z(), TpcDefs::getSide(key), crossing);
+    // std::cout << "Global: " << global.x() << "  " << global.y() << "  " << global.z() << std::endl;
 
     // apply distortion corrections
     global = applyDistortionCorrections(global);
+    //std::cout << "Global after dist corr: " << global.x() << "  " << global.y() << "  " << global.z() << std::endl;
   }
 
   return global;

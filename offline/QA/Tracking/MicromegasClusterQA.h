@@ -4,9 +4,9 @@
 #define QA_TRACKING_MICROMEGASCLUSTERQA_H_
 
 #include <fun4all/SubsysReco.h>
+#include <micromegas/MicromegasCalibrationData.h>
 #include <micromegas/MicromegasDefs.h>
 #include <micromegas/MicromegasMapping.h>
-#include <micromegas/MicromegasCalibrationData.h>
 
 #include <array>
 #include <map>
@@ -26,28 +26,39 @@ class PHCompositeNode;
 class MicromegasClusterQA : public SubsysReco
 {
  public:
-  MicromegasClusterQA(const std::string &name = "MicromegasClusterQA");
+  MicromegasClusterQA(const std::string& name = "MicromegasClusterQA");
 
   ~MicromegasClusterQA() override = default;
 
-  int InitRun(PHCompositeNode *topNode) override;
-  int process_event(PHCompositeNode *topNode) override;
-  int EndRun(const int runnumber) override;
+  int InitRun(PHCompositeNode* topNode) override;
+  int process_event(PHCompositeNode* topNode) override;
 
   /// set default pedestal
-  void set_default_pedestal( double value )
-  { m_default_pedestal = value; }
+  void set_default_pedestal(double value)
+  {
+    m_default_pedestal = value;
+  }
 
   /// set whether default pedestal is used or not
-  void set_use_default_pedestal( bool value )
-  { m_use_default_pedestal = value; }
+  void set_use_default_pedestal(bool value)
+  {
+    m_use_default_pedestal = value;
+  }
 
   /// calibration file
-  void set_calibration_file( const std::string& value )
-  { m_calibration_filename = value; }
+  void set_calibration_file(const std::string& value)
+  {
+    m_calibration_filename = value;
+  }
 
-  private:
+  /// set min sample for signal hits
+  void set_sample_min(uint16_t value) { m_sample_min = value; }
 
+  /// set max sample for signal hits
+  void set_sample_max(uint16_t value) { m_sample_max = value; }
+
+
+ private:
   void create_histograms();
 
   std::string get_histogram_prefix() const;
@@ -73,7 +84,7 @@ class MicromegasClusterQA : public SubsysReco
   TH1* m_h_cluster_count_found = nullptr;
 
   /// Acts tracking geometry for surface lookup
-  ActsGeometry *m_tGeometry = nullptr;
+  ActsGeometry* m_tGeometry = nullptr;
 
   //! hits
   TrkrHitSetContainer* m_hitsetcontainer = nullptr;
@@ -94,6 +105,12 @@ class MicromegasClusterQA : public SubsysReco
   /// keep track of detector names
   std::vector<std::string> m_detector_names;
 
+  /// min sample for signal
+  uint16_t m_sample_min = 0;
+
+  /// max sample for signal
+  uint16_t m_sample_max = 1024;
+
   ///@name calibration filename
   //@{
 
@@ -110,8 +127,6 @@ class MicromegasClusterQA : public SubsysReco
   MicromegasCalibrationData m_calibration_data;
 
   //@}
-
-
 };
 
 #endif  // MicromegasClusterQA_H

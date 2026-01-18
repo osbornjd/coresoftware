@@ -11,10 +11,13 @@
 #include <fun4all/Fun4AllBase.h>
 #endif
 
+#include <array>
+#include <limits>
 #include <vector>
 
 class PHCompositeNode;
 class Event;
+class MbdRawContainer;
 class MbdPmtContainer;
 class MbdOut;
 class MbdCalib;
@@ -23,44 +26,54 @@ class CDBUtils;
 class TF1;
 class TCanvas;
 #ifndef ONLINE
+class CaloPacket;
 class CaloPacketContainer;
 class Gl1Packet;
+class PHG4TruthInfoContainer;
+class PHG4VtxPoint;
 #endif
 
 class MbdEvent
 {
  public:
-  MbdEvent(const int cal_pass = 0);
+  MbdEvent(const int cal_pass = 0, const bool proc_charge = false);
   virtual ~MbdEvent();
 
-  int SetRawData(Event *event, MbdPmtContainer *bbcpmts);
-#ifndef ONLINE
-  int SetRawData(CaloPacketContainer *mbdraw, MbdPmtContainer *bbcpmts, Gl1Packet *gl1raw);
-#endif
-  int Calculate(MbdPmtContainer *bbcpmts, MbdOut *bbcout);
   int InitRun();
   int End();
   void Clear();
 
+  int SetRawData(Event *event, MbdRawContainer *bbcraws, MbdPmtContainer *bbcpmts);
+#ifndef ONLINE
+  int SetRawData(std::array< CaloPacket*,2> &dstp, MbdRawContainer *bbcraws, MbdPmtContainer *bbcpmts, Gl1Packet *gl1raw);
+#endif
+  int ProcessPackets(MbdRawContainer *bbcraws);
+  int ProcessRawContainer(MbdRawContainer *bbcraws, MbdPmtContainer *bbcpmts);
+  void PostProcessChannels(MbdPmtContainer *bbcpmts);
+  int Calculate(MbdPmtContainer *bbcpmts, MbdOut *bbcout, PHCompositeNode *topNode = nullptr);
+
   void SetSim(const int s) { _simflag = s; }
+  void SetRawDstFlag(const int r) { _rawdstflag = r; }
+  void SetFitsOnly(const int f) { _fitsonly = f; }
 
   float get_bbcz() { return m_bbcz; }
   float get_bbczerr() { return m_bbczerr; }
   float get_bbct0() { return m_bbct0; }
   float get_bbct0err() { return m_bbct0err; }
 
-  int get_bbcn(const int iarm) { return m_bbcn[iarm]; }
+  int   get_bbcn(const int iarm) { return m_bbcn[iarm]; }
   float get_bbcq(const int iarm) { return m_bbcq[iarm]; }
   float get_bbct(const int iarm) { return m_bbct[iarm]; }
   float get_bbcte(const int iarm) { return m_bbcte[iarm]; }
 
-  int get_pmtq(const int ipmt) { return m_pmtq[ipmt]; }
+  int   get_pmtq(const int ipmt) { return m_pmtq[ipmt]; }
   float get_pmttt(const int ipmt) { return m_pmttt[ipmt]; }
   float get_pmttq(const int ipmt) { return m_pmttq[ipmt]; }
 
-  int get_EventNumber(void) const { return m_evt; }
+  int   get_EventNumber(void) const { return m_evt; }
+  void  set_EventNumber(int ievt) { m_evt = ievt; }
 
-  void set_debugintt(const int d) { _debugintt = d; }
+  void  set_debug(const int d) { _debug = d; }
 
   MbdSig *GetSig(const int ipmt) { return &_mbdsig[ipmt]; }
 
@@ -69,8 +82,6 @@ class MbdEvent
   int FillSampMaxCalib();
 
   int  calib_is_done() { return _calib_done; }
-
-  int ProcessRawPackets(MbdPmtContainer *bbcpmts);
 
   int  Verbosity() { return _verbose; }
   void Verbosity(const int v) { _verbose = v; }
@@ -87,7 +98,19 @@ class MbdEvent
   int Read_TT_CLK_Offsets(const std::string &t0cal_fname);
   //int DoQuickClockOffsetCalib();
 
-  int _debugintt{0};
+  bool isbadtch(const int ipmtch);
+
+  // Debugging variables
+  int _debug{0};
+#ifndef ONLINE
+  PHG4TruthInfoContainer* _truth_container {nullptr};
+  PHG4VtxPoint* _vtxp {nullptr};
+  PHG4VtxPoint* GetPrimaryVtx(PHCompositeNode *topNode);
+#endif
+  int epmt[2]{-1, -1};  // pmt of earliest time
+  // int lpmt[2] {-1,-1};        // pmt of latest time
+  double tepmt[2]{1e9, 1e9};    // earliest time
+  double tlpmt[2]{-1e9, -1e9};  // latest time
   void ReadSyncFile(const char *fname = "SYNC_INTTMBD.root");
 
   float gaincorr[MbdDefs::MBD_N_PMT]{};       // gain corrections
@@ -100,6 +123,8 @@ class MbdEvent
   int _verbose{0};
   int _runnum{0};
   int _simflag{0};
+  int _rawdstflag{0};  // dst with raw container
+  int _fitsonly{0};    // stop reco after waveform fits (for DST_CALOFIT pass)
   int _nsamples{31};
   int _calib_done{0}; 
   unsigned int _no_sampmax{0};      //! sampmax calib doesn't exist
@@ -115,7 +140,10 @@ class MbdEvent
   // raw data
   Float_t m_adc[MbdDefs::MBD_N_FEECH][MbdDefs::MAX_SAMPLES]{};   // raw waveform, adc values
   Float_t m_samp[MbdDefs::MBD_N_FEECH][MbdDefs::MAX_SAMPLES]{};  // raw waveform, sample values
-  Float_t m_ampl[MbdDefs::MBD_N_FEECH]{};                        // raw amplitude
+
+  Float_t m_ampl[MbdDefs::MBD_N_FEECH]{};                        // raw amplitude (ADC)
+  Float_t m_ttdc[MbdDefs::MBD_N_FEECH]{};                        // T-ch TDC
+  Float_t m_qtdc[MbdDefs::MBD_N_FEECH]{};                        // Q-ch TDC
 
   std::vector<MbdSig> _mbdsig;
 
@@ -143,7 +171,8 @@ class MbdEvent
   float TRIG_SAMP[16]{};  // [board]
 
   // Calibration Data
-  int _calpass{0};
+  int  _calpass{0};
+  bool _always_process_charge{false};
   TString _caldir;
   //std::string _caldir;
 
@@ -162,14 +191,14 @@ class MbdEvent
   int CalcPedCalib();
 
   //
-  void ClusterEarliest(std::vector<float> &times, double& mean, double& rms, double& rmin, double& rmax) const;
+  void ClusterEarliest(std::vector<float> &times, double& mean, double& rms, double& rmin, double& rmax);
  
-  TCanvas *ac{nullptr};  // for plots used during debugging
-
   // debug stuff
+  TCanvas *ac{nullptr};  // for plots used during debugging
+  void PlotDebug();
   std::unique_ptr<TFile> _synctfile{nullptr};
   TTree *_syncttree{nullptr};
-  int _syncevt{0};
+  Double_t _refz{ std::numeric_limits<double>::quiet_NaN() };
   std::vector<Int_t> bbevt;
   std::vector<UShort_t> bbclk;
   std::vector<Float_t> mybbz;

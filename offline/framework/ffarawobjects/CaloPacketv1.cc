@@ -13,6 +13,7 @@ CaloPacketv1::CaloPacketv1()
   femclock.fill(0);
   femevt.fill(0);
   femslot.fill(0);
+  femstatus.fill(CaloPacket::NOTSET);
   checksumlsb.fill(0);
   checksummsb.fill(0);
   calcchecksumlsb.fill(0);
@@ -44,6 +45,7 @@ void CaloPacketv1::Reset()
   femclock.fill(0);
   femevt.fill(0);
   femslot.fill(0);
+  femstatus.fill(CaloPacket::NOTSET);
   checksumlsb.fill(0);
   checksummsb.fill(0);
   calcchecksumlsb.fill(0);
@@ -238,9 +240,9 @@ int CaloPacketv1::iValue(const int n, const std::string &what) const
   return std::numeric_limits<int>::min();
 }
 
-int CaloPacketv1::iValue(const int channel, const int sample) const
+int CaloPacketv1::iValue(const int sample, const int channel) const
 {
-  return samples.at(channel).at(sample);
+  return samples.at(sample).at(channel);
 }
 
 void CaloPacketv1::identify(std::ostream &os) const

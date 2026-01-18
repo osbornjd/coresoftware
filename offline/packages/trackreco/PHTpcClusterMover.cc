@@ -10,8 +10,8 @@
 #include <trackbase_historic/SvtxTrack.h>  // for SvtxTrack, SvtxTrack::C...
 #include <trackbase_historic/SvtxTrackMap.h>
 
-#include <g4detectors/PHG4TpcCylinderGeom.h>
-#include <g4detectors/PHG4TpcCylinderGeomContainer.h>
+#include <g4detectors/PHG4TpcGeom.h>
+#include <g4detectors/PHG4TpcGeomContainer.h>
 
 #include <fun4all/Fun4AllReturnCodes.h>
 
@@ -43,7 +43,7 @@ int PHTpcClusterMover::InitRun(PHCompositeNode *topNode)
   }
   for (int layer = 7; layer < 7 + 48; layer++)
   {
-    PHG4TpcCylinderGeom *GeoLayer = _tpc_geom_container->GetLayerCellGeom(layer);
+    PHG4TpcGeom *GeoLayer = _tpc_geom_container->GetLayerCellGeom(layer);
     std::cout << "PHTpcClusterMover:: layer = " << layer << " layer_radius " << GeoLayer->get_radius() << std::endl;
     layer_radius[layer - 7] = GeoLayer->get_radius();
   }
@@ -221,7 +221,7 @@ int PHTpcClusterMover::process_event(PHCompositeNode * /*topNode*/)
       newclus->setSubSurfKey(subsurfkey);
 
       // get local coordinates
-      Acts::Vector3 normal = surface->normal(_tGeometry->geometry().getGeoContext());
+      Acts::Vector3 normal = surface->normal(_tGeometry->geometry().getGeoContext(), Acts::Vector3(1,1,1),Acts::Vector3(1,1,1));
       auto local = surface->globalToLocal(_tGeometry->geometry().getGeoContext(),
                                           global * Acts::UnitConstants::cm,
                                           normal);
@@ -277,10 +277,10 @@ int PHTpcClusterMover::End(PHCompositeNode * /*topNode*/)
 int PHTpcClusterMover::GetNodes(PHCompositeNode *topNode)
 {
   // tpc geometry
-  _tpc_geom_container = findNode::getClass<PHG4TpcCylinderGeomContainer>(topNode, "CYLINDERCELLGEOM_SVTX");
+  _tpc_geom_container = findNode::getClass<PHG4TpcGeomContainer>(topNode, "TPCGEOMCONTAINER");
   if (!_tpc_geom_container)
   {
-    std::cout << PHWHERE << " ERROR: Can't find node CYLINDERCELLGEOM_SVTX" << std::endl;
+    std::cout << PHWHERE << " ERROR: Can't find node TPCGEOMCONTAINER" << std::endl;
     return Fun4AllReturnCodes::ABORTEVENT;
   }
 

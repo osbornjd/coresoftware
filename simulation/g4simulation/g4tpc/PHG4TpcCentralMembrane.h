@@ -209,7 +209,7 @@ class PHG4TpcCentralMembrane : public SubsysReco, public PHParameterInterface
    * as expected by G4Hit. The energy is then converted back to a number of electrons
    * inside PHG4TpcElectronDrift
    */
-  double electrons_per_gev = std::numeric_limits<double>::signaling_NaN();
+  double electrons_per_gev = std::numeric_limits<double>::quiet_NaN();
 
   /// delay between central membrane hits and trigger time (ns)
   int m_centralMembraneDelay = 0;
@@ -232,14 +232,14 @@ class PHG4TpcCentralMembrane : public SubsysReco, public PHParameterInterface
       std::array<int, nRadii>& nStripesIn,
       std::array<int, nRadii>& nStripesBefore);
 
-  int SearchModule(int nStripes,
-                   const double x1a[][nRadii], const double x1b[][nRadii],
-                   const double x2a[][nRadii], const double x2b[][nRadii],
-                   const double y1a[][nRadii], const double y1b[][nRadii],
-                   const double y2a[][nRadii], const double y2b[][nRadii],
-                   const double x3a[][nRadii], const double y3a[][nRadii],
-                   const double x3b[][nRadii], const double y3b[][nRadii],
-                   double x, double y, const std::array<int, nRadii>& nGoodStripes) const;
+  static int SearchModule(int nStripes,
+                          const double x1a[][nRadii], const double x1b[][nRadii],
+                          const double x2a[][nRadii], const double x2b[][nRadii],
+                          const double y1a[][nRadii], const double y1b[][nRadii],
+                          const double y2a[][nRadii], const double y2b[][nRadii],
+                          const double x3a[][nRadii], const double y3a[][nRadii],
+                          const double x3b[][nRadii], const double y3b[][nRadii],
+                          double x, double y, const std::array<int, nRadii>& nGoodStripes);
 
   PHG4Hit* GetPHG4HitFromStripe(int petalID, int moduleID, int radiusID, int stripeID, int nElectrons) const;
 };

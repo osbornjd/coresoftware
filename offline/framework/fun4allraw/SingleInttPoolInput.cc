@@ -7,34 +7,42 @@
 #include <ffarawobjects/InttRawHitContainerv2.h>
 #include <ffarawobjects/InttRawHitv2.h>
 
+#include <fun4all/DBInterface.h>
+#include <fun4all/InputFileHandlerReturnCodes.h>
+
+#include <phool/RunnumberRange.h>
 #include <phool/PHCompositeNode.h>
 #include <phool/PHIODataNode.h>    // for PHIODataNode
 #include <phool/PHNodeIterator.h>  // for PHNodeIterator
 #include <phool/getClass.h>
+#include <phool/recoConsts.h>
 
 #include <Event/Event.h>
 #include <Event/EventTypes.h>
 #include <Event/Eventiterator.h>
 
+#include <TSystem.h>
+
+#include <odbc++/resultset.h>
+#include <odbc++/statement.h>
+
 #include <algorithm>  // for max
 #include <cstdint>    // for uint64_t
 #include <cstdlib>    // for exit
 #include <iostream>   // for operator<<, basic_o...
-#include <set>
 #include <memory>
+#include <set>
 #include <utility>  // for pair
 
 SingleInttPoolInput::SingleInttPoolInput(const std::string &name)
   : SingleStreamingInput(name)
 {
   SubsystemEnum(InputManagerType::INTT);
-  plist = new Packet *[1];
   m_rawHitContainerName = "INTTRAWHIT";
 }
 
 SingleInttPoolInput::~SingleInttPoolInput()
 {
-  delete[] plist;
   for (auto iter : poolmap)
   {
     if (Verbosity() > 2)
@@ -53,7 +61,7 @@ void SingleInttPoolInput::FillPool(const uint64_t minBCO)
   }
   while (GetEventiterator() == nullptr)  // at startup this is a null pointer
   {
-    if (!OpenNextFile())
+    if (OpenNextFile() == InputFileHandlerReturnCodes::FAILURE)
     {
       AllDone(1);
       return;
@@ -67,7 +75,7 @@ void SingleInttPoolInput::FillPool(const uint64_t minBCO)
     while (!evt)
     {
       fileclose();
-      if (!OpenNextFile())
+      if (OpenNextFile() == InputFileHandlerReturnCodes::FAILURE)
       {
         AllDone(1);
         return;
@@ -79,6 +87,17 @@ void SingleInttPoolInput::FillPool(const uint64_t minBCO)
       std::cout << "Fetching next Event" << evt->getEvtSequence() << std::endl;
     }
     RunNumber(evt->getRunNumber());
+    if (m_SavedRunNumber != RunNumber())
+    {
+      if (GetVerbosity() > 1)
+      {
+        std::cout << "setting streaming mode for run " << RunNumber() << std::endl;
+      }
+      streamingMode(IsStreaming(RunNumber()));
+      m_SavedRunNumber = RunNumber();
+      ConfigureStreamingInputManagerLocal(m_SavedRunNumber);
+    }
+
     if (GetVerbosity() > 1)
     {
       evt->identify();
@@ -99,20 +118,15 @@ void SingleInttPoolInput::FillPool(const uint64_t minBCO)
     }
 
     int EventSequence = evt->getEvtSequence();
-    int npackets = evt->getPacketList(plist, 1);
-
-    if (npackets > 1)
-    {
-      exit(1);
-    }
+    std::vector<Packet *> pktvec = evt->getPacketVector();
     if (m_SkipEarlyEvents)
     {
-      for (int i = 0; i < npackets; i++)
+      for (Packet *pkt : pktvec)
       {
-        int numBCOs = plist[i]->iValue(0, "NR_BCOS");
+        int numBCOs = pkt->iValue(0, "NR_BCOS");
         for (int j = 0; j < numBCOs; j++)
         {
-          uint64_t bco = plist[i]->lValue(j, "BCOLIST");
+          uint64_t bco = pkt->lValue(j, "BCOLIST");
           if (bco < minBCO)
           {
             continue;
@@ -123,33 +137,33 @@ void SingleInttPoolInput::FillPool(const uint64_t minBCO)
     }
     if (m_SkipEarlyEvents)
     {
-      for (int i = 0; i < npackets; i++)
+      for (Packet *pkt : pktvec)
       {
-        delete plist[i];
+        delete pkt;
       }
       delete evt;
       continue;
     }
-    for (int i = 0; i < npackets; i++)
+    for (Packet *pkt : pktvec)
     {
       if (Verbosity() > 2)
       {
-        plist[i]->identify();
+        pkt->identify();
       }
 
-      if (poolmap.find(plist[i]->getIdentifier()) == poolmap.end())  // we haven't seen this one yet
+      if (!poolmap.contains(pkt->getIdentifier()))  // we haven't seen this one yet
       {
         if (Verbosity() > 1)
         {
-          std::cout << "starting new intt pool for packet " << plist[i]->getIdentifier() << std::endl;
+          std::cout << "starting new intt pool for packet " << pkt->getIdentifier() << std::endl;
         }
-        poolmap[plist[i]->getIdentifier()] = new intt_pool(1000, 100);
-        poolmap[plist[i]->getIdentifier()]->Verbosity(Verbosity());
-        poolmap[plist[i]->getIdentifier()]->Name(std::to_string(plist[i]->getIdentifier()));
+        poolmap[pkt->getIdentifier()] = new intt_pool(1000, 100);
+        poolmap[pkt->getIdentifier()]->Verbosity(Verbosity());
+        poolmap[pkt->getIdentifier()]->Name(std::to_string(pkt->getIdentifier()));
       }
-      poolmap[plist[i]->getIdentifier()]->addPacket(plist[i]);
+      poolmap[pkt->getIdentifier()]->addPacket(pkt);
 
-      delete plist[i];
+      delete pkt;
     }
 
     delete evt;
@@ -166,7 +180,17 @@ void SingleInttPoolInput::FillPool(const uint64_t minBCO)
           std::cout << "Number of Hits: " << num_hits << " for packet "
                     << pool->getIdentifier() << std::endl;
         }
-
+        if (Verbosity() > 2)
+        {
+          if (IsStandaloneMode())
+          {
+            std::cout << "INTT Pool in Standalone mode " << std::endl;
+          }
+          else
+          {
+            std::cout << "INTT Pool with GL1 BCO " << std::endl;
+          }
+        }
         int numBCOs = pool->iValue(0, "NR_BCOS");
         uint64_t largest_bco = 0;
         bool skipthis{true};
@@ -174,11 +198,12 @@ void SingleInttPoolInput::FillPool(const uint64_t minBCO)
         for (int j = 0; j < numBCOs; j++)
         {
           uint64_t bco = pool->lValue(j, "BCOLIST");
-          if (largest_bco < bco)
-          {
-            largest_bco = bco;
-          }
+          largest_bco = std::max(largest_bco, bco);
           if (bco < minBCO)
+          {
+            continue;
+          }
+          if (!IsStandaloneMode() && bco > minBCO * 2)
           {
             continue;
           }
@@ -195,7 +220,11 @@ void SingleInttPoolInput::FillPool(const uint64_t minBCO)
           for (int k = 0; k < nbcos; k++)
           {
             uint64_t bco = pool->lValue(fee, k, "BCOVAL");
-            if(bco < minBCO)
+            if (bco < minBCO)
+            {
+              continue;
+            }
+            if (!IsStandaloneMode() && bco > minBCO * 2)
             {
               continue;
             }
@@ -215,11 +244,47 @@ void SingleInttPoolInput::FillPool(const uint64_t minBCO)
           for (int j = 0; j < num_hits; j++)
           {
             uint64_t gtm_bco = pool->lValue(j, "BCO");
+
+            bool found{false};
+            static uint64_t const header = 0xcadead;
+            static uint64_t const footer = 0x80cafe;
+            static uint64_t const projection = 0xffffff;
+            for (unsigned int shift = 0; shift < 36; shift+=4)
+            {
+                if ((gtm_bco & (projection << shift)) == (header << shift)) {
+                    if (1 < Verbosity()) {
+                        std::cout << std::hex
+                            << " Header found in BCO!"
+                            << " bco: 0x" << gtm_bco
+                            << " projection: 0x" << (header << shift)
+                            << std::dec << std::endl;
+                    }
+                    found = true;
+                    break;
+                }
+                if ((gtm_bco & (projection << shift)) == (footer << shift)) {
+                    if (1 < Verbosity()) {
+                        std::cout << std::hex
+                            << " Footer found in BCO!"
+                            << " bco: 0x" << gtm_bco
+                            << " projection: 0x" << (footer << shift)
+                            << std::dec << std::endl;
+                    }
+                    found = true;
+                    break;
+                }
+            }
+            if (found) { continue; }
+
             if (gtm_bco < minBCO)
             {
               // std::cout << "dropping hit with bco 0x" << std::hex
-              // 	      << gtm_bco << ", min bco: 0x" << minBCO
-              // 	      << std::endl;
+              //       << gtm_bco << ", min bco: 0x" << minBCO
+              //       << std::endl;
+              continue;
+            }
+            if (!IsStandaloneMode() && gtm_bco > minBCO * 2)
+            {
               continue;
             }
             auto newhit = std::make_unique<InttRawHitv2>();
@@ -264,7 +329,7 @@ void SingleInttPoolInput::FillPool(const uint64_t minBCO)
             m_InttRawHitMap[gtm_bco].push_back(newhit.release());
           }
         }
-        //	    Print("FEEBCLK");
+        //    Print("FEEBCLK");
       }
       pool->next();
     }
@@ -298,7 +363,7 @@ void SingleInttPoolInput::Print(const std::string &what) const
     for (const auto &bcliter : m_InttRawHitMap)
     {
       std::cout << "Beam clock 0x" << std::hex << bcliter.first << std::dec << std::endl;
-      for (auto feeiter : bcliter.second)
+      for (auto *feeiter : bcliter.second)
       {
         std::cout << "fee: " << feeiter->get_fee()
                   << " at " << std::hex << feeiter << std::dec << std::endl;
@@ -307,9 +372,9 @@ void SingleInttPoolInput::Print(const std::string &what) const
   }
   if (what == "ALL" || what == "STACK")
   {
-    for (auto &[packetid, bclkstack] : m_BclkStackPacketMap)
+    for (const auto &[packetid, bclkstack] : m_BclkStackPacketMap)
     {
-      for (auto &bclk : bclkstack)
+      for (const auto &bclk : bclkstack)
       {
         std::cout << "stacked bclk: 0x" << std::hex << bclk << std::dec << std::endl;
       }
@@ -325,9 +390,9 @@ void SingleInttPoolInput::CleanupUsedPackets(const uint64_t bclk)
 {
   m_BclkStack.erase(m_BclkStack.begin(), m_BclkStack.upper_bound(bclk));
   m_BeamClockFEE.erase(m_BeamClockFEE.begin(), m_BeamClockFEE.upper_bound(bclk));
-  for(auto it = m_InttRawHitMap.begin(); it != m_InttRawHitMap.end() && (it->first <= bclk); it = m_InttRawHitMap.erase(it))
+  for (auto it = m_InttRawHitMap.begin(); it != m_InttRawHitMap.end() && (it->first <= bclk); it = m_InttRawHitMap.erase(it))
   {
-    for( const auto& rawhit : it->second)
+    for (const auto &rawhit : it->second)
     {
       delete rawhit;
     }
@@ -384,7 +449,7 @@ bool SingleInttPoolInput::GetSomeMoreEvents(const uint64_t ibclk)
   //   if (!iter.second->depth_ok())
   //   {
   //   std::cout << "GetSomeMoreEvents depth not ok, ret true" << std::endl;
-  // 	return true;
+  //   return true;
   //   }
   // }
   uint64_t localbclk = ibclk;
@@ -407,20 +472,18 @@ bool SingleInttPoolInput::GetSomeMoreEvents(const uint64_t ibclk)
       if ((highest_bclk - m_InttRawHitMap.begin()->first) < MaxBclkDiff())
       {
         // std::cout << "FEE " << bcliter.first << " bclk: "
-        // 		<< std::hex << bcliter.second << ", req: " << localbclk
-        // 		<< std::dec << std::endl;
+        // << std::hex << bcliter.second << ", req: " << localbclk
+        // << std::dec << std::endl;
         return true;
       }
-      else
-      {
-        std::cout << PHWHERE << Name() << ": erasing FEE " << bcliter.first
-                  << " with stuck bclk: 0x" << std::hex << bcliter.second
-                  << " current bco range: 0x" << m_InttRawHitMap.begin()->first
-                  << ", to: 0x" << highest_bclk << ", delta: " << std::dec
-                  << (highest_bclk - m_InttRawHitMap.begin()->first)
-                  << std::dec << std::endl;
-        toerase.insert(bcliter.first);
-      }
+
+      std::cout << PHWHERE << Name() << ": erasing FEE " << bcliter.first
+                << " with stuck bclk: 0x" << std::hex << bcliter.second
+                << " current bco range: 0x" << m_InttRawHitMap.begin()->first
+                << ", to: 0x" << highest_bclk << ", delta: " << std::dec
+                << (highest_bclk - m_InttRawHitMap.begin()->first)
+                << std::dec << std::endl;
+      toerase.insert(bcliter.first);
     }
   }
   for (auto iter : toerase)
@@ -457,11 +520,96 @@ void SingleInttPoolInput::CreateDSTNode(PHCompositeNode *topNode)
 }
 //_______________________________________________________
 
-void SingleInttPoolInput::ConfigureStreamingInputManager()
+void SingleInttPoolInput::ConfigureStreamingInputManagerLocal(const int runnumber)
 {
   if (StreamingInputManager())
   {
-    StreamingInputManager()->SetInttBcoRange(m_BcoRange);
-    StreamingInputManager()->SetInttNegativeBco(m_NegativeBco);
+    // if it is triggered after the gtm firmware change
+    if (runnumber > 58677 && m_BcoRange < 5)
+    {
+      SetBcoRange(3);
+      if (GetVerbosity() > 2)
+      {
+        std::cout << "INTT changed to triggered event combining with range [-"
+                  << m_NegativeBco << "," << m_BcoRange << "]" << std::endl;
+      }
+    }
+    switch (m_StreamingFlag)
+    {
+    case InttStreamingMode::TRIGGERED:
+      std::cout << PHWHERE << " INTT triggered event combining with range [-"
+                << m_NegativeBco << "," << m_BcoRange << "]" << std::endl;
+      break;
+    case InttStreamingMode::STREAMING:
+      std::cout << PHWHERE << " INTT streaming event combining with range [-"
+                << m_NegativeBco << "," << m_BcoRange << "]" << std::endl;
+      break;
+    case InttStreamingMode::UNDEFINED:
+      std::cout << PHWHERE << " INTT undefined streaming mode, combining with range [-"
+                << m_NegativeBco << "," << m_BcoRange << "]" << std::endl;
+      break;
+    default:
+      std::cout << PHWHERE << " Unknown INTT streaming mode: "
+                << m_StreamingFlag << " combining with range [-"
+                << m_NegativeBco << "," << m_BcoRange << "]" << std::endl;
+      break;
+    }
+    StreamingInputManager()->SetInttBcoRange(GetBcoRange());
+    StreamingInputManager()->SetInttNegativeBco(GetNegativeBco());
   }
+}
+
+void SingleInttPoolInput::streamingMode(const bool isStreaming)
+{
+  if (isStreaming)
+  {
+    if(RunNumber() > RunnumberRange::RUN3PP_FIRST)
+    {
+      SetNegativeBco(120 - 24);
+    }
+    else
+    {
+      SetNegativeBco(120 - 23);
+    }
+    SetBcoRange(500);
+    if (GetVerbosity() > 2)
+    {
+      std::cout << "INTT set to streaming event combining" << std::endl;
+    }
+    return;
+  }
+
+  SetNegativeBco(1);
+  SetBcoRange(2);
+}
+
+bool SingleInttPoolInput::IsStreaming(int runnumber)
+{
+  odbc::Statement *statement = DBInterface::instance()->getStatement("daq");
+  std::string sched_data;
+  std::string sql = "SELECT sched_data FROM gtm_scheduler WHERE vgtm=1 AND sched_entry = 1 AND runnumber = " + std::to_string(runnumber) + ";";
+  std::unique_ptr<odbc::ResultSet> result_set(statement->executeQuery(sql));
+  if (result_set && result_set->next())
+  {
+    sched_data = result_set->getString("sched_data");
+  }
+  bool m_is_streaming;
+  if (std::string{"{17,55,24,54}"} == sched_data)
+  {
+    m_is_streaming = true;
+    m_StreamingFlag = 1;
+  }
+  else if (std::string{"{0,54,91,53}"} == sched_data)
+  {
+    /// Triggered
+    m_is_streaming = false;
+    m_StreamingFlag = -1;
+  }
+  else
+  {
+    std::cout << PHWHERE << "Unexpected value for sched_data: '" << sched_data << "'" << std::endl;
+    gSystem->Exit(1);
+    exit(1);
+  }
+  return m_is_streaming;
 }
