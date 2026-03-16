@@ -267,19 +267,24 @@ class PHActsSiliconSeeding : public SubsysReco
   std::vector<float> m_mvtxgy = {};
   std::vector<float> m_mvtxgz = {};
   std::vector<float> m_mvtxgr = {};
+  int m_mvtxStrobe = std::numeric_limits<int>::max();
   float m_projgx = std::numeric_limits<float>::quiet_NaN();
   float m_projgy = std::numeric_limits<float>::quiet_NaN();
   float m_projgz = std::numeric_limits<float>::quiet_NaN();
   float m_projgr = std::numeric_limits<float>::quiet_NaN();
   float m_projlx = std::numeric_limits<float>::quiet_NaN();
   float m_projlz = std::numeric_limits<float>::quiet_NaN();
+  int m_inttlayer = std::numeric_limits<int>::max();
   float m_clusgx = std::numeric_limits<float>::quiet_NaN();
   float m_clusgy = std::numeric_limits<float>::quiet_NaN();
   float m_clusgz = std::numeric_limits<float>::quiet_NaN();
   float m_clusgr = std::numeric_limits<float>::quiet_NaN();
   float m_cluslx = std::numeric_limits<float>::quiet_NaN();
   float m_cluslz = std::numeric_limits<float>::quiet_NaN();
-
+  int m_timebucketdiff = std::numeric_limits<int>::max();
+  int m_addedToTrack = std::numeric_limits<int>::max();
+  int m_ninttadded = std::numeric_limits<int>::max();
+  int m_clustimebucket = std::numeric_limits<int>::quiet_NaN();
   ActsGeometry *m_tGeometry = nullptr;
   TrackSeedContainer *m_seedContainer = nullptr;
   TrkrClusterContainer *m_clusterMap = nullptr;

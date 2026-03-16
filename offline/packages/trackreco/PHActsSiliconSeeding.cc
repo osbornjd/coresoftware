@@ -203,6 +203,7 @@ void PHActsSiliconSeeding::runSeeder()
   int circleFitTime = 0;
   int seederTime = 0;
   int spTime = 0;
+  m_seedid = 0;
   for (int strobe = m_lowStrobeIndex; strobe < m_highStrobeIndex; strobe++)
   {
     if (Verbosity() > 3)
@@ -312,8 +313,8 @@ void PHActsSiliconSeeding::makeSvtxTracksWithTime(const GridSeeds& seedVector,
 {
   int numSeeds = 0;
   int numGoodSeeds = 0;
-  m_seedid = -1;
 
+  std::cout << "Calling for strobe " << strobe << std::endl;
   for (const auto& seeds : seedVector)
   {
     /// loop over acts triplets
@@ -321,7 +322,7 @@ void PHActsSiliconSeeding::makeSvtxTracksWithTime(const GridSeeds& seedVector,
     {
       if (Verbosity() > 1)
       {
-        std::cout << "Seed " << numSeeds << " has "
+        std::cout << "Seed " << m_seedid << " has "
                   << seed.sp().size() << " measurements "
                   << std::endl;
       }
@@ -329,7 +330,6 @@ void PHActsSiliconSeeding::makeSvtxTracksWithTime(const GridSeeds& seedVector,
       if (m_seedAnalysis)
       {
         clearTreeVariables();
-        m_seedid++;
       }
 
       std::map<TrkrDefs::cluskey, Acts::Vector3> positions;
@@ -351,6 +351,7 @@ void PHActsSiliconSeeding::makeSvtxTracksWithTime(const GridSeeds& seedVector,
         positions.insert(std::make_pair(cluskey, globalPosition));
         clus_positions.push_back(globalPosition);
       }
+      m_mvtxStrobe = strobe;
       double z = seed.z() / Acts::UnitConstants::cm;
 
       auto fitTimer = std::make_unique<PHTimer>("trackfitTimer");
@@ -397,6 +398,7 @@ void PHActsSiliconSeeding::makeSvtxTracksWithTime(const GridSeeds& seedVector,
           trackSeed->set_Z0(z);
           trackSeed->set_phi(TrackSeedHelper::get_phi(trackSeed.get(), positions));
           trackSeed->set_crossing(getCrossingIntt(*trackSeed));
+          m_seedid++;
           m_seedContainer->insert(trackSeed.get());
           numGoodSeeds++;
         }
@@ -416,6 +418,7 @@ void PHActsSiliconSeeding::makeSvtxTracksWithTime(const GridSeeds& seedVector,
         trackSeed->set_phi(TrackSeedHelper::get_phi(trackSeed.get(), positions));
         trackSeed->set_crossing(SHRT_MAX);
         m_seedContainer->insert(trackSeed.get());
+        m_seedid++;
         numGoodSeeds++;
       }
     }
@@ -1082,12 +1085,14 @@ std::vector<std::vector<TrkrDefs::cluskey>> PHActsSiliconSeeding::findMatchesWit
 
   std::vector<TrkrDefs::cluskey> keys;
   std::vector<Acts::Vector3> clusters;
+  std::cout << "Processing mvtx seed " << m_seedid << std::endl;
   for (auto& [key, pos] : positions)
   {
     keys.push_back(key);
     clusters.push_back(pos);
+    std::cout << "     " << pos.transpose() << std::endl;
   }
-
+  m_ninttadded = 0;
   std::set<TrkrDefs::cluskey> layer34matches;
   std::set<TrkrDefs::cluskey> layer56matches;
   auto innerLayerMatches = iterateLayers(3, 5, strobe, keys, clusters);
@@ -1101,16 +1106,20 @@ std::vector<std::vector<TrkrDefs::cluskey>> PHActsSiliconSeeding::findMatchesWit
   {
     innerLayerMatches.push_back(keys);
   }
+  std::cout << "starting iteration to layers 5-6"<<std::endl;
+  int subseed = 0;
   for (auto& seed : innerLayerMatches)
   {
     keys.clear();
     clusters.clear();
+    std::cout << "processing subseed id " << subseed << std::endl;
     for (auto& key : seed)
     {
       keys.push_back(key);
       clusters.push_back(m_tGeometry->getGlobalPosition(
           key,
           m_clusterMap->findCluster(key)));
+          std::cout << "   with position " << clusters.back().transpose() << std::endl;
     }
     auto match = iterateLayers(5, 7, strobe, keys, clusters);
     if (Verbosity() > 1)
@@ -1179,8 +1188,8 @@ std::vector<std::vector<TrkrDefs::cluskey>> PHActsSiliconSeeding::iterateLayers(
     float layerradius = m_geomContainerIntt->GetLayerGeom(layer)->get_radius();
     if(layer < 3)
       {
-	x0 = m_mvtx_x0;
-	y0 = m_mvtx_y0;
+	      x0 = m_mvtx_x0;
+	      y0 = m_mvtx_y0;
       }
 
     float xfitradius_moved = fitpars[1] - x0;
@@ -1204,7 +1213,7 @@ std::vector<std::vector<TrkrDefs::cluskey>> PHActsSiliconSeeding::iterateLayers(
       auto surf = m_tGeometry->maps().getSiliconSurface(hitsetkey);
       auto surfcenter = surf->center(m_tGeometry->geometry().geoContext);
       float surfphi = getPhiFromBeamSpot(surfcenter.y(), surfcenter.x());
-      if(Verbosity() > 5)
+      if(Verbosity() > 500)
       {
         std::cout << "approximate phis " << approximate_phi1 << " " << approximate_phi2 << " using " << approximatephi
                   << " and surfphi " << surfphi << std::endl;
@@ -1215,7 +1224,7 @@ std::vector<std::vector<TrkrDefs::cluskey>> PHActsSiliconSeeding::iterateLayers(
       /// the size of one intt segment (256 * 80 micron strips in a segment)
       if (std::fabs(dphi) > 0.3)
       {
-        if (Verbosity() > 3)
+        if (Verbosity() > 300)
         {
           std::cout << "Skipping hitsetkey " << hitsetkey << " with dphi " << dphi << std::endl;
         }
@@ -1223,23 +1232,26 @@ std::vector<std::vector<TrkrDefs::cluskey>> PHActsSiliconSeeding::iterateLayers(
       }
 
       int timebucket = InttDefs::getTimeBucketId(hitsetkey);
+      m_timebucketdiff = std::numeric_limits<int>::max();
+
       if (layer34timebucket < std::numeric_limits<int>::max())
       {
+        m_timebucketdiff = std::abs(timebucket - layer34timebucket);
         if (std::abs(timebucket - layer34timebucket) > 1)
         {
-          if (Verbosity() > 3)
+          if (Verbosity() > 300)
           {
             std::cout << "Skipping hitsetkey " << hitsetkey << " with timebucket " << timebucket
                       << " because layer 3-4 timebucket is " << layer34timebucket << std::endl;
           }
-          continue;
+          //continue;
         }
       }
       int strobecrossinglow = (strobe + m_strobeLowWindow) * m_strobeWidth;
       int strobecrossinghigh = (strobe + m_strobeHighWindow) * m_strobeWidth;
       if (timebucket < strobecrossinglow || timebucket > strobecrossinghigh)
       {
-        if (Verbosity() > 3)
+        if (Verbosity() > 300)
         {
           std::cout << "Skipping hitsetkey " << hitsetkey << " with timebucket " << timebucket
                     << " because it is outside the strobe range " << strobecrossinglow
@@ -1247,8 +1259,12 @@ std::vector<std::vector<TrkrDefs::cluskey>> PHActsSiliconSeeding::iterateLayers(
                     << ", " << m_strobeLowWindow << ", " << m_strobeHighWindow << " for strobe " << strobe << std::endl;
 
         }
-        continue;
+        //continue;
       }
+      auto ladderphiid = InttDefs::getLadderPhiId(hitsetkey);
+      auto ladderziid = InttDefs::getLadderZId(hitsetkey);
+      auto thislayer = TrkrDefs::getLayer(hitsetkey);
+      std::cout << "BARE hitsetkey " << InttDefs::genHitSetKey(thislayer, ladderphiid, ladderziid, 0) << " and current hitsetkey " << hitsetkey << std::endl;
       auto range = m_clusterMap->getClusters(hitsetkey);
       for (auto clusIter = range.first; clusIter != range.second; ++clusIter)
       {
@@ -1265,8 +1281,11 @@ std::vector<std::vector<TrkrDefs::cluskey>> PHActsSiliconSeeding::iterateLayers(
         auto glob = m_tGeometry->getGlobalPosition(
             cluskey, cluster);
         auto intersection = TrackFitUtils::get_helix_surface_intersection(surf, fitpars, glob, m_tGeometry);
+        std::cout << "global intersection is " << intersection.transpose() << std::endl;
         auto local = (surf->transform(m_tGeometry->geometry().getGeoContext())).inverse() * (intersection * Acts::UnitConstants::cm);
         local /= Acts::UnitConstants::cm;
+        std::cout << "local intersection is " << local.transpose() << std::endl;
+        std::cout << "checking global position " << glob.transpose() << " for cluster " << cluskey << std::endl;
         m_projgx = intersection.x();
         m_projgy = intersection.y();
         m_projgr = std::sqrt(square(intersection.x()) + square(intersection.y()));
@@ -1277,6 +1296,7 @@ std::vector<std::vector<TrkrDefs::cluskey>> PHActsSiliconSeeding::iterateLayers(
         m_projgz = intersection.z();
         m_projlx = local.x();
         m_projlz = local.y();
+        m_inttlayer = layer;
         if (m_seedAnalysis)
         {
           const auto globalP = m_tGeometry->getGlobalPosition(
@@ -1291,6 +1311,15 @@ std::vector<std::vector<TrkrDefs::cluskey>> PHActsSiliconSeeding::iterateLayers(
           m_clusgz = globalP.z();
           m_cluslx = cluster->getLocalX();
           m_cluslz = cluster->getLocalY();
+       
+          if(TrkrDefs::getLayer(cluskey) > 2)
+          {
+            m_clustimebucket = InttDefs::getTimeBucketId(cluskey);
+          }
+          else
+          {
+            m_clustimebucket = std::numeric_limits<int>::quiet_NaN();
+          }
           h_nInttProj->Fill(local.x() - cluster->getLocalX(),
                             local.y() - cluster->getLocalY());
           h_hits->Fill(globalP(0), globalP(1));
@@ -1299,17 +1328,18 @@ std::vector<std::vector<TrkrDefs::cluskey>> PHActsSiliconSeeding::iterateLayers(
 
           h_resids->Fill(local.y() - cluster->getLocalY(),
                          local.x() - cluster->getLocalX());
-          m_tree->Fill();
         }
 
         /// Z strip spacing is the entire strip, so because we use fabs
         /// we divide by two
         float rphiresid = fabs(local.x() - cluster->getLocalX());
         float zresid = fabs(local.y() - cluster->getLocalY());
-       
+        m_addedToTrack = 0;
         if (rphiresid < m_inttrPhiSearchWin && zresid < m_inttzSearchWin)
 
         {
+          m_addedToTrack = 1;
+          m_ninttadded++;
           if (Verbosity() > 2)
           {
             std::cout << "matched intt cluster" << std::endl;
@@ -1342,6 +1372,11 @@ std::vector<std::vector<TrkrDefs::cluskey>> PHActsSiliconSeeding::iterateLayers(
             std::cout << "residuals are " << rphiresid << ", " << zresid << std::endl;
             std::cout << "windows are " << m_inttrPhiSearchWin << ", " << m_inttzSearchWin << std::endl;
           }
+        }
+        if (m_seedAnalysis)
+        {
+          std::cout << "filling..." << std::endl;
+          m_tree->Fill();
         }
       }
     }
@@ -1700,10 +1735,16 @@ void PHActsSiliconSeeding::createHistograms()
   m_tree->Branch("clusgr", &m_clusgr, "m_clusgr/F");
   m_tree->Branch("cluslx", &m_cluslx, "m_cluslx/F");
   m_tree->Branch("cluslz", &m_cluslz, "m_cluslz/F");
+  m_tree->Branch("inttlayer",&m_inttlayer,"m_inttlayer/I");
+  m_tree->Branch("tb", &m_clustimebucket, "m_clustimebucket/I");
   m_tree->Branch("mvtxgx", &m_mvtxgx);
   m_tree->Branch("mvtxgy", &m_mvtxgy);
   m_tree->Branch("mvtxgz", &m_mvtxgz);
   m_tree->Branch("mvtxgr", &m_mvtxgr);
+  m_tree->Branch("added",&m_addedToTrack,"m_addedToTrack/I");
+  m_tree->Branch("strobe", &m_mvtxStrobe,"m_mvtxStrobe/I");
+  m_tree->Branch("tbdiff", &m_timebucketdiff,"m_timebucketdiff/I");
+  m_tree->Branch("ninttadded", &m_ninttadded,"m_ninttadded/I");
 
   h_nMatchedClusters = new TH1F("nMatchedClusters", ";N_{matches}", 50, 0, 50);
   h_nInttProj = new TH2F("nInttProj", ";l_{0}^{proj}-l_{0}^{clus} [cm]; l_{1}^{proj}-l_{1}^{clus} [cm]",
