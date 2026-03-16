@@ -1160,7 +1160,7 @@ std::vector<std::vector<TrkrDefs::cluskey>> PHActsSiliconSeeding::iterateLayers(
 {
   std::vector<std::vector<TrkrDefs::cluskey>> inttMatches;
   auto dummypos = positions;
-  auto fitpars = TrackFitUtils::fitClusters(dummypos, keys, true);
+  auto fitpars = TrackFitUtils::fitClusters(dummypos, keys, false);
   float avgtripletx = 0;
   float avgtriplety = 0;
   for (const auto& pos : positions)
