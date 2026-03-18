@@ -314,7 +314,6 @@ void PHActsSiliconSeeding::makeSvtxTracksWithTime(const GridSeeds& seedVector,
   int numSeeds = 0;
   int numGoodSeeds = 0;
 
-  std::cout << "Calling for strobe " << strobe << std::endl;
   for (const auto& seeds : seedVector)
   {
     /// loop over acts triplets
@@ -386,12 +385,26 @@ void PHActsSiliconSeeding::makeSvtxTracksWithTime(const GridSeeds& seedVector,
             const auto& cluskey = mvtx_clus->Id();
             trackSeed->insert_cluster_key(cluskey);
           }
+          m_ninttadded = 0;
           for (auto& intt_clus : intt_clus_vec)
           {
             trackSeed->insert_cluster_key(intt_clus);
+            if(TrkrDefs::getTrkrId(intt_clus) == TrkrDefs::TrkrId::inttId)
+            {
+              auto inttpos = m_tGeometry->getGlobalPosition(
+                  intt_clus,
+                  m_clusterMap->findCluster(intt_clus));
+              m_mvtxgx.push_back(inttpos.x());
+              m_mvtxgy.push_back(inttpos.y());
+              m_mvtxgz.push_back(inttpos.z());
+              m_ninttadded++;
+            }
             positions.insert(std::make_pair(intt_clus, m_tGeometry->getGlobalPosition(
                                                            intt_clus,
                                                            m_clusterMap->findCluster(intt_clus))));
+          }
+          if(m_seedAnalysis){
+          m_seedstree->Fill();
           }
           TrackSeedHelper::circleFitByTaubin(trackSeed.get(), positions, 0, 7);
           TrackSeedHelper::lineFit(trackSeed.get(), positions, 0, 2);
@@ -1085,12 +1098,10 @@ std::vector<std::vector<TrkrDefs::cluskey>> PHActsSiliconSeeding::findMatchesWit
 
   std::vector<TrkrDefs::cluskey> keys;
   std::vector<Acts::Vector3> clusters;
-  std::cout << "Processing mvtx seed " << m_seedid << std::endl;
   for (auto& [key, pos] : positions)
   {
     keys.push_back(key);
     clusters.push_back(pos);
-    std::cout << "     " << pos.transpose() << std::endl;
   }
   m_ninttadded = 0;
   std::set<TrkrDefs::cluskey> layer34matches;
@@ -1104,23 +1115,22 @@ std::vector<std::vector<TrkrDefs::cluskey>> PHActsSiliconSeeding::findMatchesWit
   }
   if (innerLayerMatches.empty())
   {
+    std::cout << "inner layer matches empty" << std::endl;
     innerLayerMatches.push_back(keys);
   }
-  std::cout << "starting iteration to layers 5-6"<<std::endl;
-  int subseed = 0;
+
   for (auto& seed : innerLayerMatches)
   {
     keys.clear();
     clusters.clear();
-    std::cout << "processing subseed id " << subseed << std::endl;
     for (auto& key : seed)
     {
       keys.push_back(key);
       clusters.push_back(m_tGeometry->getGlobalPosition(
           key,
           m_clusterMap->findCluster(key)));
-          std::cout << "   with position " << clusters.back().transpose() << std::endl;
     }
+    std::cout << "iterating layer 57"<<std::endl;
     auto match = iterateLayers(5, 7, strobe, keys, clusters);
     if (Verbosity() > 1)
     {
@@ -1140,6 +1150,8 @@ std::vector<std::vector<TrkrDefs::cluskey>> PHActsSiliconSeeding::findMatchesWit
   if (Verbosity() > 2)
   {
     std::cout << "intt matches size " << inttMatches.size() << std::endl;
+    std::cout << "Event is " << m_event << std::endl;
+    std::cout << "seed id is " << m_seedid << std::endl;
     std::cout << "the matches are " << std::endl;
     for (auto& matchvec : inttMatches)
     {
@@ -1261,10 +1273,7 @@ std::vector<std::vector<TrkrDefs::cluskey>> PHActsSiliconSeeding::iterateLayers(
         }
         //continue;
       }
-      auto ladderphiid = InttDefs::getLadderPhiId(hitsetkey);
-      auto ladderziid = InttDefs::getLadderZId(hitsetkey);
-      auto thislayer = TrkrDefs::getLayer(hitsetkey);
-      std::cout << "BARE hitsetkey " << InttDefs::genHitSetKey(thislayer, ladderphiid, ladderziid, 0) << " and current hitsetkey " << hitsetkey << std::endl;
+
       auto range = m_clusterMap->getClusters(hitsetkey);
       for (auto clusIter = range.first; clusIter != range.second; ++clusIter)
       {
@@ -1281,11 +1290,9 @@ std::vector<std::vector<TrkrDefs::cluskey>> PHActsSiliconSeeding::iterateLayers(
         auto glob = m_tGeometry->getGlobalPosition(
             cluskey, cluster);
         auto intersection = TrackFitUtils::get_helix_surface_intersection(surf, fitpars, glob, m_tGeometry);
-        std::cout << "global intersection is " << intersection.transpose() << std::endl;
         auto local = (surf->transform(m_tGeometry->geometry().getGeoContext())).inverse() * (intersection * Acts::UnitConstants::cm);
         local /= Acts::UnitConstants::cm;
-        std::cout << "local intersection is " << local.transpose() << std::endl;
-        std::cout << "checking global position " << glob.transpose() << " for cluster " << cluskey << std::endl;
+        std::cout << "   intersection is " << intersection.transpose() << std::endl;
         m_projgx = intersection.x();
         m_projgy = intersection.y();
         m_projgr = std::sqrt(square(intersection.x()) + square(intersection.y()));
@@ -1368,14 +1375,13 @@ std::vector<std::vector<TrkrDefs::cluskey>> PHActsSiliconSeeding::iterateLayers(
         {
           if (Verbosity() > 3)
           {
-            std::cout << "there are no matched intt clusters in this hitsetkey" << std::endl;
+            std::cout << "there are no matched intt clusters in hitsetkey " << hitsetkey << std::endl;
             std::cout << "residuals are " << rphiresid << ", " << zresid << std::endl;
             std::cout << "windows are " << m_inttrPhiSearchWin << ", " << m_inttzSearchWin << std::endl;
           }
         }
         if (m_seedAnalysis)
         {
-          std::cout << "filling..." << std::endl;
           m_tree->Fill();
         }
       }
@@ -1390,11 +1396,14 @@ SpacePointPtr PHActsSiliconSeeding::makeSpacePoint(
 {
   Acts::Vector2 localPos(clus->getLocalX() * Acts::UnitConstants::cm,
                          clus->getLocalY() * Acts::UnitConstants::cm);
-  Acts::Vector3 globalPos(0, 0, 0);
-  Acts::Vector3 mom(1, 1, 1);
-  globalPos = surf->localToGlobal(m_tGeometry->geometry().getGeoContext(),
-                                  localPos, mom);
+  auto globalPos = m_tGeometry->getGlobalPosition(
+      key,
+      m_clusterMap->findCluster(key));
+  Acts::Vector3 mo(1, 1, 1);
+  Acts::Vector3 oglobalPos = surf->localToGlobal(m_tGeometry->geometry().getGeoContext(),
+                                   localPos, mo);
 
+  std::cout << oglobalPos.transpose() << "          " << globalPos.transpose() << std::endl;
   Acts::SquareMatrix2 localCov = Acts::SquareMatrix2::Zero();
   localCov(0, 0) = pow(clus->getRPhiError(), 2) * Acts::UnitConstants::cm2;
   localCov(1, 1) = pow(clus->getZError(), 2) * Acts::UnitConstants::cm2;
@@ -1414,7 +1423,7 @@ SpacePointPtr PHActsSiliconSeeding::makeSpacePoint(
   /// dr/d{x,y} = (1 / sqrt(x² + y²)) * 2 * {x,y}
   ///             = 2 * {x,y} / r
   ///       dz/dz = 1
-
+  Acts::Vector3 mom(1,1,1);
   Acts::RotationMatrix3 rotLocalToGlobal =
       surf->referenceFrame(m_tGeometry->geometry().getGeoContext(), globalPos, mom);
   auto scale = 2 / std::hypot(x, y);
@@ -1680,6 +1689,7 @@ int PHActsSiliconSeeding::createNodes(PHCompositeNode* topNode)
 void PHActsSiliconSeeding::writeHistograms()
 {
   m_file->cd();
+  m_seedstree->Write();
   h_nInttProj->Write();
   h_nMatchedClusters->Write();
   h_nMvtxHits->Write();
@@ -1720,6 +1730,15 @@ void PHActsSiliconSeeding::clearTreeVariables()
 }
 void PHActsSiliconSeeding::createHistograms()
 {
+  m_seedstree = new TTree("finalseeds", "final seeds tree");
+  m_seedstree->Branch("seedid", &m_seedid, "m_seedid/I");
+  m_seedstree->Branch("event", &m_event, "m_event/I");
+  m_seedstree->Branch("mvtxgx", &m_mvtxgx);
+  m_seedstree->Branch("mvtxgy", &m_mvtxgy);
+  m_seedstree->Branch("mvtxgz", &m_mvtxgz);
+  m_seedstree->Branch("mvtxgr", &m_mvtxgr);
+  m_seedstree->Branch("ninttadded", &m_ninttadded, "m_ninttadded/I");
+
   m_tree = new TTree("seeds", "seed tree");
   m_tree->Branch("seedid", &m_seedid, "m_seedid/I");
   m_tree->Branch("event", &m_event, "m_event/I");

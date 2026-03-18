@@ -262,11 +262,13 @@ class PHActsSiliconSeeding : public SubsysReco
 
   TrkrClusterCrossingAssoc *_cluster_crossing_map = nullptr;
   TTree *m_tree = nullptr;
+  TTree *m_seedstree = nullptr;
   int m_seedid = std::numeric_limits<int>::quiet_NaN();
   std::vector<float> m_mvtxgx = {};
   std::vector<float> m_mvtxgy = {};
   std::vector<float> m_mvtxgz = {};
   std::vector<float> m_mvtxgr = {};
+
   int m_mvtxStrobe = std::numeric_limits<int>::max();
   float m_projgx = std::numeric_limits<float>::quiet_NaN();
   float m_projgy = std::numeric_limits<float>::quiet_NaN();
