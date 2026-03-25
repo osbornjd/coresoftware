@@ -1399,11 +1399,8 @@ SpacePointPtr PHActsSiliconSeeding::makeSpacePoint(
   auto globalPos = m_tGeometry->getGlobalPosition(
       key,
       m_clusterMap->findCluster(key));
-  Acts::Vector3 mo(1, 1, 1);
-  Acts::Vector3 oglobalPos = surf->localToGlobal(m_tGeometry->geometry().getGeoContext(),
-                                   localPos, mo);
+  globalPos *= Acts::UnitConstants::cm;
 
-  std::cout << oglobalPos.transpose() << "          " << globalPos.transpose() << std::endl;
   Acts::SquareMatrix2 localCov = Acts::SquareMatrix2::Zero();
   localCov(0, 0) = pow(clus->getRPhiError(), 2) * Acts::UnitConstants::cm2;
   localCov(1, 1) = pow(clus->getZError(), 2) * Acts::UnitConstants::cm2;
