@@ -198,7 +198,8 @@ void TrackResiduals::clearClusterStateVectors()
   m_clusAdc.clear();
   m_clusMaxAdc.clear();
   m_cluslayer.clear();
-
+  m_clustimebucket.clear();
+  m_clusstrobe.clear();
   m_statelx.clear();
   m_statelz.clear();
   m_stateelx.clear();
@@ -325,15 +326,15 @@ int TrackResiduals::process_event(PHCompositeNode* topNode)
   {
     fillResidualTreeKF(topNode);
   }
-
-  if (m_doVertex)
-  {
-    fillVertexTree(topNode);
-  }
   if (m_doEventTree)
   {
     fillEventTree(topNode);
   }
+  if (m_doVertex)
+  {
+    fillVertexTree(topNode);
+  }
+  
   m_event++;
   clearClusterStateVectors();
   return Fun4AllReturnCodes::EVENT_OK;
@@ -1163,7 +1164,21 @@ void TrackResiduals::fillClusterBranchesKF(TrkrDefs::cluskey ckey, SvtxTrack* tr
   m_cluslayer.push_back(TrkrDefs::getLayer(ckey));
   m_clusphisize.push_back(cluster->getPhiSize());
   m_cluszsize.push_back(cluster->getZSize());
-
+  if(TrkrDefs::getLayer(ckey)<3)
+  {
+    m_clusstrobe.push_back(MvtxDefs::getStrobeId(ckey));
+  }
+  else{
+    m_clusstrobe.push_back(std::numeric_limits<int>::max());
+  }
+  if(TrkrDefs::getLayer(ckey)>2 && TrkrDefs::getLayer(ckey) < 7)
+  {
+    m_clustimebucket.push_back(InttDefs::getTimeBucketId(ckey));
+  }
+  else
+  {
+    m_clustimebucket.push_back(std::numeric_limits<int>::max());
+  }
   auto misaligncenter = surf->center(geometry->geometry().getGeoContext());
   auto misalignnorm = -1 * surf->normal(geometry->geometry().getGeoContext(), Acts::Vector3(1, 1, 1), Acts::Vector3(1, 1, 1));
   auto misrot = surf->transform(geometry->geometry().getGeoContext()).rotation();
@@ -1620,6 +1635,7 @@ void TrackResiduals::createBranches()
     m_eventtree->Branch("ntracks", &m_ntracks_all, "m_ntracks_all/I");
     m_eventtree->Branch("mbdcharge",&m_totalmbd, "m_totalmbd/F");
     m_eventtree->Branch("ntpcClusSector", &m_ntpc_clus_sector);
+    m_eventtree->Branch("nInttDoubletSeed", &m_ngoodsilseed, "m_ngoodsilseed/I");
   }
 
   m_failedfits = new TTree("failedfits", "tree with seeds from failed Acts fits");
@@ -1670,6 +1686,16 @@ void TrackResiduals::createBranches()
   m_vertextree->Branch("gz", &m_clusgz);
   m_vertextree->Branch("gr", &m_clusgr);
   m_vertextree->Branch("mbdcharge", &m_totalmbd, "m_totalmbd/F");
+  m_vertextree->Branch("nInttDoubletSeed", &m_ngoodsilseed, "m_ngoodsilseed/I");
+  m_vertextree->Branch("nmvtx", &m_nmvtx_all, "m_nmvtx_all/I");
+  m_vertextree->Branch("nintt", &m_nintt_all, "m_nintt_all/I");
+  m_vertextree->Branch("nhittpc0", &m_ntpc_hits0, "m_ntpc_hits0/I");
+  m_vertextree->Branch("nhittpc1", &m_ntpc_hits1, "m_ntpc_hits1/I");
+  m_vertextree->Branch("nclustpc0", &m_ntpc_clus0, "m_ntpc_clus0/I");
+  m_vertextree->Branch("nclustpc1", &m_ntpc_clus1, "m_ntpc_clus1/I");
+  m_vertextree->Branch("nmms", &m_nmms_all, "m_nmms_all/I");
+  m_vertextree->Branch("nsiseed", &m_nsiseed, "m_nsiseed/I");
+  m_vertextree->Branch("ntpcseed", &m_ntpcseed, "m_ntpcseed/I");
 
   m_hittree = new TTree("hittree", "A tree with all hits");
   m_hittree->Branch("run", &m_runnumber, "m_runnumber/I");
@@ -1805,7 +1831,8 @@ void TrackResiduals::createBranches()
   m_tree->Branch("Y0", &m_Y0, "m_Y0/F");
   m_tree->Branch("dcaxy", &m_dcaxy, "m_dcaxy/F");
   m_tree->Branch("dcaz", &m_dcaz, "m_dcaz/F");
-
+  m_tree->Branch("clusstrobe", &m_clusstrobe);
+  m_tree->Branch("clustimebucket",&m_clustimebucket);
   m_tree->Branch("cluslayer", &m_cluslayer);
   m_tree->Branch("clusstave", &m_clstave);
   m_tree->Branch("cluschip", &m_clchip);
@@ -2162,10 +2189,48 @@ void TrackResiduals::fillEventTree(PHCompositeNode* topNode)
   m_nmms_all = 0;
   m_nsiseed = 0;
   m_ntpcseed = 0;
+  m_ngoodsilseed = 0;
+  std::map<int, int> strobeclusmap;
+  for(int i=-5; i<5; i++)
+  {
+    strobeclusmap[i] = 0;
+  }
   m_ntpc_clus_sector.resize(24, 0);
+  if(silseedmap){
   m_nsiseed = silseedmap->size();
+  for(const auto& seed : *silseedmap)
+  {
+    auto keys = TrackAnalysisUtils::get_cluster_keys(seed);
+    int nm = 0;
+    int ni = 0;
+    for (const auto& key : keys)
+    {
+      if(TrkrDefs::getTrkrId(key) == TrkrDefs::TrkrId::mvtxId)
+      {
+        nm++;
+        int strobe = MvtxDefs::getStrobeId(key);
+        if(strobe >= -5 && strobe < 5)
+        {
+          strobeclusmap[strobe]++;
+        }
+      }
+      else if(TrkrDefs::getTrkrId(key) == TrkrDefs::TrkrId::inttId)
+      {
+        ni++;
+      }
+    }
+    if(nm>1 && ni > 1)
+    {
+      m_ngoodsilseed++;
+   }
+  }
+  }
+  if(tpcseedmap){
   m_ntpcseed = tpcseedmap->size();
+  }
+  if(trackmap){
   m_ntracks_all = trackmap->size();
+  }
 
   // Hits
   if (m_doHits)
@@ -2232,7 +2297,7 @@ void TrackResiduals::fillEventTree(PHCompositeNode* topNode)
   }
   if (m_doEventTree)
   {
-    if (Verbosity() > 1)
+    if (Verbosity() > 0 )
     {
       std::cout << " m_event:" << m_event << std::endl;
       std::cout << " m_ntpc_clus0:" << m_ntpc_clus0 << std::endl;
@@ -2240,6 +2305,10 @@ void TrackResiduals::fillEventTree(PHCompositeNode* topNode)
       std::cout << " m_nmvtx_all:" << m_nmvtx_all << std::endl;
       std::cout << " m_nintt_all: " << m_nintt_all << std::endl;
       std::cout << " m_nmms_all: " << m_nmms_all << std::endl;
+      for(const auto& [strobe, nclus] : strobeclusmap)
+      {
+        std::cout << " strobe: " << strobe << " nclus: " << nclus << std::endl;
+      }
     }
     m_eventtree->Fill();
   }

@@ -267,6 +267,7 @@ class TrackResiduals : public SubsysReco
   int m_segtype = std::numeric_limits<int>::quiet_NaN();
   int m_tileid = std::numeric_limits<int>::quiet_NaN();
 
+int m_ngoodsilseed = std::numeric_limits<int>::quiet_NaN();
   //! clusters on track information
   std::vector<float> m_clusAdc;
   std::vector<float> m_clusMaxAdc;
@@ -293,6 +294,8 @@ class TrackResiduals : public SubsysReco
   std::vector<int> m_clusedge;
   std::vector<int> m_clusoverlap;
   std::vector<uint64_t> m_cluskeys;
+  std::vector<int> m_clusstrobe;
+  std::vector<int> m_clustimebucket;
   std::vector<float> m_idealsurfcenterx;
   std::vector<float> m_idealsurfcentery;
   std::vector<float> m_idealsurfcenterz;
