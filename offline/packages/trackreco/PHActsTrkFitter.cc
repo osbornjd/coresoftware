@@ -715,7 +715,6 @@ void PHActsTrkFitter::loopTracks(Acts::Logging::Level logLevel)
 
         // get surfaces matching source links
         const auto surfaces_tmp = getSurfaceVector(sourceLinks);
-
         // skip if there is no surfaces
         if (surfaces_tmp.empty())
         {
@@ -731,6 +730,7 @@ void PHActsTrkFitter::loopTracks(Acts::Logging::Level logLevel)
               continue;
             }
           }
+
           //else if (m_forceTpcOnlyFit)
           //{
           //  if (surface_apr->geometryId().volume() < 14)
@@ -739,6 +739,17 @@ void PHActsTrkFitter::loopTracks(Acts::Logging::Level logLevel)
           //  }
           //}
           bool pop_flag = false;
+          if(Verbosity()>4)
+          {
+          std::cout << " check approach" << std::endl;
+          std::cout << "surface_apr->geometryId() " << surface_apr->geometryId() << std::endl;
+          std::cout << "surface_apr->geometryId().boundary() " << surface_apr->geometryId().boundary() << std::endl;
+          std::cout << "surface_apr->geometryId().sensitive() " << surface_apr->geometryId().sensitive() << std::endl;
+          std::cout << "surface_apr->geometryId().approach() " << surface_apr->geometryId().approach() << std::endl;
+          std::cout << "surface center " << surface_apr->center(m_tGeometry->geometry().geoContext).transpose() << std::endl;
+          surface_apr->toStream(m_tGeometry->geometry().geoContext);
+          std::cout << "surfaces size " << surfaces.size() << std::endl;
+          }
           if (surface_apr->geometryId().approach() == 1)
           {
             surfaces.push_back(surface_apr);
@@ -746,6 +757,10 @@ void PHActsTrkFitter::loopTracks(Acts::Logging::Level logLevel)
           else
           {
             pop_flag = true;
+            if(surface_apr->geometryId().approach() == 0 && surface_apr->geometryId().sensitive() == 0)
+            {
+              continue;
+            }
             for (const auto& surface_sns : surfaces_tmp)
             {
               if (surface_apr->geometryId().volume() == surface_sns->geometryId().volume())
@@ -766,16 +781,6 @@ void PHActsTrkFitter::loopTracks(Acts::Logging::Level logLevel)
               surfaces.pop_back();
               pop_flag = false;
             }
-            if (surface_apr->geometryId().volume() == 12 && surface_apr->geometryId().layer() == 8)
-            {
-              for (const auto& surface_sns : surfaces_tmp)
-              {
-                if (14 == surface_sns->geometryId().volume())
-                {
-                  surfaces.push_back(surface_sns);
-                }
-              }
-            }
           }
         }
         // With an empty ACTS material map, m_materialSurfaces is empty.
@@ -784,10 +789,10 @@ void PHActsTrkFitter::loopTracks(Acts::Logging::Level logLevel)
         {
           surfaces = surfaces_tmp;
         }
-
         checkSurfaceVec(surfaces);
         if (Verbosity() > 1)
         {
+          std::cout << "final surfaces size " << surfaces.size() << std::endl;
           for (const auto& surf : surfaces)
           {
             std::cout << "Surface vector : " << surf->geometryId() << std::endl;
