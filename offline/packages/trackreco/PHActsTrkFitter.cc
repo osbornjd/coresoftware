@@ -780,7 +780,7 @@ void PHActsTrkFitter::loopTracks(Acts::Logging::Level logLevel)
             {
               surfaces.pop_back();
               pop_flag = false;
-            }
+            }  
           }
         }
         // With an empty ACTS material map, m_materialSurfaces is empty.
@@ -789,6 +789,16 @@ void PHActsTrkFitter::loopTracks(Acts::Logging::Level logLevel)
         {
           surfaces = surfaces_tmp;
         }
+        SurfacePtrVec finalsurfaces;
+        for(const auto& surf : surfaces)
+        {
+          if (surf->geometryId().volume()==14 && (surf->geometryId().approach() == 1 || surf->geometryId().approach()==2))
+          {
+            continue;
+          }
+          finalsurfaces.push_back(surf);
+        }
+        surfaces = finalsurfaces;
         checkSurfaceVec(surfaces);
         if (Verbosity() > 1)
         {
