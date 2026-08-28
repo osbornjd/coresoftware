@@ -27,6 +27,7 @@ pkginclude_HEADERS = \
   TrackSeed_v2.h \
   SvtxTrackSeed_v1.h \
   SvtxTrackSeed_v2.h \
+  SvtxTrackSeed_v3.h \
   TrackSeed_FastSim_v1.h \
   TrackSeed_FastSim_v2.h \
   TrackSeedContainer.h \
@@ -41,6 +42,7 @@ pkginclude_HEADERS = \
   SvtxTrack_v2.h \
   SvtxTrack_v3.h \
   SvtxTrack_v4.h \
+  SvtxTrack_v5.h \
   SvtxTrack_FastSim.h \
   SvtxTrack_FastSim_v1.h \
   SvtxTrack_FastSim_v2.h \
@@ -79,6 +81,7 @@ ROOTDICTS = \
   TrackSeed_v2_Dict.cc \
   SvtxTrackSeed_v1_Dict.cc \
   SvtxTrackSeed_v2_Dict.cc \
+  SvtxTrackSeed_v3_Dict.cc \
   TrackSeed_FastSim_v1_Dict.cc \
   TrackSeed_FastSim_v2_Dict.cc \
   TrackSeedContainer_Dict.cc \
@@ -98,6 +101,7 @@ ROOTDICTS = \
   SvtxTrack_v2_Dict.cc \
   SvtxTrack_v3_Dict.cc \
   SvtxTrack_v4_Dict.cc \
+  SvtxTrack_v5_Dict.cc \
   SvtxTrack_FastSim_Dict.cc \
   SvtxTrack_FastSim_v1_Dict.cc \
   SvtxTrack_FastSim_v2_Dict.cc \
@@ -140,6 +144,7 @@ libtrackbase_historic_io_la_SOURCES = \
   TrackSeed_v2.cc \
   SvtxTrackSeed_v1.cc \
   SvtxTrackSeed_v2.cc \
+  SvtxTrackSeed_v3.cc \
   TrackSeed_FastSim_v1.cc \
   TrackSeed_FastSim_v2.cc \
   TrackSeedContainer.cc \
@@ -158,6 +163,7 @@ libtrackbase_historic_io_la_SOURCES = \
   SvtxTrack_v2.cc \
   SvtxTrack_v3.cc \
   SvtxTrack_v4.cc \
+  SvtxTrack_v5.cc \
   SvtxTrack_FastSim.cc \
   SvtxTrack_FastSim_v1.cc \
   SvtxTrack_FastSim_v2.cc \

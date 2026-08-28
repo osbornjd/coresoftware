@@ -3,12 +3,13 @@
 
 #include <fun4all/SubsysReco.h>
 
-#include <array>
-#include <numbers>
-#include <string>
-
 #include <TRotation.h>
 #include <TVector3.h>
+
+#include <array>
+#include <cstddef>
+#include <numbers>
+#include <string>
 
 class CDBTTree;
 class PHField3DCartesian;
@@ -76,6 +77,8 @@ class PHGarfield : public SubsysReco
   double GetSpaceChargeScaleSide0() const { return m_spaceChargeScale_side0; }
   double GetSpaceChargeScaleSide1() const { return m_spaceChargeScale_side1; }
 
+  void SetZeroField(bool zerofield) { m_zerofield = zerofield; }
+
  private:
   void GetMagneticFieldTesla(double x_cm, double y_cm, double z_cm, double &bx_t, double &by_t, double &bz_t) const;      // Feeds magnetic field to Garfield
   void GetElectricFieldVcm(double x_cm, double y_cm, double z_cm, double &ex_vcm, double &ey_vcm, double &ez_vcm) const;  // Feeds electric field to Garfield
@@ -93,7 +96,7 @@ class PHGarfield : public SubsysReco
   PHField3DCartesian *m_field{nullptr};           // The standard sPHENIX field holding container.
   Garfield::ComponentUser *m_component{nullptr};  // This handles the interface of the electric and magnetic fields as handed to Garfield
   Garfield::MediumMagboltz *m_gas{nullptr};       // This is the pre-tabulated gas properties required by Garfield...
-  std::string m_defaultGasfile;
+  std::string m_defaultGasfile {"/cvmfs/sphenix.sdcc.bnl.gov/files/gasfiles"};
   bool m_GasFilesLoaded{false};
 
   // Transform convention:
@@ -111,6 +114,7 @@ class PHGarfield : public SubsysReco
   double m_spaceChargeScale_side0{1.0};  // south, z < 0
   double m_spaceChargeScale_side1{1.0};  // north, z > 0
   double m_CMVoltageDefault{432.8};      // V/cm, nominal TPC field
+  bool m_zerofield{false};
   TH2 *m_erCorrection{nullptr};          // radial correction, input bins in V/m
   TH2 *m_ezCorrection{nullptr};          // local longitudinal correction, input bins in V/m
 
