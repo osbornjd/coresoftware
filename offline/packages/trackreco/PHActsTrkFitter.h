@@ -40,7 +40,6 @@ class TrackSeed;
 class TrackSeedContainer;
 class TrkrClusterContainer;
 class SvtxAlignmentStateMap;
-class PHG4TpcGeomContainer;
 class PHCompositeNode;
 
 using SourceLink = ActsSourceLink;
@@ -85,6 +84,10 @@ class PHActsTrkFitter : public SubsysReco
   void forceSiOnlyFit(bool forceSiOnlyFit)
   {
     m_forceSiOnlyFit = forceSiOnlyFit;
+  }
+  void forceSiOnlyFitTpcSeedPT()
+  {
+    m_siOnlyTpcSeedPt = true;
   }
 
   /// FOR ALIGNMENT STUDIES ONLY, USE AT OWN RISK. With direct navigation, force a fit with only tpc hits and a full
@@ -241,6 +244,7 @@ class PHActsTrkFitter : public SubsysReco
   /// Acts::DirectedNavigator with a list of sorted silicon+MM surfaces
   bool m_fitSiliconMMs = false;
   bool m_forceSiOnlyFit = false;
+  bool m_siOnlyTpcSeedPt = false;
   bool m_forceTpcOnlyFit = false;
 
   /// requires micromegas present when fitting silicon-MM surfaces
@@ -313,8 +317,6 @@ class PHActsTrkFitter : public SubsysReco
   bool m_commissioning = false;
 
   bool m_enable_crossing_estimate = false;
-
-  PHG4TpcGeomContainer* _tpccellgeo = nullptr;
 
   /// Variables for doing event time execution analysis
   bool m_timeAnalysis = false;

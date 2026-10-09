@@ -32,8 +32,6 @@
 #include <trackbase_historic/TrackSeedContainer.h>
 #include <trackbase_historic/TrackSeedHelper.h>
 
-#include <g4detectors/PHG4TpcGeomContainer.h>
-
 #include <micromegas/MicromegasDefs.h>
 
 #include <ffamodules/CDBInterface.h>
@@ -334,13 +332,6 @@ int PHActsTrkFitter::InitRun(PHCompositeNode* topNode)
     m_evaluator->verbosity(Verbosity());
   }
 
-  _tpccellgeo = findNode::getClass<PHG4TpcGeomContainer>(topNode, "TPCGEOMCONTAINER");
-  if (!_tpccellgeo)
-  {
-    std::cout << PHWHERE << " unable to find DST node TPCGEOMCONTAINER" << std::endl;
-    return Fun4AllReturnCodes::ABORTRUN;
-  }
-
   _topNode = topNode;
 
   if (Verbosity() > 1)
@@ -464,7 +455,7 @@ void PHActsTrkFitter::loopTracks(Acts::Logging::Level logLevel)
     {
       continue;
     }
-    
+
     unsigned int tpcid = track->get_tpc_seed_index();
     unsigned int siid = track->get_silicon_seed_index();
     auto *siseed = m_siliconSeeds->get(siid);
@@ -478,7 +469,7 @@ void PHActsTrkFitter::loopTracks(Acts::Logging::Level logLevel)
 		      << " tpc crossing " << tpcseed->get_crossing()
 		      << " best crossing " << best_crossing << " crossing estimate " << track->get_crossing_estimate() << std::endl;
 	  }
-    
+
     // capture the input crossing value, and set crossing parameters
     //==============================
 
@@ -508,14 +499,14 @@ void PHActsTrkFitter::loopTracks(Acts::Logging::Level logLevel)
 
     // no path forward in this case, move on
     if(crossing == SHRT_MAX && crossing_estimate == SHRT_MAX) { continue; }
-	
+
     /// Need to also check that the tpc seed wasn't removed by the ghost finder
     if (!tpcseed)
     {
       std::cout << "no tpc seed" << std::endl;
       continue;
     }
-	
+
     if (Verbosity() > 0)
       {
 	if (siseed)
@@ -572,7 +563,7 @@ void PHActsTrkFitter::loopTracks(Acts::Logging::Level logLevel)
       }
       crossing_estimate = crossing;
     }
-	
+
     // Fit this track assuming either:
     //    crossing = best crossing value, if it exists (uses nvary = 0)
     //    crossing = crossing_estimate +/- max_bunch_search, if no INTT value exists and m_enable_crossing_estimate flag is set.
@@ -591,7 +582,7 @@ void PHActsTrkFitter::loopTracks(Acts::Logging::Level logLevel)
       SourceLinkVec sourceLinks;
 
       MakeSourceLinks makeSourceLinks;
-      makeSourceLinks.initialize(_tpccellgeo, m_tGeometry, _topNode);
+      makeSourceLinks.initialize(m_tGeometry, _topNode);
       makeSourceLinks.setVerbosity(Verbosity());
       makeSourceLinks.set_pp_mode(m_pp_mode);
       makeSourceLinks.set_cluster_edge_rejection(m_cluster_edge_rejection);
@@ -618,7 +609,8 @@ void PHActsTrkFitter::loopTracks(Acts::Logging::Level logLevel)
               m_clusterContainer,
               m_tGeometry,
               m_globalPositionWrapper,
-              this_crossing);
+              this_crossing, 
+              !m_forceSiOnlyFit); //for alignment tests, if forceSiOnlyFit is true, then we want to turn off the parametrized cluster errors when building source links
         }
 
         // tpc source links
@@ -1309,8 +1301,8 @@ void PHActsTrkFitter::updateSvtxTrack(
   track->set_z(params.position(m_transient_geocontext)(2) / Acts::UnitConstants::cm);
 
   auto* seed = track->get_tpc_seed();
-
-  if(!m_forceSiOnlyFit)
+  
+  if(!m_forceSiOnlyFit || !m_siOnlyTpcSeedPt)
   {
     track->set_px(params.momentum()(0));
     track->set_py(params.momentum()(1));
